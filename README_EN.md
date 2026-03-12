@@ -1,6 +1,6 @@
 <div align="center">
 
-  # 🤖 AutoResearch
+  # 🧪 ProjectEvolve
 
   ### **Autonomous AI-Powered Research and Project Improvement System**
 
@@ -28,7 +28,7 @@
 
 **Original karpathy/autoresearch** — AI agent researches neural network training (nanochat), modifying only `train.py` with a single `val_bpb` metric.
 
-**AutoResearch** — extends this idea to **any project**:
+**ProjectEvolve** — extends this idea to **any project**:
 - Any programming language (Python, JavaScript, Go, Rust, ...)
 - Any task types (backend, frontend, DevOps, documentation, ...)
 - Any files and directories (full freedom of action)
@@ -41,9 +41,9 @@
 
 ## 📖 Overview
 
-**AutoResearch** is a universal tool for running an AI agent on any project. The agent autonomously analyzes code, proposes improvements, makes changes, and learns from previous experiments.
+**ProjectEvolve** is a universal tool for running an AI agent on any project. The agent autonomously analyzes code, proposes improvements, makes changes, and learns from previous experiments.
 
-### What AutoResearch Does?
+### What ProjectEvolve Does?
 
 1. **Analyzes** — studies project structure, code, documentation
 2. **Proposes** — generates improvement ideas
@@ -56,9 +56,9 @@
 
 ## 📖 Overview
 
-**AutoResearch** is a universal tool for running an AI agent on any project to autonomously research, improve, and evolve the codebase.
+**ProjectEvolve** is a universal tool for running an AI agent on any project to autonomously research, improve, and evolve the codebase.
 
-### 🎯 Why AutoResearch?
+### 🎯 Why ProjectEvolve?
 
 - **🔄 Autonomous experiments** — AI independently analyzes, proposes, and implements improvements
 - **📚 Knowledge accumulation** — each iteration sees previous results, building project knowledge
@@ -70,7 +70,7 @@
 
 ```
 ┌─────────────────┐      ┌──────────────┐      ┌─────────────┐
-│  Your Project   │─────▶│  AutoResearch│─────▶│  AI Agent   │
+│  Your Project   │─────▶│ ProjectEvolve│─────▶│  AI Agent   │
 │  (any language) │      │  (script)    │      │  (Claude)   │
 └─────────────────┘      └──────────────┘      └─────────────┘
                                 │                      │
@@ -108,7 +108,7 @@
 
 > **See:** `INSTALL.md` — this is the instruction for AI agent on cross-platform setup.
 
-### Step 2️⃣: Run AutoResearch
+### Step 2️⃣: Run ProjectEvolve
 
 After environment setup, run the script:
 
