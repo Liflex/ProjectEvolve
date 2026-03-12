@@ -252,3 +252,111 @@ npm install -g @anthropic-ai/claude-code
 ```bash
 pip install pyyaml
 ```
+
+---
+
+## Изолированный запуск на других проектах
+
+### Важно: Полная изоляция
+
+AutoResearch работает **изолированно** от самого проекта autoresearch. Все файлы создаются в **целевом проекте**.
+
+### Структура файлов в целевом проекте
+
+```
+your-project/                          # Целевой проект (например, bybittrader)
+├── .autoresearch/                     # Создаётся AutoResearch
+│   ├── experiments/
+│   │   ├── prompt_1.md               # Промпт для эксперимента 1
+│   │   ├── output_1.md               # Ответ AI агента
+│   │   ├── prompt_2.md               # Промпт для эксперимента 2
+│   │   ├── output_2.md               # Ответ AI агента
+│   │   ├── last_experiment.md        # Последний эксперимент
+│   │   ├── accumulation_context.md   # Полная история
+│   │   └── summary.json              # Все результаты
+│   ├── logs/
+│   │   └── autoresearch.log          # Логи выполнения
+│   └── .autoresearch.json            # Конфигурация проекта
+├── .claude/
+│   └── memory/
+│       ├── lessons.md                # Уроки (с метками приоритета)
+│       ├── patterns.md               # Паттерны (с метками приоритета)
+│       └── architecture.md           # Архитектура (с метками приоритета)
+└── [ваши файлы проекта...]
+
+Git ветки: autoresearch-YYYYMMDD-HHMMSS  # Создаются в целевом проекте
+```
+
+### ⚠️ Важно: Нельзя запускать из Claude Code
+
+**Проблема:** AutoResearch использует Claude CLI, который **не может запускаться изнутри сессии Claude Code** (nested session protection).
+
+**Решение:** Запускайте из обычного терминала.
+
+```bash
+# ❌ НЕ ЗАПУСКАЙТЕ из Claude Code
+# Это не сработает - nested session protection
+
+# ✅ ЗАПУСКАЙТЕ из обычного терминала
+cd F:/IdeaProjects/autoresearch
+python autoresearch.py --project F:/IdeaProjects/bybittrader --iter 10
+```
+
+### Пример: BybitTrader
+
+Тестовый запуск на `F:\IdeaProjects\bybittrader`:
+
+```bash
+cd F:/IdeaProjects/autoresearch
+python autoresearch.py --project F:/IdeaProjects/bybittrader --iter 1 --timeout 0
+```
+
+**Результаты:**
+- ✅ `.autoresearch/` создан в bybittrader (НЕ в autoresearch!)
+- ✅ Git ветка `autoresearch-20260313-013849` создана в bybittrader
+- ✅ Конфигурация `.autoresearch.json` создана
+- ✅ Промпт `prompt_1.md` сгенерирован
+- ❌ Claude CLI заблокирован (nested session protection)
+
+### Проверка изоляции
+
+После запуска AutoResearch:
+
+```bash
+# Проверить целевой проект
+ls F:/IdeaProjects/myproject/.autoresearch/experiments/
+# Вывод: prompt_1.md, output_1.md, и т.д.
+
+cd F:/IdeaProjects/myproject
+git branch
+# Вывод: * autoresearch-20260313-013849
+
+# Проверить проект autoresearch (должен быть без изменений)
+git -C F:/IdeaProjects/autoresearch status
+# Вывод: clean (нет изменений)
+```
+
+### Быстрая настройка без интерактивного режима
+
+Если интерактивный режим не работает, создайте `.autoresearch.json` вручную:
+
+```json
+{
+  "name": "ProjectName",
+  "description": "Project description",
+  "goals": ["Goal 1", "Goal 2"],
+  "constraints": ["Constraint 1"],
+  "tech_stack": ["Python", "FastAPI"],
+  "focus_areas": ["Performance", "Security"]
+}
+```
+
+---
+
+## Багфиксы в этой версии
+
+- ✅ **Исправлен `args.start_from`** - был баг: проверял `start_from` вместо `args.start_from`
+- ✅ **Исправлен `is_configured()`** - теперь загружает конфиг перед проверкой
+- ✅ **Исправлен шаблон `default_prompt.md`** - убраны недопустимые плейсхолдеры
+- ✅ **Добавлен пункт "7. UX и Документация"** в default_prompt.md
+

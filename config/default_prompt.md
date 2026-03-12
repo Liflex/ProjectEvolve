@@ -50,11 +50,11 @@
 Опишите изменение в формате:
 
 ```markdown
-## Experiment {iteration}: {Title}
+## Experiment {iteration}: [Title]
 
-**Hypothesis:** {Что ожидаем улучшить}
-**Target:** {Какой компонент изменяем}
-**Metric:** {Как измеряем успех}
+**Hypothesis:** [Что ожидаем улучшить]
+**Target:** [Какой компонент изменяем]
+**Metric:** [Как измеряем успех]
 ```
 
 ### 3. Apply Change
@@ -127,20 +127,30 @@ python F:/IdeaProjects/autoresearch/utils/quality_loop.py --project . --max-iter
 - Без метки — minor improvement (не попадет в контекст!)
 
 ```markdown
-## Experiment {iteration}: {Title}
+## Experiment {iteration}: [Title]
 
-**Date:** {YYYY-MM-DD}
-**Hypothesis:** {Что тестировали}
-**Files Modified:** {список}
-**Changes Made:** {описание}
+**Date:** [YYYY-MM-DD]
+**Hypothesis:** [Что тестировали]
+**Files Modified:** [список]
+**Changes Made:** [описание]
 **Results:**
-- Score: {score} (baseline: {baseline})
-- Tests: {pass/fail}
-- Build: {success/failure}
+- Score: [score] (baseline: [baseline])
+- Tests: [pass/fail]
+- Build: [success/failure]
 **Decision:** KEEP | DISCARD | MANUAL_REVIEW
-**Notes for Next:** {заметки для следующей итерации}
+**Notes for Next:** [заметки для следующей итерации]
 ---
 ```
+
+### 7. UX и Документация
+
+При добавлении новых функций:
+- **Документируй** — обновляй README.md или создавай отдельные файлы документации для сложных фич
+- **Думай о UX** — не перегружай пользователя опциями
+- **Автоматизируй** — если действие можно сделать автоматически, сделай
+- **Давай выбор** — если автоматизация не всегда уместна, добавь флаг с рекомендацией
+
+*Пример*: новая фича с умолчаниями + флагом `--manual` для продвинутых пользователей
 
 ## Фокусные области
 
@@ -162,13 +172,13 @@ python F:/IdeaProjects/autoresearch/utils/quality_loop.py --project . --max-iter
 
 ### Evaluation Results
 
-**Quality Gate Score:** {score} (baseline: {baseline}, delta: {+/-})
-**Tests:** {pass/fail}
-**Build:** {success/failure}
+**Quality Gate Score:** [score] (baseline: [baseline], delta: [+/-])
+**Tests:** [pass/fail]
+**Build:** [success/failure]
 **Metrics:**
-- Score improvement: {delta}
-- Files modified: {count}
-- Lines changed: {+/-}
+- Score improvement: [delta]
+- Files modified: [count]
+- Lines changed: [+/-]
 
 ### Decision
 
@@ -258,12 +268,12 @@ thresholds:
 
 **Последний эксперимент:**
 ```markdown
-{last_experiment_content}
+[Содержание последнего эксперимента будет добавлено автоматически]
 ```
 
 **Полный лог:**
 ```markdown
-{accumulation_context_content}
+[Полный лог экспериментов будет добавлен автоматически]
 ```
 
 Начинайте эксперимент {iteration}.

@@ -463,30 +463,42 @@ if __name__ == "__main__":
 
 ## Step 4: Configuration File Template
 
-**Create `.autoresearch.json` with detected values:**
+**AutoResearch auto-creates `.autoresearch.json` on first run.**
+
+If you want to create it manually, here's the template:
 
 ```json
 {
-  "environment": {
-    "os": "{{OS_TYPE}}",
-    "shell": "{{SHELL_TYPE}}",
-    "python": "{{PYTHON_CMD}}",
-    "node": "{{NODE_CMD}}"
-  },
-  "project": {
-    "name": "{{PROJECT_NAME}}",
-    "description": "{{PROJECT_DESCRIPTION}}",
-    "root": "{{PROJECT_ROOT}}"
-  },
-  "paths": {
-    "experiments": ".autoresearch/experiments",
-    "logs": ".autoresearch/logs",
-    "memory": ".autoresearch/memory"
-  }
+  "name": "ProjectName",
+  "description": "Brief project description",
+  "goals": [
+    "Goal 1: Improve code quality",
+    "Goal 2: Add tests",
+    "Goal 3: Update documentation"
+  ],
+  "constraints": [
+    "Don't break existing API",
+    "All changes must be tested"
+  ],
+  "tech_stack": ["Python", "FastAPI", "PostgreSQL"],
+  "focus_areas": ["Performance", "Security", "Documentation"],
+  "memory_files": [
+    ".claude/memory/lessons.md",
+    ".claude/memory/patterns.md",
+    ".claude/memory/architecture.md"
+  ],
+  "context_files": [
+    "README.md",
+    "CLAUDE.md"
+  ]
 }
 ```
 
-**Reference:** This config is loaded by `ProjectConfig` class in `autoresearch.py:180-220`
+**Auto-detection:** On first run, AutoResearch tries to detect:
+- `name` from directory name or `package.json`/`pyproject.toml`
+- `tech_stack` from project files (package.json, requirements.txt, etc.)
+
+**Reference:** This config is loaded by `ProjectConfig` class in `autoresearch.py:209-240`
 
 ---
 
@@ -612,4 +624,135 @@ AutoResearch agent использует `read_last_entries()` которая:
 - **CRITICAL**: key features, фундаментальная архитектура
 - **IMPORTANT**: значимые UX улучшения, reusable patterns
 - **Без метки**: minor fixes, generic quality rules
+
+---
+
+## Running AutoResearch on Other Projects
+
+### Overview
+
+AutoResearch runs **isolated** from the autoresearch project itself. All files are created in the **target project** directory.
+
+### File Structure in Target Project
+
+When you run AutoResearch on project `F:\IdeaProjects\myproject`:
+
+```
+F:\IdeaProjects\myproject\
+├── .autoresearch/
+│   ├── experiments/
+│   │   ├── prompt_N.md          # Generated prompt for experiment N
+│   │   ├── output_N.md          # AI agent's response
+│   │   ├── last_experiment.md   # Last experiment summary (for agent, rewritten)
+│   │   ├── accumulation_context.md  # Full experiment history (for human, appended)
+│   │   ├── changes_log.md       # Changes chronology (for human, appended)
+│   │   └── summary.json         # All results summary
+│   ├── logs/
+│   │   └── autoresearch.log     # Execution logs
+│   └── .autoresearch.json       # Project configuration
+├── .claude/
+│   └── memory/
+│       ├── lessons.md           # Lessons learned (use [CRITICAL]/[IMPORTANT] tags)
+│       ├── patterns.md          # Reusable patterns (use [CRITICAL]/[IMPORTANT] tags)
+│       └── architecture.md      # Architecture decisions (use [CRITICAL]/[IMPORTANT] tags)
+└── [project files...]
+```
+
+**Git branches:** Created in target project (e.g., `autoresearch-20260313-013849`)
+
+### Quick Start
+
+```bash
+# 1. Navigate to autoresearch directory
+cd F:/IdeaProjects/autoresearch
+
+# 2. Run on target project
+python autoresearch.py --project F:/IdeaProjects/bybittrader --iter 10 --timeout 5
+
+# 3. Or run from anywhere with full path
+python F:/IdeaProjects/autoresearch/autoresearch.py --project /path/to/target --iter 5
+```
+
+### Configuration File
+
+AutoResearch auto-creates `.autoresearch.json` in the target project:
+
+```json
+{
+  "name": "ProjectName",
+  "description": "Project description",
+  "goals": ["Goal 1", "Goal 2"],
+  "constraints": ["Constraint 1"],
+  "tech_stack": ["Python", "FastAPI"],
+  "focus_areas": ["Performance", "Security"]
+}
+```
+
+### ⚠️ Important: Cannot Run from Within Claude Code
+
+**Issue:** AutoResearch cannot execute Claude CLI from within a Claude Code session due to nested session protection.
+
+**Solution:** Run AutoResearch from a regular terminal:
+
+```bash
+# ❌ DON'T: Run from within Claude Code
+# This will fail with nested session error
+
+# ✅ DO: Run from regular terminal
+cd F:/IdeaProjects/autoresearch
+python autoresearch.py --project F:/IdeaProjects/bybittrader --iter 10
+```
+
+### Example: BybitTrader Experiment
+
+Test run on `F:\IdeaProjects\bybittrader`:
+
+```bash
+cd F:/IdeaProjects/autoresearch
+python autoresearch.py --project F:/IdeaProjects/bybittrader --iter 1 --timeout 0
+```
+
+**Results:**
+- ✅ `.autoresearch/` created in bybittrader (not in autoresearch)
+- ✅ Git branch `autoresearch-20260313-013849` created in bybittrader
+- ✅ Configuration `.autoresearch.json` created
+- ✅ Prompt `prompt_1.md` generated
+- ❌ Claude CLI blocked (nested session protection)
+
+### Verification
+
+After running AutoResearch, verify isolation:
+
+```bash
+# Check target project
+ls F:/IdeaProjects/myproject/.autoresearch/experiments/
+# Output: prompt_1.md, output_1.md, etc.
+
+cd F:/IdeaProjects/myproject
+git branch
+# Output: * autoresearch-YYYYMMDD-HHMMSS
+
+# Check autoresearch project (should be unchanged)
+git -C F:/IdeaProjects/autoresearch status
+# Output: clean (no changes)
+```
+
+### Troubleshooting
+
+**Error: "Claude CLI not found"**
+```bash
+# Install Claude CLI
+npm install -g @anthropic-ai/claude-code
+```
+
+**Error: "Nested session detected"**
+- Run from regular terminal, not from within Claude Code
+
+**Error: "Permission denied"**
+- Check Claude Code permissions mode
+- Use `bypass permissions on` for full autonomy
+
+**No output files created**
+- Check logs: `cat .autoresearch/logs/autoresearch.log`
+- Verify Claude CLI: `claude --version`
 

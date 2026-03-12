@@ -101,6 +101,56 @@ def log(msg: str, level: str = "INFO", project_dir: Optional[Path] = None):
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(f"{prefix} {msg}\n")
 
+def read_last_entries(path: Path, max_entries: int = 5) -> str:
+    """Читает ТОЛЬКО записи помеченные [CRITICAL] или [IMPORTANT].
+
+    Логика:
+    1. Включаются только записи с метками [CRITICAL] или [IMPORTANT]
+    2. Обычные записи без меток НЕ включаются
+    3. Это ограничивает контекст до 30-50 KB вместо 200+ KB
+
+    Args:
+        path: Путь к файлу памяти (lessons.md, patterns.md, architecture.md)
+        max_entries: Игнорируется (для совместимости с вызовами)
+
+    Returns:
+        str: Содержимое только помеченных записей
+    """
+    if not path.exists():
+        return ""
+
+    content = path.read_text(encoding="utf-8")
+
+    # Разбиваем по ## заголовкам
+    lines = content.split("\n")
+    entries = []
+    current_entry = []
+    current_header = ""
+
+    for line in lines:
+        if line.startswith("## "):
+            # Сохраняем предыдущую запись
+            if current_entry:
+                entries.append({"header": current_header, "content": "\n".join(current_entry)})
+            current_header = line
+            current_entry = [line]
+        else:
+            if current_entry is not None:
+                current_entry.append(line)
+
+    # Сохраняем последнюю запись
+    if current_entry:
+        entries.append({"header": current_header, "content": "\n".join(current_entry)})
+
+    # Берем только помеченные записи
+    marked_entries = []
+    for entry in entries:
+        header = entry["header"]
+        if "[CRITICAL]" in header or "[IMPORTANT]" in header:
+            marked_entries.append(entry)
+
+    return "\n".join(e["content"] for e in marked_entries)
+
 # =============================================================================
 # CLAUDE CLI DETECTION
 # =============================================================================
@@ -233,6 +283,9 @@ class ProjectConfig:
 
     def is_configured(self) -> bool:
         """Проверяет, настроен ли проект."""
+        # Сначала загружаем конфигурацию если файл существует
+        if self.config_file.exists():
+            self.load()
         return bool(
             self.config_file.exists() and
             self.config.get("name") and
@@ -463,20 +516,13 @@ def build_agent_prompt(config: ProjectConfig, iteration: int, total: int) -> str
 Начинайте эксперимент {iteration}.
 """
 
-    # Читаем накопленный контекст если есть
-    accumulated_context = ""
+    # Читаем последний эксперимент (accumulation_context.md только для человека, не для агента!)
     last_experiment = ""
-
     project_dir = config.project_dir
     exp_dir = project_dir / ".autoresearch" / "experiments"
 
     if exp_dir.exists():
-        accumulation_file = exp_dir / "accumulation_context.md"
         last_exp_file = exp_dir / "last_experiment.md"
-
-        if accumulation_file.exists():
-            accumulated_context = accumulation_file.read_text(encoding="utf-8")
-
         if last_exp_file.exists():
             last_experiment = last_exp_file.read_text(encoding="utf-8")
 
@@ -495,19 +541,220 @@ def build_agent_prompt(config: ProjectConfig, iteration: int, total: int) -> str
 
     prompt = template.format(**context)
 
-    # Добавляем накопленный контекст если есть
-    if accumulated_context or last_experiment:
-        prompt += "\n\n## Накопленный контекст\n\n"
+    # Добавляем контекст для агента (НЕ весь accumulation_context - он для человека!)
+    memory_dir = project_dir / ".claude" / "memory"
 
-        if last_experiment:
-            prompt += "### Последний эксперимент\n\n"
-            prompt += last_experiment + "\n\n"
+    # Читаем память проекта с приоритетами (только [CRITICAL] и [IMPORTANT])
+    project_memory = ""
+    if memory_dir.exists():
+        lessons = read_last_entries(memory_dir / "lessons.md", 5)
+        patterns = read_last_entries(memory_dir / "patterns.md", 5)
+        architecture = read_last_entries(memory_dir / "architecture.md", 5)
 
-        if accumulated_context:
-            prompt += "### Полный лог экспериментов\n\n"
-            prompt += accumulated_context + "\n\n"
+        if lessons or patterns or architecture:
+            project_memory += "\n\n## Память проекта\n\n"
+
+            if lessons:
+                project_memory += f"### Lessons Learned\n{lessons}\n\n"
+
+            if patterns:
+                project_memory += f"### Patterns Found\n{patterns}\n\n"
+
+            if architecture:
+                project_memory += f"### Architecture Decisions\n{architecture}\n\n"
+
+    # Добавляем ТОЛЬКО последний эксперимент (не весь лог!)
+    if last_experiment:
+        project_memory += "## Последний эксперимент\n\n"
+        project_memory += last_experiment + "\n\n"
+
+    # Добавляем текущее состояние проекта (git status)
+    try:
+        result = subprocess.run(
+            ["git", "status", "--short"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        if result.stdout.strip():
+            project_memory += "## Текущее состояние проекта\n\n"
+            project_memory += "### Изменённые файлы (git status)\n```\n"
+            project_memory += result.stdout.strip()
+            project_memory += "\n```\n\n"
+    except:
+        pass
+
+    if project_memory:
+        prompt += project_memory
 
     return prompt
+
+def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
+    """Парсит отчет эксперимента из вывода агента.
+
+    Args:
+        output: Вывод Claude CLI
+        iteration: Номер эксперимента
+
+    Returns:
+        Dict с данными эксперимента
+    """
+    import re
+
+    # Извлекаем данные из отчета
+    title = "Untitled"
+    what_done = "N/A"
+    files_modified = []
+    results = "N/A"
+    notes_next = "N/A"
+
+    # Ищем Title
+    match = re.search(r'\*\*Title:\*\*\s*(.+?)(?:\n|\*)', output)
+    if match:
+        title = match.group(1).strip()
+
+    # Ищем секции
+    sections = re.split(r'\n#{1,3}\s+', output)
+
+    for section in sections:
+        if "What Was Done" in section or "Changes Made" in section:
+            what_done = section.strip()[:500]  # Ограничиваем размер
+        elif "Files Modified" in section:
+            # Извлекаем список файлов
+            for line in section.split('\n'):
+                if '-' in line and '.' in line:
+                    files_modified.append(line.strip('- *').strip())
+        elif "Evaluation Results" in section or "Results" in section:
+            results = section.strip()[:500]
+        elif "Notes for Next" in section:
+            notes_next = section.strip()[:500]
+
+    return {
+        "number": iteration,
+        "title": title,
+        "what_done": what_done,
+        "files_modified": files_modified[:10],  # Максимум 10 файлов
+        "results": results,
+        "notes_next": notes_next,
+        "date": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    }
+
+def save_last_experiment_summary(project_dir: Path, experiment: Dict[str, Any]):
+    """Сохраняет краткую сводку ТОЛЬКО последнего эксперимента для агента.
+
+    Этот файл перезаписывается каждой итерацией — в контекст попадает только последний!
+
+    Args:
+        project_dir: Директория проекта
+        experiment: Данные эксперимента
+    """
+    exp_dir = project_dir / ".autoresearch" / "experiments"
+    last_exp_file = exp_dir / "last_experiment.md"
+
+    summary = f"""# Last Experiment Summary
+
+**Experiment #{experiment['number']}** — {experiment.get('title', 'Untitled')}
+**Date:** {experiment.get('date', '')}
+
+## What Was Done
+
+{experiment.get('what_done', 'N/A')}
+
+## Files Modified
+
+{chr(10).join(f"- {f}" for f in experiment.get('files_modified', [])) if experiment.get('files_modified') else '- None'}
+
+## Key Results
+
+{experiment.get('results', 'N/A')}
+
+## For Next Iteration
+
+{experiment.get('notes_next', 'N/A')}
+"""
+
+    last_exp_file.write_text(summary, encoding="utf-8")
+    log(f"Saved last_experiment.md", "DEBUG", project_dir)
+
+def save_accumulation_context(project_dir: Path, experiment: Dict[str, Any]):
+    """Добавляет эксперимент в полный лог всех экспериментов.
+
+    Args:
+        project_dir: Директория проекта
+        experiment: Данные эксперимента
+    """
+    exp_dir = project_dir / ".autoresearch" / "experiments"
+    context_file = exp_dir / "accumulation_context.md"
+
+    entry = f"""
+## Experiment {experiment['number']} — {experiment.get('title', 'Untitled')}
+
+**Date:** {experiment.get('date', '')}
+
+### What Was Done
+
+{experiment.get('what_done', 'N/A')}
+
+### Files Modified
+
+{chr(10).join(f"- {f}" for f in experiment.get('files_modified', [])) if experiment.get('files_modified') else '- None'}
+
+### Results
+
+{experiment.get('results', 'N/A')}
+
+### Notes for Next
+
+{experiment.get('notes_next', 'N/A')}
+
+---
+"""
+
+    if context_file.exists():
+        content = context_file.read_text(encoding="utf-8")
+        content += entry
+    else:
+        content = f"# AutoResearch Experiment Log\n\n{entry}"
+
+    context_file.write_text(content, encoding="utf-8")
+    log(f"Updated accumulation_context.md", "DEBUG", project_dir)
+
+def save_changes_log(project_dir: Path, experiment: Dict[str, Any]):
+    """Добавляет запись в хронологию изменений.
+
+    Args:
+        project_dir: Директория проекта
+        experiment: Данные эксперимента
+    """
+    exp_dir = project_dir / ".autoresearch" / "experiments"
+    changes_log_file = exp_dir / "changes_log.md"
+
+    entry = f"""## Experiment {experiment['number']} — {experiment.get('title', 'Untitled')}
+
+**Time:** {experiment.get('date', '')}
+
+**Files:** {', '.join(experiment.get('files_modified', [])) if experiment.get('files_modified') else 'None'}
+
+**What was done:**
+
+{experiment.get('what_done', 'N/A')}
+
+**Results:**
+
+{experiment.get('results', 'N/A')}
+
+
+"""
+
+    if changes_log_file.exists():
+        content = changes_log_file.read_text(encoding="utf-8")
+        content += entry
+    else:
+        content = f"# AutoResearch Changes Log\n\n{entry}"
+
+    changes_log_file.write_text(content, encoding="utf-8")
+    log(f"Updated changes_log.md", "DEBUG", project_dir)
 
 # =============================================================================
 # EXPERIMENT LOOP
@@ -571,7 +818,7 @@ def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> 
             errors='replace',
             env=env,
             check=False,
-            timeout=1800  # 30 минут максимум для одного эксперимента
+            timeout=7200  # 2 часа максимум для одного эксперимента
         )
 
         if result.returncode != 0:
@@ -591,9 +838,9 @@ def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> 
             return {"status": "incomplete", "output": output}
 
     except subprocess.TimeoutExpired as e:
-        log(f"Claude CLI timeout after 30 minutes!", "ERROR", project_dir)
+        log(f"Claude CLI timeout after 2 hours!", "ERROR", project_dir)
         log(f"Experiment {iteration} timed out - may be stuck on permission prompt or hanging", "ERROR", project_dir)
-        return {"status": "error", "error": f"Timeout after 30 minutes. Claude CLI may be waiting for permission approval or stuck."}
+        return {"status": "error", "error": f"Timeout after 2 hours. Claude CLI may be waiting for permission approval or stuck."}
     except Exception as e:
         log(f"Ошибка запуска: {e}", "ERROR", project_dir)
         return {"status": "error", "error": str(e)}
@@ -651,6 +898,22 @@ def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: O
 
         result = run_single_experiment(config, i, max_experiment_number)
         results.append(result)
+
+        # Сохраняем last_experiment.md и accumulation_context.md после успешного эксперимента
+        if result.get("status") in ["success", "incomplete"]:
+            output = result.get("output", "")
+            if output and ">>>EXPERIMENT_COMPLETE<<<" in output:
+                # Парсим отчет эксперимента
+                exp_data = parse_experiment_report(output, i)
+
+                # Сохраняем краткую сводку для агента (перезаписывается)
+                save_last_experiment_summary(project_dir, exp_data)
+
+                # Добавляем в полный лог (добавляется)
+                save_accumulation_context(project_dir, exp_data)
+
+                # Добавляем в хронологию изменений
+                save_changes_log(project_dir, exp_data)
 
         # Пауза перед следующей итерацией
         if i < max_experiment_number and timeout > 0:
@@ -771,12 +1034,13 @@ def main():
     timeout = args.timeout_opt or args.timeout
 
     # Определяем стартовый номер
-    if start_from is None:
+    if args.start_from is None:
         # Автоопределяем следующий номер эксперимента
         exp_dir = project_dir / ".autoresearch" / "experiments"
         start_from = get_next_experiment_number(exp_dir)
         log(f"Автоопределён следующий номер: Experiment {start_from}", "INFO", project_dir)
     else:
+        start_from = args.start_from
         log(f"Указан стартовый номер: Experiment {start_from}", "INFO", project_dir)
 
     # Режим только настройки
