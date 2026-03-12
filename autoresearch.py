@@ -69,15 +69,16 @@ def get_next_experiment_number(exp_dir: Path) -> int:
     if not exp_dir.exists():
         return 1
 
-    # Ищем все output_N.md файлы
+    # Ищем все output_N.md И prompt_N.md файлы
     existing = []
-    for file in exp_dir.glob("output_*.md"):
-        match = file.stem.split("_")[1]
-        try:
-            num = int(match)
-            existing.append(num)
-        except:
-            continue
+    for pattern in ["output_*.md", "prompt_*.md"]:
+        for file in exp_dir.glob(pattern):
+            match = file.stem.split("_")[1]
+            try:
+                num = int(match)
+                existing.append(num)
+            except:
+                continue
 
     if not existing:
         return 1
