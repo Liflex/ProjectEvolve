@@ -2,6 +2,12 @@
 
 > This document is read by the AI agent during first-time setup to configure the environment for the target system.
 
+> **Implementation Reference:** See `autoresearch.py` for the actual code that implements these steps:
+> - **Line 60-130:** `get_claude_command()` - Cross-platform Claude CLI detection
+> - **Line 133-175:** `check_claude_cli()` - CLI validation
+> - **Line 390-450:** `run_single_experiment()` - Experiment execution
+> - **Line 280-360:** `build_agent_prompt()` - Prompt generation with context
+
 ---
 
 ## Overview
@@ -10,6 +16,8 @@
 
 Your task: Detect the operating system and configure the environment accordingly.
 
+The implementation follows the patterns defined in `autoresearch.py`.
+
 ---
 
 ## Step 1: Detect Operating System
@@ -17,7 +25,7 @@ Your task: Detect the operating system and configure the environment accordingly
 First, determine the target operating system:
 
 ```bash
-# Check OS
+# Check OS (implemented in autoresearch.py:60-80)
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     export OS="linux"
     export SHELL_TYPE="bash"
@@ -28,7 +36,7 @@ elif [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
     export OS="windows"
     export SHELL_TYPE="pwsh"
 else
-    # Fallback detection
+    # Fallback detection (see autoresearch.py:60-80)
     uname_output=$(uname -s)
     case "$uname_output" in
         Linux*)     export OS="linux"; export SHELL_TYPE="bash" ;;
@@ -43,6 +51,8 @@ echo "Detected OS: $OS"
 echo "Shell type: $SHELL_TYPE"
 ```
 
+**Reference:** This OS detection logic is mirrored in `autoresearch.py:60-80` in the `get_claude_command()` function.
+
 ---
 
 ## Step 2: Platform-Specific Setup
@@ -53,7 +63,7 @@ echo "Shell type: $SHELL_TYPE"
 #!/bin/bash
 # Linux Setup
 
-# 1. Check Python 3.10+
+# 1. Check Python 3.10+ (autoresearch.py requires Python 3.10+)
 if ! command -v python3 &> /dev/null; then
     echo "Installing Python 3..."
     sudo apt-get update
@@ -63,7 +73,7 @@ else
     echo "Python found: $python_version"
 fi
 
-# 2. Check Claude CLI
+# 2. Check Claude CLI (detected by autoresearch.py:60-130)
 if ! command -v claude &> /dev/null; then
     echo "Installing Claude CLI..."
     npm install -g @anthropic-ai/claude-code
@@ -71,7 +81,7 @@ else
     echo "Claude CLI found: $(claude --version)"
 fi
 
-# 3. Check Git
+# 3. Check Git (used for backup branches)
 if ! command -v git &> /dev/null; then
     echo "Installing Git..."
     sudo apt-get install -y git
@@ -79,7 +89,7 @@ else
     echo "Git found: $(git --version)"
 fi
 
-# 4. Create project directories
+# 4. Create project directories (autoresearch.py:395-400)
 mkdir -p .autoresearch/experiments
 mkdir -p .autoresearch/logs
 
@@ -128,12 +138,12 @@ if ! command -v npm &> /dev/null; then
     brew install node
 fi
 
-# 4. Install Claude CLI
+# 4. Install Claude CLI (detected in autoresearch.py:60-130)
 if ! command -v claude &> /dev/null; then
     npm install -g @anthropic-ai/claude-code
 fi
 
-# 5. Create project directories
+# 5. Create project directories (autoresearch.py:395-400)
 mkdir -p .autoresearch/experiments .autoresearch/logs
 
 echo "✓ macOS setup complete"
@@ -143,6 +153,7 @@ echo "✓ macOS setup complete"
 
 ```powershell
 # Windows PowerShell Setup
+# Implementation reference: autoresearch.py:60-130 (Windows detection)
 
 # 1. Check Python
 $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
@@ -159,14 +170,14 @@ if (-not $npmCmd) {
     winget install OpenJS.Node.js
 }
 
-# 3. Install Claude CLI
+# 3. Install Claude CLI (detected by autoresearch.py:60-130)
 $claudeCmd = Get-Command claude -ErrorAction SilentlyContinue
 if (-not $claudeCmd) {
     Write-Host "Installing Claude CLI..."
     npm install -g @anthropic-ai/claude-code
 }
 
-# 4. Create project directories
+# 4. Create project directories (autoresearch.py:395-400)
 New-Item -ItemType Directory -Force -Path ".autoresearch\experiments" | Out-Null
 New-Item -ItemType Directory -Force -Path ".autoresearch\logs" | Out-Null
 
@@ -184,6 +195,11 @@ Write-Host "✓ Windows setup complete"
 """
 AutoResearch Environment Detector
 Auto-detects OS and configures paths for AutoResearch
+
+Implementation reference: This is the template version.
+See autoresearch.py for production implementation:
+- Line 60-130: get_claude_command() - Claude CLI detection
+- Line 133-175: check_claude_cli() - CLI validation
 """
 
 import os
@@ -193,18 +209,25 @@ import subprocess
 from pathlib import Path
 
 class EnvironmentConfig:
-    """Auto-detected environment configuration."""
+    """Auto-detected environment configuration.
+
+    Reference: This class demonstrates the detection logic used
+    throughout autoresearch.py for cross-platform support.
+    """
 
     def __init__(self):
-        self.os_type = self._detect_os()
+        self.os_type = self._detect_os()  # See autoresearch.py:68
         self.python_cmd = self._find_python()
         self.node_cmd = self._find_node()
-        self.claude_cmd = self._find_claude()
+        self.claude_cmd = self._find_claude()  # See autoresearch.py:60-130
         self.shell_cmd = self._find_shell()
         self.project_root = Path.cwd()
 
     def _detect_os(self) -> str:
-        """Detect operating system."""
+        """Detect operating system.
+
+        Reference: autoresearch.py:68 - uses sys.platform for detection
+        """
         system = platform.system().lower()
         if system == "linux":
             return "linux"
@@ -216,7 +239,10 @@ class EnvironmentConfig:
             return "unknown"
 
     def _find_python(self) -> str:
-        """Find Python executable."""
+        """Find Python executable.
+
+        Reference: autoresearch.py assumes Python 3.10+ is available
+        """
         candidates = ["python3", "python", "py"]
         for cmd in candidates:
             try:
@@ -232,7 +258,10 @@ class EnvironmentConfig:
         return "python3"  # Default
 
     def _find_node(self) -> str:
-        """Find Node.js/npm."""
+        """Find Node.js/npm.
+
+        Reference: Required for Claude CLI installation
+        """
         try:
             subprocess.run(["npm", "--version"], capture_output=True, timeout=5)
             return "npm"
@@ -240,9 +269,13 @@ class EnvironmentConfig:
             return None
 
     def _find_claude(self) -> str:
-        """Find Claude CLI command."""
+        """Find Claude CLI command.
+
+        Reference: autoresearch.py:60-130 - get_claude_command()
+        This demonstrates the detection logic used there.
+        """
         if self.os_type == "windows":
-            # Try PowerShell
+            # Try PowerShell (see autoresearch.py:72-81)
             try:
                 result = subprocess.run(
                     ["powershell.exe", "-Command", "Get-Command claude | Select-Object -ExpandProperty Source"],
@@ -256,11 +289,14 @@ class EnvironmentConfig:
                 pass
             return "claude"
         else:
-            # Unix-like
+            # Unix-like (see autoresearch.py:104)
             return "claude"
 
     def _find_shell(self) -> str:
-        """Find default shell."""
+        """Find default shell.
+
+        Reference: Used in autoresearch.py:409-418 for command execution
+        """
         if self.os_type == "windows":
             return "powershell.exe"
         elif self.os_type == "macos":
@@ -269,10 +305,15 @@ class EnvironmentConfig:
             return "bash"
 
     def get_autoresearch_command(self, iterations: int = 10, timeout: int = 5) -> list:
-        """Get the command to run AutoResearch."""
+        """Get the command to run AutoResearch.
+
+        Reference: autoresearch.py:390-450 - run_single_experiment()
+        This shows how commands are constructed for different platforms.
+        """
         autoresearch_py = Path(__file__).parent / "autoresearch.py"
 
         if self.os_type == "windows":
+            # Windows: PowerShell with Claude CLI (see autoresearch.py:409-418)
             return [
                 self.python_cmd,
                 str(autoresearch_py),
@@ -281,6 +322,7 @@ class EnvironmentConfig:
                 "--timeout", str(timeout)
             ]
         else:
+            # Unix: direct command (see autoresearch.py:418)
             return [
                 self.python_cmd,
                 str(autoresearch_py),
@@ -290,7 +332,10 @@ class EnvironmentConfig:
             ]
 
     def check_dependencies(self) -> dict:
-        """Check if all dependencies are installed."""
+        """Check if all dependencies are installed.
+
+        Reference: autoresearch.py:133-175 - check_claude_cli()
+        """
         status = {
             "python": self.python_cmd is not None,
             "node": self.node_cmd is not None,
@@ -300,7 +345,10 @@ class EnvironmentConfig:
         return status
 
     def _check_git(self) -> bool:
-        """Check if Git is installed."""
+        """Check if Git is installed.
+
+        Reference: Git is used in autoresearch.py for backup branches
+        """
         try:
             subprocess.run(["git", "--version"], capture_output=True, timeout=5)
             return True
@@ -321,7 +369,10 @@ class EnvironmentConfig:
         print(f"{'='*60}\n")
 
     def install_missing_dependencies(self):
-        """Install missing dependencies based on OS."""
+        """Install missing dependencies based on OS.
+
+        Reference: These commands match the platform detection in autoresearch.py:60-130
+        """
         missing = [k for k, v in self.check_dependencies().items() if not v]
 
         if not missing:
@@ -375,6 +426,8 @@ if __name__ == "__main__":
 }
 ```
 
+**Reference:** This config is loaded by `ProjectConfig` class in `autoresearch.py:180-220`
+
 ---
 
 ## Step 5: Validation
@@ -382,7 +435,7 @@ if __name__ == "__main__":
 **After setup, validate the installation:**
 
 ```bash
-# Validation script
+# Validation script (implements checks from autoresearch.py:133-175)
 python3 << 'EOF'
 import subprocess
 import sys
@@ -417,17 +470,50 @@ else:
 EOF
 ```
 
+**Reference:** Validation logic mirrors `check_claude_cli()` in `autoresearch.py:133-175`
+
+---
+
+## Step 6: Running Experiments
+
+**Once configured, experiments run as follows:**
+
+```bash
+# Command construction (see autoresearch.py:390-450)
+python autoresearch.py --project /path/to/project --iter 10 --timeout 5
+
+# For each experiment (autoresearch.py:409-425):
+# - Build prompt with context (autoresearch.py:280-360)
+# - Execute via detected Claude CLI command
+# - Save output to .autoresearch/experiments/output_N.md
+# - Parse results and check for completion marker
+```
+
 ---
 
 ## Agent Instructions Summary
 
 **When setting up a new project:**
 
-1. Detect OS → Use appropriate install commands
-2. Install missing dependencies
-3. Create `.autoresearch/` directories
-4. Generate `.autoresearch.json` config
-5. Validate installation
-6. Run first experiment
+1. **Detect OS** → Use appropriate install commands (ref: `autoresearch.py:68`)
+2. **Install dependencies** → Python, Node.js, Claude CLI (ref: `autoresearch.py:60-130`)
+3. **Create directories** → `.autoresearch/experiments`, `.autoresearch/logs` (ref: `autoresearch.py:395-400`)
+4. **Generate config** → `.autoresearch.json` (ref: `autoresearch.py:180-220`)
+5. **Validate** → Check all dependencies (ref: `autoresearch.py:133-175`)
+6. **Run experiments** → Use detected Claude CLI command (ref: `autoresearch.py:390-450`)
 
-**Key principle:** Adapt commands to the detected OS, don't assume any specific platform.
+**Key principle:** All commands in `autoresearch.py` are designed to work cross-platform. Follow the same patterns.
+
+---
+
+## Code Reference Summary
+
+| Function | Lines | Purpose |
+|----------|-------|---------|
+| `get_claude_command()` | 60-130 | Cross-platform Claude CLI detection |
+| `check_claude_cli()` | 133-175 | Validates Claude CLI installation |
+| `build_agent_prompt()` | 280-360 | Generates prompt with accumulated context |
+| `run_single_experiment()` | 390-450 | Executes one experiment using detected CLI |
+| `run_autoresearch()` | 470-540 | Main loop, orchestrates experiments |
+
+**For platform-specific details:** See the inline comments in each function referencing `INSTALL.md`.
