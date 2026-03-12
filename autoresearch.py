@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
 """
-AutoResearch - Автономная система исследования и улучшения проектов
+AutoResearch - Autonomous AI-Powered Research and Project Improvement System
 
-Универсальный инструмент для запуска AI-агента на любом проекте с целью
-автономного исследования, улучшения и саморазвития.
+Universal tool for running AI agent on any project for autonomous research,
+improvement, and self-development.
+
+Cross-platform support: Windows, Linux, macOS
+See INSTALL.md for platform-specific setup instructions.
 
 Usage:
-    python autoresearch.py                          # Интерактивный режим
-    python autoresearch.py --project /path/to/proj  # Указать проект
-    python autoresearch.py --project . --iter 10    # 10 итераций
-    python autoresearch.py --project . --iter 5 --timeout 2  # 2 мин интервал
+    python autoresearch.py                          # Interactive mode
+    python autoresearch.py --project /path/to/proj  # Specify project
+    python autoresearch.py --project . --iter 10    # 10 iterations
+    python autoresearch.py --project . --iter 5 --timeout 2  # 2 min interval
+
+Platform Detection:
+    This script auto-detects the OS and uses appropriate commands.
+    For manual setup or troubleshooting, see INSTALL.md.
 """
 
 import os
@@ -62,11 +69,23 @@ def log(msg: str, level: str = "INFO", project_dir: Optional[Path] = None):
 # =============================================================================
 # CLAUDE CLI DETECTION
 # =============================================================================
+# See INSTALL.md for platform-specific installation instructions
+# The code below auto-detects the OS and uses appropriate commands
 
 def get_claude_command() -> str:
-    """Находит команду для запуска Claude CLI."""
+    """Auto-detects the command to run Claude CLI on any platform.
+
+    Cross-platform implementation following INSTALL.md guidelines:
+    - Windows: Uses PowerShell with ExecutionPolicy Bypass
+    - Linux/macOS: Uses direct 'claude' command
+    - Falls back to trying all available methods
+
+    Returns:
+        str: Command string to run Claude CLI
+    """
+    # Auto-detect OS and use appropriate method
     if sys.platform == "win32":
-        # Windows: пробуем powershell.exe
+        # Windows: Try PowerShell (see INSTALL.md Step 2 - Windows)
         try:
             result = subprocess.run(
                 ["powershell.exe", "-Command", "Get-Command claude | Select-Object -ExpandProperty Source"],
@@ -82,7 +101,7 @@ def get_claude_command() -> str:
         except:
             pass
 
-        # Fallback через cmd.exe
+        # Fallback: Try cmd.exe where command
         try:
             result = subprocess.run(
                 ["cmd", "/c", "where claude.ps1"],
@@ -97,13 +116,21 @@ def get_claude_command() -> str:
         except:
             pass
 
-    # Unix или fallback
+    # Unix-like systems (Linux, macOS) - see INSTALL.md Step 2
     return "claude"
 
 def check_claude_cli() -> bool:
-    """Проверяет наличие Claude CLI."""
+    """Checks if Claude CLI is installed and accessible.
+
+    Validates installation following INSTALL.md Step 5 (Validation).
+    Works on all platforms: Windows, Linux, macOS.
+
+    Returns:
+        bool: True if Claude CLI is found and working
+    """
     claude_cmd = get_claude_command()
 
+    # Platform-specific validation
     if sys.platform == "win32" and "powershell.exe" in claude_cmd:
         import re
         match = re.search(r'-File\s+"([^"]+)"', claude_cmd)
@@ -115,7 +142,7 @@ def check_claude_cli() -> bool:
             if Path(ps1_path).exists():
                 return True
 
-    # Для Unix пробуем прямую команду
+    # Cross-platform: try running --version
     result = subprocess.run(
         claude_cmd.split() + ["--version"],
         capture_output=True,
@@ -400,7 +427,9 @@ def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> 
     output_file = exp_dir / f"output_{iteration}.md"
 
     try:
+        # Parse command based on platform (see INSTALL.md Step 2)
         if sys.platform == "win32" and "powershell.exe" in claude_cmd:
+            # Windows: Extract .ps1 path and build PowerShell command
             import re
             match = re.search(r'-File\s+"([^"]+)"', claude_cmd)
             if match:
@@ -410,11 +439,12 @@ def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> 
                     "-NoProfile",
                     "-ExecutionPolicy", "Bypass",
                     "-File", ps1_path,
-                    "--print",
+                    "--print",  # Non-interactive mode
                 ]
             else:
                 raise ValueError("Cannot parse PowerShell command")
         else:
+            # Unix-like (Linux, macOS): direct command
             cmd_args = claude_cmd.split() + ["--print"]
 
         env = os.environ.copy()
