@@ -330,6 +330,23 @@ def build_agent_prompt(config: ProjectConfig, iteration: int, total: int) -> str
 Начинайте эксперимент {iteration}.
 """
 
+    # Читаем накопленный контекст если есть
+    accumulated_context = ""
+    last_experiment = ""
+
+    project_dir = config.project_dir
+    exp_dir = project_dir / ".autoresearch" / "experiments"
+
+    if exp_dir.exists():
+        accumulation_file = exp_dir / "accumulation_context.md"
+        last_exp_file = exp_dir / "last_experiment.md"
+
+        if accumulation_file.exists():
+            accumulated_context = accumulation_file.read_text(encoding="utf-8")
+
+        if last_exp_file.exists():
+            last_experiment = last_exp_file.read_text(encoding="utf-8")
+
     # Заполняем переменные
     cfg = config.config
     context = {
@@ -340,9 +357,24 @@ def build_agent_prompt(config: ProjectConfig, iteration: int, total: int) -> str
         "goals": "\n".join(f"- {g}" for g in cfg.get("goals", [])) or "- Не указаны",
         "tech_stack": ", ".join(cfg.get("tech_stack", [])) or "Не определён",
         "constraints": "\n".join(f"- {c}" for c in cfg.get("constraints", [])) or "- Нет",
+        "focus_areas": "\n".join(f"- {a}" for a in cfg.get("focus_areas", [])) or "- Исследуй любые улучшения",
     }
 
-    return template.format(**context)
+    prompt = template.format(**context)
+
+    # Добавляем накопленный контекст если есть
+    if accumulated_context or last_experiment:
+        prompt += "\n\n## Накопленный контекст\n\n"
+
+        if last_experiment:
+            prompt += "### Последний эксперимент\n\n"
+            prompt += last_experiment + "\n\n"
+
+        if accumulated_context:
+            prompt += "### Полный лог экспериментов\n\n"
+            prompt += accumulated_context + "\n\n"
+
+    return prompt
 
 # =============================================================================
 # EXPERIMENT LOOP
