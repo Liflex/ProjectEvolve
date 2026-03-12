@@ -120,6 +120,12 @@ python F:/IdeaProjects/autoresearch/utils/quality_loop.py --project . --max-iter
 
 Добавьте запись в `.autoresearch/experiments/accumulation_context.md`:
 
+**ВАЖНО: Если добавляете записи в `.claude/memory/` (lessons.md, patterns.md, architecture.md), ОБЯЗАТЕЛЬНО помечайте их:**
+
+- **[CRITICAL]** — key feature, фундаментальная архитектура
+- **[IMPORTANT]** — значимое UX улучшение, reusable pattern
+- Без метки — minor improvement (не попадет в контекст!)
+
 ```markdown
 ## Experiment {iteration}: {Title}
 
@@ -261,3 +267,37 @@ thresholds:
 ```
 
 Начинайте эксперимент {iteration}.
+
+---
+
+## Memory Entry Priority System (CRITICAL/IMPORTANT)
+
+Чтобы ограничить размер промпта, используй метки приоритета в memory файлах:
+
+### Метки
+
+**[CRITICAL]** — Фундаментальная архитектура и key features
+- Ключевые features проекта
+- Архитектурные решения без которых непонятен проект
+- Базовые паттерны
+
+**[IMPORTANT]** — Важные паттерны и улучшения
+- Значимые улучшения UX
+- Reusable patterns
+- Успешные experiment results
+
+### Использование в AutoResearch
+
+При работе с memory:
+1. Читай только записи с `[CRITICAL]` или `[IMPORTANT]`
+2. Пропускай записи без меток
+3. Это ограничивает контекст до 30-50 KB вместо 200+ KB
+
+### Пример
+
+```markdown
+## [CRITICAL] Decision: Priority Scoring System Architecture
+## [IMPORTANT] Pattern: Cascade Merge Strategies
+## Lesson: Minor fix (без метки - игнорируется)
+```
+

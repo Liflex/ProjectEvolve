@@ -577,3 +577,39 @@ python autoresearch.py --project /path/to/project --iter 10 --timeout 5
 | `run_autoresearch()` | 470-540 | Main loop, orchestrates experiments |
 
 **For platform-specific details:** See the inline comments in each function referencing `INSTALL.md`.
+
+---
+
+## Memory Entry Priority System
+
+Когда AI агент добавляет записи в `.claude/memory/`, он должен использовать систему приоритетов:
+
+### Метки для записей
+
+**[CRITICAL]** — Фундаментальные вещи
+```markdown
+## [CRITICAL] Lesson: Priority Scoring System Architecture
+## [CRITICAL] Pattern: AutoResearch Experiment Structure
+```
+
+**[IMPORTANT]** — Важные паттерны
+```markdown
+## [IMPORTANT] Pattern: Cascade Merge Strategies
+## [IMPORTANT] Lesson: Profile Recommender Improves Discoverability
+```
+
+**Без метки** — minor improvements (не попадут в контекст)
+
+### Лимиты контекста
+
+AutoResearch agent использует `read_last_entries()` которая:
+- Включает только `[CRITICAL]` и `[IMPORTANT]` записи
+- Исключает обычные записи
+- Ограничивает промпт до 30-50 KB вместо 200+ KB
+
+### Когда использовать метки
+
+- **CRITICAL**: key features, фундаментальная архитектура
+- **IMPORTANT**: значимые UX улучшения, reusable patterns
+- **Без метки**: minor fixes, generic quality rules
+
