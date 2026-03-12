@@ -54,25 +54,26 @@
 
 ## 🚀 Quick Start
 
-### Step 1️⃣: Initial Setup (Automatic)
+### Step 1️⃣: Environment Setup by AI Agent
 
-On first run, AI agent will ask questions about your project:
+**For AI agent:** Read `INSTALL.md` and configure the system:
 
 ```bash
-# For any project — navigate and run:
-cd /path/to/your/project
-python F:/IdeaProjects/autoresearch/autoresearch.py
+# AI agent sets up the environment
+# (install Python, Node.js, Claude CLI, create directories)
 ```
 
-**Agent will ask:**
-- Project name
-- Short description
-- Goals for improvement
-- Constraints (if any)
+**AI agent will:**
+- ✅ Detect OS (Windows/Linux/macOS)
+- ✅ Install missing dependencies
+- ✅ Create required directories
+- ✅ Verify installation
 
-After answering, `.autoresearch.json` configuration file will be created.
+> **See:** `INSTALL.md` — this is the instruction for AI agent on cross-platform setup.
 
-### Step 2️⃣: Run Experiments
+### Step 2️⃣: Run AutoResearch
+
+After environment setup, run the script:
 
 ```bash
 # Basic run (10 iterations, 5 min interval)
