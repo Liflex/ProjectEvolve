@@ -54,44 +54,43 @@
 
 ## 🚀 Quick Start
 
-### Installation
+### Step 1️⃣: Initial Setup (Automatic)
+
+On first run, AI agent will ask questions about your project:
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/your-username/autoresearch.git
-cd autoresearch
-
-# 2. Install Claude CLI
-npm install -g @anthropic-ai/claude-code
-
-# 3. Ready!
+# For any project — navigate and run:
+cd /path/to/your/project
+python F:/IdeaProjects/autoresearch/autoresearch.py
 ```
 
-### Usage
+**Agent will ask:**
+- Project name
+- Short description
+- Goals for improvement
+- Constraints (if any)
+
+After answering, `.autoresearch.json` configuration file will be created.
+
+### Step 2️⃣: Run Experiments
 
 ```bash
-# Interactive mode (will ask questions)
-python autoresearch.py --project /path/to/your/project
+# Basic run (10 iterations, 5 min interval)
+python F:/IdeaProjects/autoresearch/autoresearch.py --project /path/to/project
 
-# Quick run with parameters
-python autoresearch.py --project . --iter 10 --timeout 5
+# With parameters
+python F:/IdeaProjects/autoresearch/autoresearch.py --project . --iter 50 --timeout 2
 
-# Configure only, don't run
-python autoresearch.py --project . --configure
+# Windows (via bat-file)
+F:/IdeaProjects/autoresearch/autoresearch.bat . 50 2
 ```
 
-### Windows (bat-file)
+**Parameters:**
+- `--project` — path to your project
+- `--iter` — number of iterations (default: 10)
+- `--timeout` — interval between iterations in minutes (default: 5)
 
-```batch
-REM Run in current project
-autoresearch.bat
-
-REM 10 iterations
-autoresearch.bat . 10
-
-REM 10 iterations, 2 minutes interval
-autoresearch.bat . 10 2
-```
+---
 
 ---
 
