@@ -29,6 +29,10 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional, List
 
+# Добавляем utils в путь
+UTILS_DIR = Path(__file__).parent / "utils"
+sys.path.insert(0, str(UTILS_DIR))
+
 # =============================================================================
 # CONFIG
 # =============================================================================
@@ -298,6 +302,77 @@ def detect_tech_stack(project_dir: Path) -> List[str]:
             tech.extend(technologies)
 
     return list(set(tech))
+
+# =============================================================================
+# QUALITY GATE
+# =============================================================================
+
+def run_quality_gate(project_dir: Path) -> Dict[str, Any]:
+    """Запускает Quality Gate тесты для проекта.
+
+    Returns:
+        Dict с результатами тестов:
+        {
+            "score": 0.85,
+            "passed": True,
+            "results": [...],
+            "decision": "KEEP"
+        }
+    """
+    try:
+        # Импортируем QualityLoop
+        from quality_loop import QualityLoop
+
+        log("Запуск Quality Gate...", "INFO", project_dir)
+
+        loop = QualityLoop(project_dir)
+        state = loop.run(
+            max_iterations=2,  # Quick check
+            threshold_a=0.6,
+            threshold_b=0.7
+        )
+
+        decision = "KEEP" if state.score >= 0.6 else "REVIEW"
+
+        result = {
+            "score": state.score,
+            "passed": state.score >= 0.6,
+            "phase": state.phase.value,
+            "iterations": state.iteration - 1,
+            "stop_reason": state.stop_reason,
+            "results": [
+                {
+                    "name": r.name,
+                    "passed": r.passed,
+                    "score": r.score,
+                    "duration": r.duration
+                }
+                for r in state.results
+            ],
+            "decision": decision
+        }
+
+        log(f"Quality Gate: {decision} (score: {state.score:.2f})", "INFO", project_dir)
+
+        return result
+
+    except ImportError:
+        # quality_loop не доступен - возвращаем нейтральный результат
+        log("Quality Loop module not found, skipping...", "WARNING", project_dir)
+        return {
+            "score": 0.5,
+            "passed": None,
+            "decision": "MANUAL_REVIEW"
+        }
+    except Exception as e:
+        log(f"Quality Gate error: {e}", "WARNING", project_dir)
+        return {
+            "score": 0.5,
+            "passed": None,
+            "error": str(e),
+            "decision": "MANUAL_REVIEW"
+        }
+
 
 # =============================================================================
 # PROMPT GENERATION

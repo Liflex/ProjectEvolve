@@ -1,0 +1,115 @@
+# Quality Gate Configuration for ProjectEvolve
+# Универсальная система метрик и тестов для любых проектов
+
+# Название проекта (автозаполняется при настройке)
+project_name: ""
+
+# Метрики качества - универсальные проверки
+metrics:
+  # Автотесты - запуск тестов проекта
+  tests:
+    enabled: true
+    command: ""  # Автодетект: npm test, pytest, cargo test, go test, etc.
+    success_pattern: "pass|success|ok"
+    fail_pattern: "fail|error|failed"
+
+  # Линтинг - проверка стиля кода
+  lint:
+    enabled: false
+    command: ""  # Например: eslint, flake8, cargo clippy
+    success_pattern: ""
+    fail_pattern: "error|warning"
+
+  # Типы - проверка типов
+  types:
+    enabled: false
+    command: ""  # Например: tsc, mypy, pyright
+    success_pattern: ""
+    fail_pattern: "error"
+
+  # Сборка - проверка что проект собирается
+  build:
+    enabled: false
+    command: ""  # Например: npm run build, cargo build, go build
+    success_pattern: "built|compiled|success"
+    fail_pattern: "error|failed"
+
+  # Кастомная команда - любая проверка
+  custom:
+    enabled: false
+    command: ""  # Любая команда
+    success_pattern: ""
+    fail_pattern: ""
+
+# Пороги качества (thresholds)
+thresholds:
+  # Phase A - базовое качество
+  a:
+    min_score: 0.7  # 70% метрик должны пройти
+    required_checks: ["tests"]  # Обязательные проверки
+
+  # Phase B - строгое качество
+  b:
+    min_score: 0.85  # 85% метрик должны пройти
+    required_checks: ["tests", "build"]  # Все проверки
+
+# Loop настройки
+loop:
+  max_iterations: 4
+  stagnation_limit: 2  # Остановить если нет улучшения 2 итерации
+  stagnation_delta: 0.02  # Delta < 2% считается стагнацией
+
+# Decision правила - когда сохранять изменения
+decision:
+  keep_if:
+    score_improved: true  # Score улучшился по сравнению с baseline
+    no_regressions: true  # Нет новых fail
+    required_passed: true  # Все required_checks прошли
+
+  discard_if:
+    score_decreased: true  # Score ухудшился
+    critical_fail: true  # Критическая ошибка
+
+# Автодетект команд по типу проекта
+auto_detect:
+  python:
+    test: ["pytest", "python -m pytest", "python test.py"]
+    lint: ["flake8", "pylint", "ruff check"]
+    types: ["mypy", "pyright"]
+    build: ["python -m build"]
+
+  javascript:
+    test: ["npm test", "npm run test", "yarn test", "jest"]
+    lint: ["npm run lint", "eslint", "prettier --check"]
+    types: ["npm run typecheck", "tsc --noEmit"]
+    build: ["npm run build", "webpack", "vite build"]
+
+  typescript:
+    test: ["npm test", "npm run test", "jest"]
+    lint: ["npm run lint", "eslint", "prettier --check"]
+    types: ["tsc --noEmit", "npm run typecheck"]
+    build: ["npm run build", "tsc", "vite build"]
+
+  go:
+    test: ["go test ./...", "go test"]
+    lint: ["golangci-lint run", "golint"]
+    types: ["go vet"]  # Go имеет встроенную проверку типов
+    build: ["go build"]
+
+  rust:
+    test: ["cargo test"]
+    lint: ["cargo clippy"]
+    types: []  # Rust проверяет типы при сборке
+    build: ["cargo build"]
+
+  ruby:
+    test: ["bundle exec rspec", "rspec", "ruby test.rb"]
+    lint: ["rubocop", "bundle exec rubocop"]
+    types: []  # Ruby динамический
+    build: ["bundle exec rake build"]
+
+  java:
+    test: ["./gradlew test", "mvn test", "gradle test"]
+    lint: ["./gradlew checkstyleMain", "mvn checkstyle:check"]
+    types: ["javac"]  # Java проверяет типы при компиляции
+    build: ["./gradlew build", "mvn package", "gradle build"]

@@ -20,6 +20,64 @@ The implementation follows the patterns defined in `autoresearch.py`.
 
 ---
 
+## ⚠️ Important: Claude Code Permissions
+
+**ProjectEvolve requires Claude Code to run with appropriate permissions.**
+
+### Permissions Mode
+
+- ✅ **"bypass permissions on"** — Recommended! No approvals needed, full autonomy
+- ⚠️ **Other modes (auto/manual)** — May require permission approvals during execution
+- ❌ **Risk:** Agent may hang waiting for user to approve tool usage
+
+### Required Tools
+
+ProjectEvolve agent needs these tools to be approved (if not in bypass mode):
+
+**Core tools:**
+- `Edit` — Modify files
+- `Read` — Read file contents
+- `Write` — Create new files
+- `Glob` — Find files by pattern
+- `Grep` — Search file contents
+
+**Optional tools:**
+- `Bash` — Execute shell commands (for Quality Loop)
+- `Agent` — Spawn sub-agents
+
+### Recommended Settings
+
+**Option 1: Bypass Mode (Recommended)**
+```json
+{
+  "permissionMode": "bypass"
+}
+```
+
+**Option 2: Auto-Approve Safe Tools**
+```json
+{
+  "permissionMode": "auto",
+  "autoApproveSafeTools": true,
+  "alwaysAllowTools": ["Edit", "Read", "Write", "Glob", "Grep"]
+}
+```
+
+### What This Means
+
+| Mode | Behavior | Recommendation |
+|------|----------|----------------|
+| **bypass** | No prompts, full autonomy | ✅ Best for ProjectEvolve |
+| **auto** | Auto-approve safe tools | ⚠️ Pre-approve core tools |
+| **manual** | Prompt for every tool | ❌ Not recommended |
+
+**If agent hangs during experiment execution:**
+1. Check if a permission prompt is waiting for approval
+2. Approve the required tool (Edit, Read, Write, etc.)
+3. Or switch to bypass mode for full autonomy
+
+---
+
 ## Step 1: Detect Operating System
 
 First, determine the target operating system:

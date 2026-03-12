@@ -1,5 +1,11 @@
-# AutoResearch не требует внешних зависимостей
-# Использует только стандартную библиотеку Python
+# ProjectEvolve Requirements
+# Universal AI-powered research and project improvement system
+
+# Core dependencies for Quality Loop
+pyyaml>=6.0
+
+# Optional: for better JSON handling
+# ujson>=5.0.0
 
 # Для разработки:
 # pytest>=7.0.0

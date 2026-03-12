@@ -89,7 +89,8 @@
 - 🔍 **Analyze** — studies project structure, code, documentation
 - 💡 **Propose** — generates improvement ideas
 - 🔨 **Implement** — makes changes to code, structure, documentation
-- 🧪 **Test** — ensures nothing breaks
+- 🧪 **Quality Loop** — built-in self-testing with quantitative metrics
+- 📊 **Evaluate** — automatic scoring (0.0-1.0) with pass/fail decisions
 - 📝 **Document** — updates README, creates new documentation
 - 🔄 **Iterate** — each iteration learns from previous ones
 
@@ -106,6 +107,143 @@
 - Python 3.10+
 - Claude CLI (Anthropic)
 - Git (optional)
+
+---
+
+## 🔄 Quality Loop
+
+ProjectEvolve includes a **built-in self-testing system** inspired by quality gates:
+
+### How Quality Loop Works
+
+```
+┌──────────────┐      ┌──────────────┐      ┌──────────────┐
+│   Generate   │─────▶│    Apply     │─────▶│   Evaluate   │
+│   Idea       │      │   Changes    │      │   (Score)    │
+└──────────────┘      └──────────────┘      └──────┬───────┘
+                                                    │
+                                                    ▼
+                                             ┌──────────────┐
+                                             │   Decision   │
+                                             │  KEEP/DISCARD│
+                                             └──────────────┘
+                                                    │
+                              ┌─────────────────────┘
+                              │ (if kept)
+                              ▼
+                      ┌──────────────┐
+                      │   Next Iter.  │
+                      └──────────────┘
+```
+
+### Quality Gate Features
+
+- **Universal** — works with Python, JavaScript, Go, Rust, Ruby, Java, any language
+- **Auto-detect** — automatically finds test commands (`npm test`, `pytest`, `cargo test`, etc.)
+- **Quantitative** — scores 0.0-1.0 with pass/fail decisions
+- **Two-phase** — Phase A (base quality, 70% threshold) → Phase B (strict quality, 85% threshold)
+- **Automatic** — runs tests after each experiment, decides to keep or discard changes
+
+### Running Quality Loop
+
+```bash
+# Standalone quality check
+python F:/IdeaProjects/autoresearch/utils/quality_loop.py --project /path/to/project
+
+# Custom thresholds
+python utils/quality_loop.py --project . --threshold-a 0.7 --threshold-b 0.85
+
+# JSON output for parsing
+python utils/quality_loop.py --project . --json
+```
+
+### Quality Configuration
+
+Configuration file `.autoresearch/quality.yml` is created automatically:
+
+```yaml
+metrics:
+  tests:
+    enabled: true
+    command: ""  # Auto-detect: npm test, pytest, cargo test, etc.
+  build:
+    enabled: false
+    command: ""  # Auto-detect: npm run build, cargo build, etc.
+
+thresholds:
+  a:
+    min_score: 0.7  # Phase A threshold
+    required_checks: ["tests"]
+  b:
+    min_score: 0.85  # Phase B threshold
+    required_checks: ["tests", "build"]
+```
+
+### Decision Logic
+
+**Keep changes if:**
+- ✅ Score ≥ baseline + 0.05 (improvement)
+- ✅ All required checks pass
+- ✅ No critical failures
+
+**Discard changes if:**
+- ❌ Score decreased
+- ❌ Critical tests fail
+- ❌ Violates project constraints
+
+**Manual review if:**
+- ⚠️ Score ~ baseline (minimal change)
+- ⚠️ Some non-critical tests fail
+
+---
+
+## ⚠️ Important: Claude Code Permissions
+
+ProjectEvolve requires Claude Code to run with appropriate permissions.
+
+### Permissions Mode
+
+- ✅ **"bypass permissions on"** — Recommended! No approvals needed, full autonomy
+- ⚠️ **Other modes (auto/manual)** — May require permission approvals during execution
+- ❌ **Risk:** Agent may hang waiting for user to approve tool usage
+
+### Required Tools
+
+ProjectEvolve agent needs these tools to be approved (if not in bypass mode):
+
+**Core tools:**
+- `Edit` — Modify files
+- `Read` — Read file contents
+- `Write` — Create new files
+- `Glob` — Find files by pattern
+- `Grep` — Search file contents
+
+**Optional tools:**
+- `Bash` — Execute shell commands (for Quality Loop)
+- `Agent` — Spawn sub-agents
+
+### Recommended Settings
+
+**Option 1: Bypass Mode (Recommended)**
+```json
+{
+  "permissionMode": "bypass"
+}
+```
+
+**Option 2: Auto-Approve Safe Tools**
+```json
+{
+  "permissionMode": "auto",
+  "autoApproveSafeTools": true,
+  "alwaysAllowTools": ["Edit", "Read", "Write", "Glob", "Grep"]
+}
+```
+
+**If agent hangs during experiment execution:**
+1. Check if a permission prompt is waiting for approval
+2. Approve the required tool (Edit, Read, Write, etc.)
+3. Or switch to bypass mode for full autonomy
 
 ---
 
@@ -161,9 +299,11 @@ autoresearch/
 ├── README_RU.md             # Russian version (full)
 ├── QUICKSTART.md            # Quick guide
 ├── config/
-│   └── default_prompt.md    # Agent prompt template
+│   ├── default_prompt.md    # Agent prompt template
+│   └── quality.yml          # Quality gate configuration
 ├── utils/
-│   └── cli_setup.py         # Interactive setup
+│   ├── cli_setup.py         # Interactive setup
+│   └── quality_loop.py      # Quality loop implementation
 └── .gitignore               # Git ignore
 ```
 
@@ -173,6 +313,7 @@ autoresearch/
 your-project/
 ├── .autoresearch/
 │   ├── .autoresearch.json        # Project configuration
+│   ├── quality.yml               # Quality gate configuration (auto-created)
 │   ├── experiments/
 │   │   ├── prompt_1.md
 │   │   ├── output_1.md
