@@ -245,6 +245,8 @@ ProjectEvolve agent needs these tools to be approved (if not in bypass mode):
 2. Approve the required tool (Edit, Read, Write, etc.)
 3. Or switch to bypass mode for full autonomy
 
+**Note:** All scripts have a 30-minute timeout per experiment. If Claude CLI hangs (e.g., on permission prompts), the experiment will time out and continue to the next iteration. Check logs for timeout errors.
+
 ---
 
 ## 🚀 Quick Start
@@ -377,10 +379,13 @@ Constraints (optional):
 
 ## 📊 Usage Examples
 
-### Example 1: Quick Test
+### Example 1: Quick Test (Short Form)
 
 ```bash
-# Quick test: 3 experiments, 1 minute interval
+# Short form: 3 experiments, 1 minute interval
+python F:/IdeaProjects/autoresearch/autoresearch.py . 3 1
+
+# Long form: same as above
 python F:/IdeaProjects/autoresearch/autoresearch.py --project . --iter 3 --timeout 1
 ```
 
@@ -399,6 +404,26 @@ python F:/IdeaProjects/autoresearch/autoresearch.py --project /path/to/project -
 
 # Later — run
 python F:/IdeaProjects/autoresearch/autoresearch.py --project /path/to/project --iter 10
+```
+
+### Example 4: Continue From Specific Experiment
+
+```bash
+# Continue from Experiment 25 (after previous session ended at 24)
+python F:/IdeaProjects/autoresearch/autoresearch.py --project . --iter 10 --start-from 25
+
+# This will run Experiments 25-34 (10 experiments starting from 25)
+# The agent will still see accumulated context from all previous experiments
+```
+
+### Example 5: Auto-Detect Next Experiment Number
+
+```bash
+# Auto-detects next experiment number (if output_1.md exists, starts from 2)
+python F:/IdeaResearch/autoresearch/autoresearch.py . 10 1
+
+# Or without --project parameter (uses current directory)
+python F:/IdeaProjects/autoresearch/autoresearch.py 10 1
 ```
 
 ---

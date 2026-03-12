@@ -76,6 +76,8 @@ ProjectEvolve agent needs these tools to be approved (if not in bypass mode):
 2. Approve the required tool (Edit, Read, Write, etc.)
 3. Or switch to bypass mode for full autonomy
 
+**Note:** All scripts have a 30-minute timeout per experiment. If Claude CLI hangs (e.g., on permission prompts), the experiment will time out and continue to the next iteration. Check logs for timeout errors.
+
 ---
 
 ## Step 1: Detect Operating System

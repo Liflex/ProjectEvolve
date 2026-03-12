@@ -55,6 +55,36 @@ GLOBAL_CONFIG_FILE = AUTORESEARCH_HOME / "config" / "global.json"
 # LOGGING
 # =============================================================================
 
+def get_next_experiment_number(exp_dir: Path) -> int:
+    """Автоматически определяет следующий номер эксперимента.
+
+    Проверяет существующие output_N.md файлы и возвращает следующий свободный номер.
+
+    Args:
+        exp_dir: Директория с экспериментами
+
+    Returns:
+        int: Следующий номер эксперимента
+    """
+    if not exp_dir.exists():
+        return 1
+
+    # Ищем все output_N.md файлы
+    existing = []
+    for file in exp_dir.glob("output_*.md"):
+        match = file.stem.split("_")[1]
+        try:
+            num = int(match)
+            existing.append(num)
+        except:
+            continue
+
+    if not existing:
+        return 1
+
+    max_num = max(existing)
+    return max_num + 1
+
 def log(msg: str, level: str = "INFO", project_dir: Optional[Path] = None):
     """Логирование в консоль и файл."""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -525,6 +555,11 @@ def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> 
         env = os.environ.copy()
         env['PYTHONIOENCODING'] = 'utf-8'
 
+        # CRITICAL: Отключаем CLAUDECODE чтобы избежать nested session check
+        # Claude CLI нельзя запускать изнутри другой сессии Claude Code
+        env.pop('CLAUDECODE', None)
+        env.pop('CLAUDE_SESSION_ID', None)
+
         result = subprocess.run(
             cmd_args,
             input=prompt,
@@ -534,7 +569,8 @@ def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> 
             encoding='utf-8',
             errors='replace',
             env=env,
-            check=False
+            check=False,
+            timeout=1800  # 30 минут максимум для одного эксперимента
         )
 
         if result.returncode != 0:
@@ -553,17 +589,26 @@ def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> 
             log(f"Эксперимент {iteration} завершён без маркера", "WARNING", project_dir)
             return {"status": "incomplete", "output": output}
 
+    except subprocess.TimeoutExpired as e:
+        log(f"Claude CLI timeout after 30 minutes!", "ERROR", project_dir)
+        log(f"Experiment {iteration} timed out - may be stuck on permission prompt or hanging", "ERROR", project_dir)
+        return {"status": "error", "error": f"Timeout after 30 minutes. Claude CLI may be waiting for permission approval or stuck."}
     except Exception as e:
         log(f"Ошибка запуска: {e}", "ERROR", project_dir)
         return {"status": "error", "error": str(e)}
 
-def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: Optional[ProjectConfig] = None):
+def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: Optional[ProjectConfig] = None, start_from: int = 1):
     """Главный цикл AutoResearch."""
+    # Вычисляем конечный номер эксперимента
+    max_experiment_number = start_from + iterations - 1
+
     log("=" * 70, project_dir=project_dir)
     log("AutoResearch - запуск", project_dir=project_dir)
     log("=" * 70, project_dir=project_dir)
     log(f"Проект: {project_dir}", project_dir=project_dir)
-    log(f"Итераций: {iterations}", project_dir=project_dir)
+    log(f"Начинаем с: Experiment {start_from}", project_dir=project_dir)
+    log(f"Всего итераций: {iterations}", project_dir=project_dir)
+    log(f"Завершить на: Experiment {max_experiment_number}", project_dir=project_dir)
     log(f"Интервал: {timeout} мин", project_dir=project_dir)
     log("", project_dir=project_dir)
 
@@ -597,17 +642,17 @@ def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: O
     # Главный цикл
     results = []
 
-    for i in range(1, iterations + 1):
+    for i in range(start_from, max_experiment_number + 1):
         log("", project_dir=project_dir)
         log(f"=" * 70, project_dir=project_dir)
-        log(f"Эксперимент {i}/{iterations}", project_dir=project_dir)
+        log(f"Эксперимент {i}/{max_experiment_number}", project_dir=project_dir)
         log("=" * 70, project_dir=project_dir)
 
-        result = run_single_experiment(config, i, iterations)
+        result = run_single_experiment(config, i, max_experiment_number)
         results.append(result)
 
         # Пауза перед следующей итерацией
-        if i < iterations and timeout > 0:
+        if i < max_experiment_number and timeout > 0:
             log(f"Ожидание {timeout} минут до следующей итерации...", "INFO", project_dir)
             log(f"Следующий эксперимент в {datetime.now().strftime('%H:%M:%S')}", "INFO", project_dir)
             time.sleep(timeout * 60)
@@ -640,31 +685,65 @@ def main():
 Примеры:
   python autoresearch.py                              # Интерактивный режим
   python autoresearch.py --project /path/to/project   # Указать проект
-  python autoresearch.py --project . --iter 10        # 10 итераций
-  python autoresearch.py --project . --iter 5 --timeout 2  # 2 мин интервал
+  python autoresearch.py . 10 1                         # 10 итераций, 1 мин пауза (кратко)
+  python autoresearch.py --project . --iter 10 --timeout 2  # Полный формат
+  python autoresearch.py . 10 --start-from 25            # Продолжение с Experiment 25
         """
     )
 
+    # Позиционные аргументы (для краткого запуска)
     parser.add_argument(
-        "--project", "-p",
+        "project",
+        nargs="?",
         type=Path,
         default=DEFAULT_PROJECT,
         help="Путь к проекту (по умолчанию: текущая директория)"
     )
 
     parser.add_argument(
-        "--iter", "-i",
+        "iter",
+        nargs="?",
         type=int,
         default=DEFAULT_ITERATIONS,
         help="Количество итераций (по умолчанию: 10)"
     )
 
     parser.add_argument(
-        "--timeout", "-t",
+        "timeout",
+        nargs="?",
         type=int,
         default=DEFAULT_TIMEOUT,
-        dest="timeout",
         help="Интервал между итерациями в минутах (по умолчанию: 5)"
+    )
+
+    # Именованные аргументы (переопределяют позиционные)
+    parser.add_argument(
+        "--project", "-p",
+        type=Path,
+        dest="project_opt",
+        help="Путь к проекту"
+    )
+
+    parser.add_argument(
+        "--iter", "-i",
+        type=int,
+        dest="iter_opt",
+        help="Количество итераций (переопределяет позиционный)"
+    )
+
+    parser.add_argument(
+        "--timeout", "-t",
+        type=int,
+        dest="timeout_opt",
+        help="Интервал между итерациями (переопределяет позиционный)"
+    )
+
+    parser.add_argument(
+        "--start-from",
+        type=int,
+        default=None,
+        dest="start_from",
+        help="Начать с указанного номера (если не указано - автоопределение)"
     )
 
     parser.add_argument(
@@ -681,7 +760,23 @@ def main():
 
     args = parser.parse_args()
 
-    project_dir = args.project.resolve()
+    # Определяем проект (приоритет: опция > позиционный > дефолт)
+    project_dir = (args.project_opt or args.project).resolve()
+
+    # Определяем количество итераций
+    iterations = args.iter_opt or args.iter
+
+    # Определяем таймаут
+    timeout = args.timeout_opt or args.timeout
+
+    # Определяем стартовый номер
+    if start_from is None:
+        # Автоопределяем следующий номер эксперимента
+        exp_dir = project_dir / ".autoresearch" / "experiments"
+        start_from = get_next_experiment_number(exp_dir)
+        log(f"Автоопределён следующий номер: Experiment {start_from}", "INFO", project_dir)
+    else:
+        log(f"Указан стартовый номер: Experiment {start_from}", "INFO", project_dir)
 
     # Режим только настройки
     if args.configure or args.reconfigure:
@@ -698,8 +793,9 @@ def main():
     # Запуск AutoResearch
     return run_autoresearch(
         project_dir=project_dir,
-        iterations=args.iter,
-        timeout=args.timeout
+        iterations=iterations,
+        timeout=timeout,
+        start_from=start_from
     )
 
 if __name__ == "__main__":
