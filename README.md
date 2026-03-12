@@ -2,9 +2,9 @@
 
   # 🧪 ProjectEvolve
 
-  ### **Автономная система исследования и улучшения проектов**
+  ### **Autonomous AI-Powered Research and Project Improvement System**
 
-  **[🇬🇧 English Documentation → README_EN.md](README_EN.md)**
+  [**Русская документация → README_RU.md](README_RU.md)]
 
   <br/>
 
@@ -17,82 +17,309 @@
 
 ---
 
-> **Документация на русском языке:** [README_EN.md](README_EN.md) — полное описание на английском языке
+## 💡 Philosophy
+
+> *"Give an AI agent a real project and let it experiment autonomously."*
+> — Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch)
+
+### Difference from Original
+
+**Original karpathy/autoresearch** — AI agent researches neural network training (nanochat), modifying only `train.py` with a single `val_bpb` metric.
+
+**ProjectEvolve** — extends this idea to **any project**:
+- Any programming language (Python, JavaScript, Go, Rust, ...)
+- Any task types (backend, frontend, DevOps, documentation, ...)
+- Any files and directories (full freedom of action)
+- Cross-platform (Windows, Linux, macOS)
+- Knowledge persistence across runs
+
+**Key inheritance:** agent works autonomously, iteratively improves project, keeps successful changes, discards failures.
 
 ---
 
-## 🚀 Быстрый старт
+## 📖 Overview
 
-### Шаг 1️⃣: Настройка окружения AI агентом
+**ProjectEvolve** is a universal tool for running an AI agent on any project. The agent autonomously analyzes code, proposes improvements, makes changes, and learns from previous experiments.
 
-**Для AI агента:** Прочитайте `INSTALL.md` и настройте систему.
+### What ProjectEvolve Does?
 
-**AI агент выполнит:**
-- ✅ Детекцию ОС (Windows/Linux/macOS)
-- ✅ Установку зависимостей
-- ✅ Создание директорий
-- ✅ Проверку установки
+1. **Analyzes** — studies project structure, code, documentation
+2. **Proposes** — generates improvement ideas
+3. **Implements** — makes changes to code/structure/docs
+4. **Tests** — ensures nothing breaks
+5. **Accumulates** — next iteration sees previous results
+6. **Repeats** — cycle continues autonomously
 
-### Шаг 2️⃣: Запуск ProjectEvolve
+### 🎯 Why ProjectEvolve?
 
-```bash
-# Базовый запуск (10 итераций, интервал 5 минут)
-python F:/IdeaProjects/autoresearch/autoresearch.py --project /path/to/project
+- **🔄 Autonomous experiments** — AI independently analyzes, proposes, and implements improvements
+- **📚 Knowledge accumulation** — each iteration sees previous results, building project knowledge
+- **⚡ Universality** — works with Python, JavaScript, Go, Rust, and any other technology
+- **🎨 Flexible setup** — simple questionnaire adapts to project
+- **🌐 Cross-platform** — Windows, Linux, macOS
+- **🔧 Zero maintenance** — agent handles everything
 
-# С параметрами
-python F:/IdeaProjects/autoresearch/autoresearch.py --project . --iter 50 --timeout 2
+### 💡 How it works?
 
-# Windows (через bat-файл)
-F:/IdeaProjects/autoresearch/autoresearch.bat . 50 2
+```
+┌─────────────────┐      ┌──────────────┐      ┌─────────────┐
+│  Your Project   │─────▶│ ProjectEvolve│─────▶│  AI Agent   │
+│  (any language) │      │  (script)    │      │  (Claude)   │
+└─────────────────┘      └──────────────┘      └─────────────┘
+                                │                      │
+                                ▼                      ▼
+                        ┌──────────────┐      ┌─────────────┐
+                        │ Configuration│      │ Experiment  │
+                        │ .autoresearch│      │ #1, #2, #3  │
+                        └──────────────┘      └─────────────┘
+                                │                      │
+                                ▼                      ▼
+                        ┌──────────────┐      ┌─────────────┐
+                        │  Improvements│◀─────│  Context    │
+                        │  code/docs    │      │  accumulates│
+                        └──────────────┘      └─────────────┘
 ```
 
-**Параметры:**
-- `--project` — путь к проекту
-- `--iter` — итерации (по умолчанию 10)
-- `--timeout` — интервал в минутах (по умолчанию 5)
+---
+
+## 🎨 Features
+
+### ✨ What can ProjectEvolve do?
+
+- 🔍 **Analyze** — studies project structure, code, documentation
+- 💡 **Propose** — generates improvement ideas
+- 🔨 **Implement** — makes changes to code, structure, documentation
+- 🧪 **Test** — ensures nothing breaks
+- 📝 **Document** — updates README, creates new documentation
+- 🔄 **Iterate** — each iteration learns from previous ones
+
+### 🌐 Cross-platform Support
+
+| Platform | Support | Installation |
+|----------|----------|--------------|
+| **Windows** | ✅ Full | `autoresearch.bat` |
+| **Linux** | ✅ Full | `python autoresearch.py` |
+| **macOS** | ✅ Full | `python autoresearch.py` |
+
+### 🔧 Technologies
+
+- Python 3.10+
+- Claude CLI (Anthropic)
+- Git (optional)
 
 ---
 
-## 💡 Краткое описание
+## 🚀 Quick Start
 
-**ProjectEvolve** — универсальный инструмент для запуска AI-агента на любом проекте.
+### Step 1️⃣: Environment Setup by AI Agent
 
-**Что делает:**
-- 🔍 Анализирует код
-- 💡 Предлагает улучшения
-- 🔨 Внедряет изменения
-- 🧪 Тестирует
-- 📝 Документирует
-- 🔄 Накапливает опыт
+**For AI agent:** Read `INSTALL.md` and configure the system:
 
-**Особенности:**
-- 🌐 Кроссплатформенность (Windows, Linux, macOS)
-- 📚 Накопление знаний между запусками
-- 🎨 Гибкая настройка под проект
-- 🤖 Powered by Claude AI
+```bash
+# AI agent sets up the environment
+# (install Python, Node.js, Claude CLI, create directories)
+```
+
+**AI agent will:**
+- ✅ Detect OS (Windows/Linux/macOS)
+- ✅ Install missing dependencies
+- ✅ Create required directories
+- ✅ Verify installation
+
+> **See:** `INSTALL.md` — this is the instruction for AI agent on cross-platform setup.
+
+### Step 2️⃣: Run ProjectEvolve
+
+After environment setup, run the script:
+
+```bash
+# Basic run (10 iterations, 5 min interval)
+python F:/IdeaProjects/autoresearch/autoresearch.py --project /path/to/project
+
+# With parameters
+python F:/IdeaProjects/autoresearch/autoresearch.py --project . --iter 50 --timeout 2
+
+# Windows (via bat-file)
+F:/IdeaProjects/autoresearch/autoresearch.py . 50 2
+```
+
+**Parameters:**
+- `--project` — path to your project
+- `--iter` — number of iterations (default: 10)
+- `--timeout` — interval between iterations in minutes (default: 5)
 
 ---
 
-## 📚 Полная документация
+## 📂 Project Structure
 
-🇬🇧 **[README_EN.md](README_EN.md)** — полное описание на английском языке:
-- Философия проекта
-- Подробное описание возможностей
-- Примеры использования
-- Troubleshooting
-- и т.д.
+```
+autoresearch/
+├── autoresearch.py          # Main script
+├── autoresearch.bat         # Windows launcher
+├── INSTALL.md               # Installation guide (for AI)
+├── README.md                # This file (English main)
+├── README_RU.md             # Russian version (full)
+├── QUICKSTART.md            # Quick guide
+├── config/
+│   └── default_prompt.md    # Agent prompt template
+├── utils/
+│   └── cli_setup.py         # Interactive setup
+└── .gitignore               # Git ignore
+```
+
+### What's Created in Your Project
+
+```
+your-project/
+├── .autoresearch/
+│   ├── .autoresearch.json        # Project configuration
+│   ├── experiments/
+│   │   ├── prompt_1.md
+│   │   ├── output_1.md
+│   │   ├── accumulation_context.md  # Accumulated context
+│   │   ├── last_experiment.md      # Last experiment
+│   │   ├── changes_log.md          # Changes log
+│   │   └── summary.json            # Final summary
+│   └── logs/
+│       └── autoresearch.log         # Run logs
+```
 
 ---
 
-## 🔗 Ссылки
+## 🔧 Configuration
 
-- **📖 [INSTALL.md](INSTALL.md)** — инструкция для AI агента
-- **⚡ [QUICKSTART.md](QUICKSTART.md)** — краткая инструкция
+### First Run
+
+```
+========================================================================
+   ProjectEvolve - First Time Setup
+========================================================================
+
+Project: /path/to/your-project
+
+Project name: My Awesome App
+Short description: Web app for task management
+
+Project goals (one per line):
+  > Improve performance
+  > Add tests
+  > Update documentation
+  > [Enter]
+
+Constraints (optional):
+  > Don't change API
+  > [Enter]
+
+✓ Configuration saved!
+```
+
+### Configuration File (`.autoresearch.json`)
+
+```json
+{
+  "name": "My Awesome App",
+  "description": "Web app for task management",
+  "goals": [
+    "Improve performance",
+    "Add tests",
+    "Update documentation"
+  ],
+  "constraints": [
+    "Don't change API"
+  ],
+  "tech_stack": ["Python", "FastAPI", "PostgreSQL"],
+  "focus_areas": ["performance", "testing", "documentation"]
+}
+```
 
 ---
+
+## 📊 Usage Examples
+
+### Example 1: Quick Test
+
+```bash
+# Quick test: 3 experiments, 1 minute interval
+python F:/IdeaProjects/autoresearch/autoresearch.py --project . --iter 3 --timeout 1
+```
+
+### Example 2: Long Research Session
+
+```bash
+# 50 experiments, 10 minutes interval
+python F:/IdeaProjects/autoresearch/autoresearch.py --project . --iter 50 --timeout 10
+```
+
+### Example 3: Configure Only
+
+```bash
+# Initial configuration
+python F:/IdeaProjects/autoresearch/autoresearch.py --project /path/to/project --configure
+
+# Later — run
+python F:/IdeaProjects/autoresearch/autoresearch.py --project /path/to/project --iter 10
+```
+
+---
+
+## 🛠️ Troubleshooting
+
+### Claude CLI not found
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+### Python not found
+
+Install Python 3.10+ and add to PATH.
+
+### Experiments hang
+
+Increase interval between iterations (`--timeout`).
+
+### Wrong context
+
+```bash
+python F:/IdeaProjects/autoresearch/autoresearch.py --project . --reconfigure
+```
+
+---
+
+## 📚 Documentation
+
+- 📖 [INSTALL.md](INSTALL.md) — Installation guide (for AI agent)
+- ⚡ [QUICKSTART.md](QUICKSTART.md) — Quick guide
+- 🇷🇺 [README_RU.md](README_RU.md) — Русская версия
+
+---
+
+## 🤝 Contributing
+
+Contributions welcome! Create issues and pull requests.
+
+### Ideas for Improvement
+
+- 🌐 Web UI for experiment monitoring
+- 📊 Progress visualization
+- 🔔 Completion notifications
+- 📈 Metrics and analytics
+- 🔄 CI/CD integration
+
+---
+
+## 📄 License
+
+MIT License — freely use in any project.
+
+---
+
+## ⭐ Stars
+
+If you find this project useful, please give it a star on GitHub!
 
 <div align="center">
 
-  **Сделано с ❤️ для автономного исследования проектов**
+  **Made with ❤️ for autonomous project research**
 
 </div>
