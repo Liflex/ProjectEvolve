@@ -22,19 +22,26 @@
 ## 💡 Philosophy
 
 > *"Give an AI agent a real project and let it experiment autonomously."*
-> — Inspired by Andrej Karpathy's [autoresearch](https://github.com/karpathy/autoresearch)
+> — Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch)
 
-### The Idea
+### Difference from Original
 
-**AutoResearch** extends the autonomous AI research concept to ANY project:
+**Original karpathy/autoresearch** — AI agent researches neural network training (nanochat), modifying only `train.py` with a single `val_bpb` metric.
 
-| Original (karpathy/autoresearch) | AutoResearch |
-|----------------------------------|---------------|
-| ML training (nanochat) | **Any project** (Python, JS, Go, ...) |
-| Only `train.py` | **Any files** — full control |
-| Single metric (`val_bpb`) | **Any metrics** — flexibility |
-| GPU, training cycles | **CPU, any operations** |
-| Specific task | **Universality** |
+**AutoResearch** — extends this idea to **any project**:
+- Any programming language (Python, JavaScript, Go, Rust, ...)
+- Any task types (backend, frontend, DevOps, documentation, ...)
+- Any files and directories (full freedom of action)
+- Cross-platform (Windows, Linux, macOS)
+- Knowledge persistence across runs
+
+**Key inheritance:** agent works autonomously, iteratively improves project, keeps successful changes, discards failures.
+
+---
+
+## 📖 Overview
+
+**AutoResearch** is a universal tool for running an AI agent on any project. The agent autonomously analyzes code, proposes improvements, makes changes, and learns from previous experiments.
 
 ### What AutoResearch Does?
 
@@ -206,36 +213,6 @@ Constraints (optional):
   "focus_areas": ["performance", "testing", "documentation"]
 }
 ```
-
----
-
-## 🆚 Karpathy vs AutoResearch
-
-**Improvements over the original:**
-
-| Feature | karpathy/autoresearch | AutoResearch |
-|---------|----------------------|---------------|
-| **Scope** | ML training (nanochat) | Any project |
-| **File restrictions** | Only `train.py` | Any project files |
-| **Metrics** | Single (`val_bpb`) | Any (flexible) |
-| **Execution** | GPU, training | CPU, any operations |
-| **Platform** | Specific | Cross-platform |
-| **Knowledge retention** | Within session | Across runs (files) |
-| **Setup** | Manual (`program.md`) | Interactive questionnaire |
-| **Context** | Instructions | Instructions + previous experiments |
-
-**What's preserved:**
-- ✅ Autonomy — agent works independently
-- ✅ Iterative improvement — each change is evaluated
-- ✅ Human-in-the-loop — human guides via goals/constraints
-- ✅ Fail-fast — bad changes are discarded
-
-**What's improved:**
-- ✨ Universality — any language, any project type
-- 🌐 Cross-platform — Windows, Linux, macOS
-- 📚 Persistent memory — context saved across runs
-- 🎨 Flexible setup — questionnaire adapts to project
-- 🔧 Easy CLI — simple launch for any project
 
 ---
 
