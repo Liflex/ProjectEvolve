@@ -4,6 +4,8 @@
 
   ### **Autonomous AI-Powered Research and Project Improvement System**
 
+  **Inspired by [karpathy/autoresearch](https://github.com/karpathy/autoresearch)**
+
   [**Русская документация** → README.md](README.md)
 
   <br/>
@@ -14,6 +16,34 @@
   ![Claude](https://img.shields.io/badge/Claude-AI-purple)
 
 </div>
+
+---
+
+## 💡 Philosophy
+
+> *"Give an AI agent a real project and let it experiment autonomously."*
+> — Inspired by Andrej Karpathy's [autoresearch](https://github.com/karpathy/autoresearch)
+
+### The Idea
+
+**AutoResearch** extends the autonomous AI research concept to ANY project:
+
+| Original (karpathy/autoresearch) | AutoResearch |
+|----------------------------------|---------------|
+| ML training (nanochat) | **Any project** (Python, JS, Go, ...) |
+| Only `train.py` | **Any files** — full control |
+| Single metric (`val_bpb`) | **Any metrics** — flexibility |
+| GPU, training cycles | **CPU, any operations** |
+| Specific task | **Universality** |
+
+### What AutoResearch Does?
+
+1. **Analyzes** — studies project structure, code, documentation
+2. **Proposes** — generates improvement ideas
+3. **Implements** — makes changes to code/structure/docs
+4. **Tests** — ensures nothing breaks
+5. **Accumulates** — next iteration sees previous results
+6. **Repeats** — cycle continues autonomously
 
 ---
 
@@ -176,6 +206,36 @@ Constraints (optional):
   "focus_areas": ["performance", "testing", "documentation"]
 }
 ```
+
+---
+
+## 🆚 Karpathy vs AutoResearch
+
+**Improvements over the original:**
+
+| Feature | karpathy/autoresearch | AutoResearch |
+|---------|----------------------|---------------|
+| **Scope** | ML training (nanochat) | Any project |
+| **File restrictions** | Only `train.py` | Any project files |
+| **Metrics** | Single (`val_bpb`) | Any (flexible) |
+| **Execution** | GPU, training | CPU, any operations |
+| **Platform** | Specific | Cross-platform |
+| **Knowledge retention** | Within session | Across runs (files) |
+| **Setup** | Manual (`program.md`) | Interactive questionnaire |
+| **Context** | Instructions | Instructions + previous experiments |
+
+**What's preserved:**
+- ✅ Autonomy — agent works independently
+- ✅ Iterative improvement — each change is evaluated
+- ✅ Human-in-the-loop — human guides via goals/constraints
+- ✅ Fail-fast — bad changes are discarded
+
+**What's improved:**
+- ✨ Universality — any language, any project type
+- 🌐 Cross-platform — Windows, Linux, macOS
+- 📚 Persistent memory — context saved across runs
+- 🎨 Flexible setup — questionnaire adapts to project
+- 🔧 Easy CLI — simple launch for any project
 
 ---
 
