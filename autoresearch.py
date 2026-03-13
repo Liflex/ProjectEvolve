@@ -24,6 +24,7 @@ import sys
 import json
 import time
 import subprocess
+import uuid
 import argparse
 from pathlib import Path
 from datetime import datetime
@@ -537,6 +538,7 @@ def build_agent_prompt(config: ProjectConfig, iteration: int, total: int) -> str
         "tech_stack": ", ".join(cfg.get("tech_stack", [])) or "Не определён",
         "constraints": "\n".join(f"- {c}" for c in cfg.get("constraints", [])) or "- Нет",
         "focus_areas": "\n".join(f"- {a}" for a in cfg.get("focus_areas", [])) or "- Исследуй любые улучшения",
+        "agent_instructions": cfg.get("agent_instructions", ""),
     }
 
     prompt = template.format(**context)
@@ -775,6 +777,10 @@ def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> 
     prompt_file = exp_dir / f"prompt_{iteration}.md"
     prompt_file.write_text(prompt, encoding="utf-8")
 
+    # Проверяем размер промпта
+    prompt_size = len(prompt.encode('utf-8'))
+    log(f"Prompt size: {prompt_size:,} bytes ({prompt_size // 1024} KB)", "DEBUG", project_dir)
+
     # Запускаем Claude CLI
     claude_cmd = get_claude_command()
     output_file = exp_dir / f"output_{iteration}.md"
@@ -792,7 +798,7 @@ def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> 
                     "-NoProfile",
                     "-ExecutionPolicy", "Bypass",
                     "-File", ps1_path,
-                    "--print",  # Non-interactive mode
+                    "--print",
                 ]
             else:
                 raise ValueError("Cannot parse PowerShell command")
@@ -808,42 +814,67 @@ def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> 
         env.pop('CLAUDECODE', None)
         env.pop('CLAUDE_SESSION_ID', None)
 
-        result = subprocess.run(
+        log(f"Running: {cmd_args}", "DEBUG", project_dir)
+
+        # Используем subprocess.Popen для контроля над процессом
+        process = subprocess.Popen(
             cmd_args,
-            input=prompt,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             cwd=project_dir,
-            capture_output=True,
             text=True,
             encoding='utf-8',
             errors='replace',
-            env=env,
-            check=False,
-            timeout=7200  # 2 часа максимум для одного эксперимента
+            env=env
         )
 
-        if result.returncode != 0:
-            log(f"Claude CLI error: {result.stderr}", "ERROR", project_dir)
-            return {"status": "error", "error": result.stderr}
+        try:
+            # communicate с timeout - возвращает (stdout, stderr)
+            stdout, stderr = process.communicate(input=prompt, timeout=7200)
 
-        # Сохраняем вывод
-        output = result.stdout
-        output_file.write_text(output, encoding="utf-8")
+            if process.returncode != 0:
+                log(f"Claude CLI error (code {process.returncode}): {stderr}", "ERROR", project_dir)
+                return {"status": "error", "error": stderr}
 
-        # Проверяем маркер завершения
-        if ">>>EXPERIMENT_COMPLETE<<<" in output:
-            log(f"Эксперимент {iteration} завершён", "INFO", project_dir)
-            return {"status": "success", "output": output}
-        else:
-            log(f"Эксперимент {iteration} завершён без маркера", "WARNING", project_dir)
-            return {"status": "incomplete", "output": output}
+            # Логируем stderr для отладки (даже при успехе)
+            if stderr.strip():
+                log(f"Claude CLI stderr: {stderr[:500]}", "DEBUG", project_dir)
 
-    except subprocess.TimeoutExpired as e:
-        log(f"Claude CLI timeout after 2 hours!", "ERROR", project_dir)
-        log(f"Experiment {iteration} timed out - may be stuck on permission prompt or hanging", "ERROR", project_dir)
-        return {"status": "error", "error": f"Timeout after 2 hours. Claude CLI may be waiting for permission approval or stuck."}
+            # Сохраняем вывод
+            output_file.write_text(stdout, encoding="utf-8")
+
+            # Проверяем маркер завершения
+            if ">>>EXPERIMENT_COMPLETE<<<" in stdout:
+                log(f"Эксперимент {iteration} завершён", "INFO", project_dir)
+                return {"status": "success", "output": stdout}
+            else:
+                log(f"Эксперимент {iteration} завершён без маркера", "WARNING", project_dir)
+                return {"status": "incomplete", "output": stdout}
+
+        except subprocess.TimeoutExpired:
+            # При timeout сначала убиваем процесс, потом получаем остатки вывода
+            process.kill()
+            stdout, stderr = process.communicate()
+
+            log(f"Claude CLI timeout after 2 hours!", "ERROR", project_dir)
+            log(f"Experiment {iteration} timed out - may be stuck on permission prompt or hanging", "ERROR", project_dir)
+            return {"status": "error", "error": f"Timeout after 2 hours. Claude CLI may be waiting for permission approval or stuck."}
+
     except Exception as e:
         log(f"Ошибка запуска: {e}", "ERROR", project_dir)
         return {"status": "error", "error": str(e)}
+
+    finally:
+        # Гарантированная очистка процесса
+        if 'process' in locals() and process is not None:
+            if process.poll() is None:
+                try:
+                    process.kill()
+                    process.wait(timeout=5)
+                    log(f"Process {process.pid} forcefully terminated", "DEBUG", project_dir)
+                except:
+                    pass
 
 def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: Optional[ProjectConfig] = None, start_from: int = 1):
     """Главный цикл AutoResearch."""
@@ -1056,12 +1087,16 @@ def main():
         return 0
 
     # Запуск AutoResearch
-    return run_autoresearch(
-        project_dir=project_dir,
-        iterations=iterations,
-        timeout=timeout,
-        start_from=start_from
-    )
+    try:
+        return run_autoresearch(
+            project_dir=project_dir,
+            iterations=iterations,
+            timeout=timeout,
+            start_from=start_from
+        )
+    except KeyboardInterrupt:
+        log("\nПрервано пользователем (Ctrl+C)", "INFO", project_dir)
+        return 130
 
 if __name__ == "__main__":
     sys.exit(main())
