@@ -6,7 +6,7 @@
 > - **Line 60-130:** `get_claude_command()` - Cross-platform Claude CLI detection
 > - **Line 133-175:** `check_claude_cli()` - CLI validation
 > - **Line 390-450:** `run_single_experiment()` - Experiment execution
-> - **Line 280-360:** `build_agent_prompt()` - Prompt generation with context
+> - **Line 280-360:** `build_agent_prompt()` → moved to `utils/prompt_builder.py`
 
 ---
 
@@ -584,7 +584,7 @@ python autoresearch.py --project /path/to/project --iter 10 --timeout 5
 |----------|-------|---------|
 | `get_claude_command()` | 60-130 | Cross-platform Claude CLI detection |
 | `check_claude_cli()` | 133-175 | Validates Claude CLI installation |
-| `build_agent_prompt()` | 280-360 | Generates prompt with accumulated context |
+| `build_agent_prompt()` | utils/prompt_builder.py | Generates prompt with accumulated context |
 | `run_single_experiment()` | 390-450 | Executes one experiment using detected CLI |
 | `run_autoresearch()` | 470-540 | Main loop, orchestrates experiments |
 
@@ -614,7 +614,7 @@ python autoresearch.py --project /path/to/project --iter 10 --timeout 5
 
 ### Лимиты контекста
 
-AutoResearch agent использует `read_last_entries()` которая:
+AutoResearch agent использует `read_last_entries()` из `utils/prompt_builder.py` которая:
 - Включает только `[CRITICAL]` и `[IMPORTANT]` записи
 - Исключает обычные записи
 - Ограничивает промпт до 30-50 KB вместо 200+ KB
