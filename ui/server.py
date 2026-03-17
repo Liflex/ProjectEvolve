@@ -150,11 +150,37 @@ def _enrich_experiment(entry: Dict[str, Any], section: str) -> Dict[str, Any]:
     }
 
 
+# File-mtime cache: avoids re-reading and re-parsing accumulation_context.md
+# on every API call (dashboard polls /api/stats every 1s).
+_cache = {"data": None, "mtime": 0.0}
+
+
+def _invalidate_cache():
+    """Clear parse cache (called after file modifications)."""
+    _cache["data"] = None
+    _cache["mtime"] = 0.0
+
+
 def parse_experiments() -> List[Dict[str, Any]]:
-    """Parse all experiments from accumulation_context.md with UI fields."""
+    """Parse all experiments from accumulation_context.md with UI fields.
+
+    Results are cached by file modification time — repeated calls return
+    the cached list without re-reading the file, reducing I/O from ~6 reads
+    per page load to 1.
+    """
+    global _cache
+
     ctx_file = get_exp_dir() / "accumulation_context.md"
     if not ctx_file.exists():
         return []
+
+    try:
+        current_mtime = ctx_file.stat().st_mtime
+    except OSError:
+        current_mtime = 0
+
+    if _cache["data"] is not None and _cache["mtime"] == current_mtime:
+        return _cache["data"]
 
     base_entries = parse_accumulation_context(ctx_file)
     if not base_entries:
@@ -170,8 +196,12 @@ def parse_experiments() -> List[Dict[str, Any]]:
         if m:
             section_map[int(m.group(1))] = section
 
-    return [_enrich_experiment(e, section_map.get(e["number"], ""))
-            for e in base_entries]
+    result = [_enrich_experiment(e, section_map.get(e["number"], ""))
+              for e in base_entries]
+
+    _cache["data"] = result
+    _cache["mtime"] = current_mtime
+    return result
 
 
 # =============================================================================
@@ -236,6 +266,7 @@ async def get_experiment(n: int):
     prompt_file = exp_dir / f"prompt_{n}.md"
     output_file = exp_dir / f"output_{n}.md"
 
+    # Use cached experiments (avoids re-reading the file)
     experiments = parse_experiments()
     exp = next((e for e in experiments if e["number"] == n), None)
 
