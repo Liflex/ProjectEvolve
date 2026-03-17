@@ -34,6 +34,8 @@ from typing import Dict, Any, Optional, List
 UTILS_DIR = Path(__file__).parent / "utils"
 sys.path.insert(0, str(UTILS_DIR))
 
+from quality_loop import classify_experiment_type  # noqa: E402
+
 # =============================================================================
 # CONFIG
 # =============================================================================
@@ -608,27 +610,6 @@ def _smart_truncate(text: str, max_chars: int = 1500) -> str:
 
 
 
-def _classify_experiment_type(title: str) -> str:
-    """Classify experiment type by title keywords.
-
-    Used as fallback when agent doesn't explicitly report Type.
-    Helps the agent enforce "don't do 3+ experiments of same type" rule.
-    """
-    t = title.lower()
-    if any(kw in t for kw in ("fix", "bug", "crash", "nameerror", "error", "truncat", "hang")):
-        return "Bug Fix"
-    if any(kw in t for kw in ("security", "xss", "injection", "owasp", "path traversal", "protect")):
-        return "Security"
-    if any(kw in t for kw in ("add", "new", "implement", "introduce", "enable")):
-        return "Feature"
-    if any(kw in t for kw in ("refactor", "simplif", "clean", "extract", "consolidat", "compress")):
-        return "Refactoring"
-    if any(kw in t for kw in ("improve", "enhance", "optim", "align")):
-        return "Improvement"
-    if any(kw in t for kw in ("document", "readme", "guide")):
-        return "Docs"
-    return "Other"
-
 def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
     """Парсит отчет эксперимента из вывода агента.
 
@@ -661,7 +642,7 @@ def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
     if type_match:
         exp_type = type_match.group(1).strip()
     else:
-        exp_type = _classify_experiment_type(title)
+        exp_type = classify_experiment_type(title)
 
     # Hypothesis (used as what_done — шаблон не имеет секции "What Was Done")
     # Captures multi-line text until next bold line or heading
@@ -827,7 +808,7 @@ def _read_experiment_history(exp_dir: Path, max_entries: int = 5) -> str:
         if type_match:
             exp_type = type_match.group(1).strip()
         else:
-            exp_type = _classify_experiment_type(title)
+            exp_type = classify_experiment_type(title)
 
         # Format 1: **Score:** X | **Decision:** Y (well-formed entries)
         score_match = re.search(
@@ -1308,6 +1289,7 @@ def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: O
                 # Enrich result with parsed data for summary and summary.json
                 result["exp_number"] = i
                 result["exp_title"] = exp_data.get("title", "")
+                result["exp_type"] = exp_data.get("exp_type", "")
                 result["exp_quality_score"] = exp_data.get("quality_score")
                 result["exp_quality_decision"] = exp_data.get("quality_decision", "")
                 result["exp_is_complete"] = is_complete
@@ -1353,16 +1335,17 @@ def _print_summary(results: list, iterations: int, project_dir: Path):
     enriched = [r for r in results if r.get("exp_title")]
     if enriched:
         log("", project_dir=project_dir)
-        log("| # | Status     | Score | Decision | Title", project_dir=project_dir)
-        log("|---|------------|-------|----------|-------", project_dir=project_dir)
+        log("| # | Type        | Status     | Score | Decision | Title", project_dir=project_dir)
+        log("|---|-------------|------------|-------|----------|-------", project_dir=project_dir)
         for r in enriched:
             num = r.get("exp_number", "?")
+            exp_type = r.get("exp_type", "")[:12]
             status = (r.get("status", "?")[:9] + ("…" if len(r.get("status", "")) > 9 else ""))
             score = r.get("exp_quality_score")
             score_str = f"{score:.2f}" if score is not None else "  N/A"
             decision = r.get("exp_quality_decision", "N/A")
-            title = r.get("exp_title", "Untitled")[:45]
-            log(f"| {num} | {status:<10} | {score_str:>5} | {decision:<8} | {title}", project_dir=project_dir)
+            title = r.get("exp_title", "Untitled")[:40]
+            log(f"| {num} | {exp_type:<12} | {status:<10} | {score_str:>5} | {decision:<8} | {title}", project_dir=project_dir)
 
         # Average quality score
         scores = [r["exp_quality_score"] for r in enriched if r.get("exp_quality_score") is not None]

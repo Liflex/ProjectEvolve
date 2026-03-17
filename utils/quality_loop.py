@@ -509,6 +509,28 @@ class QualityLoop:
             return "✗ DISCARD - Quality below threshold"
 
 
+def classify_experiment_type(title: str) -> str:
+    """Classify experiment type by title keywords.
+
+    Shared between autoresearch.py and ui/server.py to prevent drift.
+    Used as fallback when agent doesn't explicitly report Type.
+    """
+    t = title.lower()
+    if any(kw in t for kw in ("fix", "bug", "crash", "nameerror", "error", "truncat", "hang")):
+        return "Bug Fix"
+    if any(kw in t for kw in ("security", "xss", "injection", "owasp", "path traversal", "protect")):
+        return "Security"
+    if any(kw in t for kw in ("add", "new", "implement", "introduce", "enable")):
+        return "Feature"
+    if any(kw in t for kw in ("refactor", "simplif", "clean", "extract", "consolidat", "compress")):
+        return "Refactoring"
+    if any(kw in t for kw in ("improve", "enhance", "optim", "align")):
+        return "Improvement"
+    if any(kw in t for kw in ("document", "readme", "guide")):
+        return "Docs"
+    return "Other"
+
+
 def main():
     """CLI entry point"""
     import argparse
