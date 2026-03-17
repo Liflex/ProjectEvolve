@@ -38,6 +38,21 @@ DEFAULT_AUTO_DETECT = {
     "python": {
         "syntax": ["python -m compileall -q ."],
     },
+    "javascript": {
+        "syntax": [
+            # Walk directory tree, run node --check on each .js/.mjs/.cjs/.jsx file
+            "node -e \"const cp=require('child_process'),fs=require('fs'),path=require('path');"
+            "function walk(d){let files=[];try{for(const e of fs.readdirSync(d,{withFileTypes:true})){"
+            "const full=path.join(d,e.name);if(e.isDirectory()&&e.name!=='node_modules'&&e.name!=='.git')"
+            "files=files.concat(walk(full));else if(/\\.(mjs|cjs|jsx?)$/.test(e.name))files.push(full)}}"
+            "catch(x){}return files}let errs=0;for(const f of walk('.')){try{cp.execFileSync('node',"
+            "['--check',f],{stdio:'pipe'})}catch(e){console.error(f+': '+(e.stderr?e.stderr.toString().trim()"
+            ":e.message));errs++}}if(errs)process.exit(1);\""
+        ],
+    },
+    "typescript": {
+        "syntax": ["npx --yes tsc --noEmit"],
+    },
 }
 
 
