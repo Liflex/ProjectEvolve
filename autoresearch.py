@@ -26,7 +26,6 @@ import time
 import subprocess
 import uuid
 import argparse
-import random
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Any, Optional, List
@@ -38,11 +37,11 @@ sys.path.insert(0, str(UTILS_DIR))
 from quality_loop import QualityLoop  # noqa: E402 — used by run_quality_gate()
 from experiment_io import (  # noqa: E402 — extracted from this file
     parse_experiment_report,
-    _read_experiment_history,
     save_last_experiment_summary,
     save_accumulation_context,
     save_changes_log,
 )
+from prompt_builder import build_agent_prompt  # noqa: E402 — extracted from this file
 
 # =============================================================================
 # CONFIG
@@ -56,31 +55,9 @@ DEFAULT_MAX_TIME = 600  # секунд (максимальная длитель�
 
 # Директории
 CONFIG_DIR = AUTORESEARCH_HOME / "config"
-PROMPTS_DIR = AUTORESEARCH_HOME / "prompts"
-UTILS_DIR = AUTORESEARCH_HOME / "utils"
 
 # Файлы конфигурации
 PROJECT_CONFIG_FILE = ".autoresearch.json"
-GLOBAL_CONFIG_FILE = AUTORESEARCH_HOME / "config" / "global.json"
-
-# =============================================================================
-# SEED CHAOS — creative nudges for experiment diversity
-# =============================================================================
-
-SEED_CHALLENGES = [
-    "Посмотри на проект глазами нового контрибьютора. Что первое бросается в глаза? Что непонятно или неудобно?",
-    "Найди самый старый файл в проекте. Зачем он нужен? Можно ли его упростить или удалить?",
-    "Проверь TODO/FIXME/HACK комментарии. Есть ли устаревшие? Можно ли что-то из них исправить сейчас?",
-    "Найди дублирование кода или логики. Можно ли объединить 2+ похожих функции/модуля?",
-    "Проверь обработку ошибок. Что происходит при неверном вводе, пустых данных, неожиданных ситуациях?",
-    "Найди код, который сложно читать или понимать. Как его можно упростить без изменения поведения?",
-    "Проверь, все ли функции/методы используются. Есть ли мёртвый код, который можно удалить?",
-    "Посмотри на тесты (если есть). Покрывают ли они важные сценарии? Не хватает ли edge cases?",
-    "Подумай о производительности. Есть ли очевидные узкие места? Лишние аллокации, N+1 запросы?",
-    "Найди самый длинный файл или функцию. Можно ли разбить на более мелкие, понятные части?",
-    "Проверь документацию/комментарии. Есть ли неточности или устаревшая информация?",
-    "Посмотри на API/CLI интерфейс проекта. Удобно ли им пользоваться? Какие ошибки может совершить пользователь?",
-]
 
 # =============================================================================
 # LOGGING
@@ -131,77 +108,6 @@ def log(msg: str, level: str = "INFO", project_dir: Optional[Path] = None):
 
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(f"{prefix} {msg}\n")
-
-def read_last_entries(path: Path, max_entries: int = 5, max_bytes: int = 10240) -> str:
-    """Читает записи помеченные [CRITICAL] или [IMPORTANT] с лимитом по размеру.
-
-    Приоритет: [CRITICAL] > [IMPORTANT]. Записи добавляются до лимита max_bytes.
-    Каждая запись обрезается до 40 строк чтобы предотвратить bloat.
-
-    Args:
-        path: Путь к файлу памяти (lessons.md, patterns.md, architecture.md)
-        max_entries: Максимум записей (по умолчанию 5)
-        max_bytes: Лимит общего размера в байтах (по умолчанию 10KB)
-
-    Returns:
-        str: Содержимое помеченных записей в рамках лимита
-    """
-    if not path.exists():
-        return ""
-
-    content = path.read_text(encoding="utf-8")
-
-    # Разбиваем по ## заголовкам
-    lines = content.split("\n")
-    entries = []
-    current_entry = []
-    current_header = ""
-
-    for line in lines:
-        if line.startswith("## "):
-            if current_entry:
-                entries.append({"header": current_header, "content": "\n".join(current_entry)})
-            current_header = line
-            current_entry = [line]
-        else:
-            if current_entry is not None:
-                current_entry.append(line)
-
-    if current_entry:
-        entries.append({"header": current_header, "content": "\n".join(current_entry)})
-
-    # Фильтруем и сортируем: CRITICAL первые, затем IMPORTANT
-    critical = [e for e in entries if "[CRITICAL]" in e["header"]]
-    important = [e for e in entries if "[IMPORTANT]" in e["header"]]
-    marked = critical + important
-
-    # Собираем с лимитами
-    result_parts = []
-    total_bytes = 0
-    count = 0
-    max_lines_per_entry = 40
-
-    for entry in marked:
-        if count >= max_entries:
-            break
-
-        # Обрезаем длинные записи
-        entry_lines = entry["content"].split("\n")
-        if len(entry_lines) > max_lines_per_entry:
-            entry_text = "\n".join(entry_lines[:max_lines_per_entry]) + "\n[...truncated]"
-        else:
-            entry_text = entry["content"]
-
-        entry_size = len(entry_text.encode("utf-8"))
-
-        if total_bytes + entry_size > max_bytes and result_parts:
-            break  # Лимит по размеру (но хотя бы одну запись включаем)
-
-        result_parts.append(entry_text)
-        total_bytes += entry_size
-        count += 1
-
-    return "\n".join(result_parts)
 
 # =============================================================================
 # CLAUDE CLI DETECTION
@@ -309,7 +215,7 @@ class ProjectConfig:
 # =============================================================================
 
 def run_interactive_setup(project_dir: Path) -> ProjectConfig:
-    """Запускает интерактивную настройку с помощью AI."""
+    """Запускает интерактивную настройку проекта."""
     log("=" * 70, project_dir=project_dir)
     log("AutoResearch - First Time Setup", project_dir=project_dir)
     log("=" * 70, project_dir=project_dir)
@@ -319,23 +225,6 @@ def run_interactive_setup(project_dir: Path) -> ProjectConfig:
 
     # Если есть частичная конфигурация, загружаем её
     config.load()
-
-    # Опросник через Claude CLI
-    questionnaire = PROMPTS_DIR / "setup_questionnaire.md"
-    setup_script = UTILS_DIR / "cli_setup.py"
-
-    if setup_script.exists():
-        # Запускаем Python скрипт настройки
-        result = subprocess.run(
-            [sys.executable, str(setup_script), str(project_dir)],
-            cwd=AUTORESEARCH_HOME
-        )
-        if result.returncode == 0:
-            config.load()
-            return config
-
-    # Fallback: базовая настройка
-    log("Запуск базовой настройки...", project_dir=project_dir)
 
     print(f"\nПроект: {project_dir}")
     print("\nДавайте настроим AutoResearch для вашего проекта.\n")
@@ -364,6 +253,16 @@ def run_interactive_setup(project_dir: Path) -> ProjectConfig:
             break
         constraints.append(constraint)
     config.config["constraints"] = constraints
+
+    print("\nФокусные области для улучшения (опционально, Enter для пропуска):")
+    focus_areas = []
+    while True:
+        area = input("  Область: ").strip()
+        if not area:
+            break
+        focus_areas.append(area)
+    if focus_areas:
+        config.config["focus_areas"] = focus_areas
 
     # Автоопределение tech stack
     tech_stack = detect_tech_stack(project_dir)
@@ -475,150 +374,6 @@ def run_quality_gate(project_dir: Path) -> Dict[str, Any]:
             "error": str(e),
             "decision": "MANUAL_REVIEW"
         }
-
-
-# =============================================================================
-# PROMPT GENERATION
-# =============================================================================
-
-def build_agent_prompt(config: ProjectConfig, iteration: int, total: int) -> str:
-    """Строит промпт для AI-агента."""
-    # Загружаем шаблон
-    template_file = CONFIG_DIR / "default_prompt.md"
-    if template_file.exists():
-        template = template_file.read_text(encoding="utf-8")
-    else:
-        template = """# AutoResearch Experiment {iteration}/{total}
-
-Вы — автономный исследователь, улучшающий проект "{project_name}".
-
-## Проект
-
-{description}
-
-## Цели
-
-{goals}
-
-## Технический стек
-
-{tech_stack}
-
-## Задача на эксперимент {iteration}
-
-Проведите исследование и улучшение проекта. Результаты сохраните в:
-- `.autoresearch/experiments/accumulation_context.md` — полный контекст
-- `.autoresearch/experiments/changes_log.md` — лог изменений
-
-## Формат отчёта
-
-В конце эксперимента предоставьте отчёт:
-
-```markdown
-## Experiment Report
-
-**Number:** {iteration}
-**Title:** [краткое название]
-**Hypothesis:** [что тестировали]
-**Files Modified:** [список]
-**Changes Made:** [описание]
-**Results:** [результаты]
-**Notes for Next:** [заметки для следующей итерации]
-
->>>EXPERIMENT_COMPLETE<<<
-```
-
-## Ограничения
-
-{constraints}
-
-Начинайте эксперимент {iteration}.
-"""
-
-    # Читаем последний эксперимент (accumulation_context.md только для человека, не для агента!)
-    last_experiment = ""
-    project_dir = config.project_dir
-    exp_dir = project_dir / ".autoresearch" / "experiments"
-
-    if exp_dir.exists():
-        last_exp_file = exp_dir / "last_experiment.md"
-        if last_exp_file.exists():
-            last_experiment = last_exp_file.read_text(encoding="utf-8")
-
-    # Заполняем переменные
-    cfg = config.config
-    context = {
-        "iteration": iteration,
-        "total": total,
-        "project_name": cfg.get("name", "Unknown"),
-        "description": cfg.get("description", "Нет описания"),
-        "goals": "\n".join(f"- {g}" for g in cfg.get("goals", [])) or "- Не указаны",
-        "tech_stack": ", ".join(cfg.get("tech_stack", [])) or "Не определён",
-        "constraints": "\n".join(f"- {c}" for c in cfg.get("constraints", [])) or "- Нет",
-        "focus_areas": "\n".join(f"- {a}" for a in cfg.get("focus_areas", [])) or "- Исследуй любые улучшения",
-        "agent_instructions": cfg.get("agent_instructions", ""),
-    }
-
-    prompt = template.format(**context)
-
-    # Добавляем контекст для агента (НЕ весь accumulation_context - он для человека!)
-    memory_dir = project_dir / ".claude" / "memory"
-
-    # Читаем память проекта с приоритетами (только [CRITICAL] и [IMPORTANT])
-    project_memory = ""
-    if memory_dir.exists():
-        lessons = read_last_entries(memory_dir / "lessons.md", max_entries=10, max_bytes=8192)
-        patterns = read_last_entries(memory_dir / "patterns.md", max_entries=7, max_bytes=8192)
-        architecture = read_last_entries(memory_dir / "architecture.md", max_entries=5, max_bytes=5120)
-
-        if lessons or patterns or architecture:
-            project_memory += "\n\n## Память проекта\n\n"
-
-            if lessons:
-                project_memory += f"### Lessons Learned\n{lessons}\n\n"
-
-            if patterns:
-                project_memory += f"### Patterns Found\n{patterns}\n\n"
-
-            if architecture:
-                project_memory += f"### Architecture Decisions\n{architecture}\n\n"
-
-    # Добавляем ТОЛЬКО последний эксперимент (не весь лог!)
-    if last_experiment:
-        project_memory += "## Последний эксперимент\n\n"
-        project_memory += last_experiment + "\n\n"
-
-    # Добавляем компактную историю последних экспериментов (для diversity awareness)
-    history = _read_experiment_history(exp_dir, max_entries=5)
-    if history:
-        project_memory += "## История экспериментов\n\n"
-        project_memory += history + "\n\n"
-
-    # Добавляем текущее состояние проекта (git status)
-    try:
-        result = subprocess.run(
-            ["git", "status", "--short"],
-            cwd=project_dir,
-            capture_output=True,
-            text=True,
-            check=False
-        )
-        if result.stdout.strip():
-            project_memory += "## Текущее состояние проекта\n\n"
-            project_memory += "### Изменённые файлы (git status)\n```\n"
-            project_memory += result.stdout.strip()
-            project_memory += "\n```\n\n"
-    except (subprocess.SubprocessError, OSError, FileNotFoundError):
-        pass
-
-    if project_memory:
-        prompt += project_memory
-
-    # Seed chaos: random creative nudge to prevent repetitive experiments
-    seed = random.choice(SEED_CHALLENGES)
-    prompt += f"\n## Случайный Seed (Разнообразие)\n\n{seed}\n"
-
-    return prompt
 
 
 # =============================================================================

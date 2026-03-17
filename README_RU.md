@@ -310,7 +310,8 @@ autoresearch/
 │   ├── default_prompt.md    # Шаблон промпта для агента
 │   └── quality.yml          # Конфигурация quality gate
 ├── utils/
-│   ├── cli_setup.py         # Интерактивная настройка
+│   ├── prompt_builder.py    # Генерация промптов с контекстом
+│   ├── experiment_io.py     # Парсинг и I/O экспериментов
 │   └── quality_loop.py      # Реализация quality loop
 └── .gitignore               # Git ignore
 ```
