@@ -114,6 +114,12 @@
         decode([0x00,0x00,0x00, 0xcc,0x13,0x80, 0x38,0x0e,0x00], 17, 3),
     ];
 
+    // Eyes — surprised (reuse neutral frame 0: wide open, no blink)
+    const EYES_SURPRISED = [EYES_NEUTRAL[0]];
+
+    // Eyes — angry (reuse sleepy frame 0: narrow/droopy)
+    const EYES_ANGRY = [EYES_SLEEPY[0]];
+
     // Tail — neutral wagging (15×21, 16 frames)
     const TAIL_OUTLINES = [
         decode([0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00, 0x00,0x00, 0x78,0x00, 0x86,0x00, 0x71,0x00, 0x08,0x80, 0x04,0x40, 0x02,0x20, 0x01,0x20, 0x01,0x20, 0x01,0x20, 0x01,0x20, 0x06,0x20, 0x38,0x40, 0x00,0x80, 0x01,0x00, 0x06,0x00, 0x38,0x00], 15, 21),
@@ -151,7 +157,7 @@
         decode([0x00,0x00,0x00,0x00, 0x00,0x10, 0x00,0x78, 0x00,0xf8, 0x01,0xf0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x03,0xe0, 0x03,0xe0, 0x03,0xc0, 0x03,0xc0, 0x07,0xc0, 0x3f,0x80, 0x3f,0x00, 0x3e,0x00, 0x3c,0x00, 0x38,0x00], 15, 21),
         decode([0x00,0x40, 0x00,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x02,0x40, 0x02,0x40, 0x02,0x40, 0x02,0x40, 0x04,0x80, 0x38,0x80, 0x01,0x00, 0x02,0x00, 0x04,0x00, 0x38,0x00], 15, 21),
         decode([0x00,0x00, 0x0e,0x00, 0x1f,0x00, 0x0f,0x80, 0x07,0xc0, 0x07,0xc0, 0x03,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x03,0xe0, 0x03,0xc0, 0x07,0xc0, 0x3f,0x80, 0x3f,0x00, 0x3e,0x00, 0x3c,0x00, 0x38,0x00], 15, 21),
-        decode([0x00,0x00, 0x00,0x00, 0x00,0x00,0x00,0x00, 0x3c,0x00, 0x7e,0x00, 0x3f,0x00, 0x0f,0x80, 0x07,0xc0, 0x03,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x07,0xe0, 0x3f,0xc0, 0x3f,0x80, 0x3f,0x00, 0x3e,0x00, 38,0x00], 15, 21),
+        decode([0x00,0x00, 0x00,0x00, 0x00,0x00,0x00,0x00, 0x3c,0x00, 0x7e,0x00, 0x3f,0x00, 0x0f,0x80, 0x07,0xc0, 0x03,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x01,0xe0, 0x07,0xe0, 0x3f,0xc0, 0x3f,0x80, 0x3f,0x00, 0x3e,0x00, 0x38,0x00], 15, 21),
     ];
 
     // ================================================================
@@ -173,10 +179,15 @@
     const TAIL_POS = { x: -8 + OX, y: -15 + OY };
 
     // Eye positions depend on expression (different anchor/size)
+    // color: per-expression eye color (null = default white)
+    // blinkSpeed: tick interval for blink animation (0 = no blink)
     const EYE_CFG = {
-        neutral: { frames: EYES_NEUTRAL, x: 9 + OX, y: 10 + OY },
-        happy:   { frames: EYES_HAPPY,   x: 10 + OX, y: 10 + OY },
-        sleepy:  { frames: EYES_SLEEPY,  x: 9 + OX, y: 11 + OY },
+        neutral:   { frames: EYES_NEUTRAL,   x: 9 + OX,  y: 10 + OY, color: null,      blinkSpeed: 8 },
+        happy:     { frames: EYES_HAPPY,     x: 10 + OX, y: 10 + OY, color: null,      blinkSpeed: 0 },
+        sleepy:    { frames: EYES_SLEEPY,    x: 9 + OX,  y: 11 + OY, color: null,      blinkSpeed: 8 },
+        surprised: { frames: EYES_SURPRISED, x: 9 + OX,  y: 10 + OY, color: '#ffff00', blinkSpeed: 0 },
+        angry:     { frames: EYES_ANGRY,     x: 9 + OX,  y: 11 + OY, color: '#ff3355', blinkSpeed: 0 },
+        thinking:  { frames: EYES_NEUTRAL,   x: 9 + OX,  y: 10 + OY, color: '#88aaff', blinkSpeed: 16 },
     };
 
     const CW = 45, CH = 37;
@@ -220,6 +231,27 @@
             'Жду приказов...',
             '*зевает*',
             'Мяу~',
+        ],
+        surprised: [
+            'МЯУ?! O_O',
+            'Ого!',
+            '*уши встали торчком*',
+            'Ничего себе!',
+            '*шерсть дыбом*',
+        ],
+        angry: [
+            '*шипение* >:(',
+            'Мррр...',
+            '*когти выпущены*',
+            '*не довольный взгляд*',
+            'Плохой код. Очень плохой.',
+        ],
+        thinking: [
+            '*размышляет*...',
+            'Хмм...',
+            'Мур... мурр...',
+            '*покусывает губы*',
+            'Нужно подумать...',
         ],
     };
 
@@ -279,7 +311,8 @@
 
         const outlineColor = '#b44aff';
         const fillColor = '#1e1430';
-        const eyeColor = '#ffffff';
+        const cfg = EYE_CFG[expression] || EYE_CFG.neutral;
+        const eyeColor = cfg.color || '#ffffff';
 
         // Z-order: body → head → tail → eyes
         drawFilled(BODY.outline, BODY.fill, BODY_POS, outlineColor, fillColor);
@@ -287,7 +320,6 @@
         drawFilled(TAIL_OUTLINES[tailFrame], TAIL_FILLS[tailFrame], TAIL_POS, outlineColor, fillColor, true);
 
         // Eyes on top
-        const cfg = EYE_CFG[expression] || EYE_CFG.neutral;
         const frames = cfg.frames;
         if (frames && frames.length > 0 && frames[eyeFrame]) {
             drawGrid(frames[eyeFrame], cfg.x, cfg.y, eyeColor);
@@ -306,14 +338,13 @@
             tailFrame = (tailFrame + 1) % TAIL_OUTLINES.length;
         }
 
-        // Eyes: blink cycle for neutral/sleepy
-        if (expression !== 'happy') {
-            const frames = (EYE_CFG[expression] || EYE_CFG.neutral).frames;
-            if (frames.length > 1) {
-                // Slow blink: advance every 8 ticks
-                if (_tickCount % 8 === 0) {
-                    eyeFrame = (eyeFrame + 1) % frames.length;
-                }
+        // Eyes: blink cycle with per-expression speed
+        const eyeCfg = EYE_CFG[expression] || EYE_CFG.neutral;
+        const blinkSpeed = eyeCfg.blinkSpeed || 0;
+        if (blinkSpeed > 0) {
+            const frames = eyeCfg.frames;
+            if (frames.length > 1 && _tickCount % blinkSpeed === 0) {
+                eyeFrame = (eyeFrame + 1) % frames.length;
             }
         }
 
@@ -344,7 +375,7 @@
         /**
          * Start animation on a canvas element.
          * @param {HTMLCanvasElement} el - canvas element
-         * @param {string} expr - 'neutral'|'happy'|'sleepy'
+         * @param {string} expr - 'neutral'|'happy'|'sleepy'|'surprised'|'angry'|'thinking'
          */
         start(el, expr, pixelSize) {
             console.log('[CatModule] start() called', { el: !!el, expr, animating, pixelSize });
@@ -379,7 +410,7 @@
             ctx = null;
         },
 
-        /** Change expression (e.g. 'happy', 'sleepy'). */
+        /** Change expression (e.g. 'happy', 'sleepy', 'surprised', 'angry', 'thinking'). */
         setExpression(expr) {
             expression = expr;
             eyeFrame = 0;

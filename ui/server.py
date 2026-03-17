@@ -330,6 +330,7 @@ async def start_run(data: RunRequest):
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
     env.pop("CLAUDE_SESSION_ID", None)
+    env["PYTHONUNBUFFERED"] = "1"
 
     try:
         process = subprocess.Popen(
@@ -347,6 +348,22 @@ async def start_run(data: RunRequest):
         "started_at": datetime.now().isoformat(),
         "logs": [], "error": None,
     })
+
+    # Initial info logs
+    prompt_file = AUTORESEARCH_HOME / "config" / "default_prompt.md"
+    prompt_size = len(prompt_file.read_text(encoding="utf-8")) if prompt_file.exists() else 0
+    ctx_file = get_exp_dir() / "accumulation_context.md"
+    ctx_size = len(ctx_file.read_text(encoding="utf-8")) if ctx_file.exists() else 0
+
+    run_state["logs"].extend([
+        f"[INIT] Starting autoresearch PID={process.pid}",
+        f"[INIT] Project: {project_dir}",
+        f"[INIT] Iterations: {data.iterations} | Timeout: {data.timeout}min | Max time: {data.max_time}s",
+        f"[INIT] Command: {' '.join(cmd)}",
+        f"[INIT] Prompt size: {prompt_size:,} bytes ({prompt_size/1024:.1f} KB)",
+        f"[INIT] Context size: {ctx_size:,} bytes ({ctx_size/1024:.1f} KB)",
+        f"[INIT] Waiting for process output...",
+    ])
 
     def _stream_pipe(pipe, prefix=""):
         """Read lines from a pipe, parse experiment progress, and append to logs."""

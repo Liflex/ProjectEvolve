@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AUTORESEARCH // HACK THE PLANET</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+    <!-- Catode32 cat sprite — working companion in sidebar -->
+    <script src="/modules/cat.js"></script>
+    <!-- Matrix rain background -->
+    <script src="/modules/matrix.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        * { scrollbar-width: thin; scrollbar-color: #1a1028 #0c0b14; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0c0b14; }
+        ::-webkit-scrollbar-thumb { background: #1a1028; border-radius: 0; }
+
+        body { background: #0c0b14; font-family: 'VT323', monospace; }
+
+        /* === CRT EFFECT (softened) === */
+        .crt::before {
+            content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+            background: repeating-linear-gradient(
+                0deg, rgba(0,0,0,0.08) 0px, rgba(0,0,0,0.08) 1px,
+                transparent 1px, transparent 4px
+            );
+        }
+        .crt::after {
+            content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9998;
+            background: radial-gradient(ellipse at center, transparent 55%, rgba(12,8,18,0.5) 100%);
+        }
+        @keyframes flicker { 0%, 100% { opacity: 1; } 92% { opacity: 1; } 93% { opacity: 0.85; } 94% { opacity: 1; } 96% { opacity: 0.92; } 97% { opacity: 1; } }
+        .flicker { animation: flicker 10s infinite; }
+
+        /* === GLOW === */
+        .glow { text-shadow: 0 0 6px currentColor, 0 0 14px currentColor, 0 0 28px currentColor; }
+        .glow-sm { text-shadow: 0 0 4px currentColor, 0 0 8px currentColor; }
+        .glow-v { text-shadow: 0 0 6px currentColor, 0 0 14px currentColor, 0 0 28px currentColor; }
+        .box-glow { box-shadow: 0 0 10px rgba(180,74,255,0.12), inset 0 0 10px rgba(180,74,255,0.04); }
+
+        /* === KUNG FURY PALETTE — synthwave retro === */
+        :root {
+            --ng:    #39ff14;       /* neon green (softened) */
+            --ng2:   #b8f0c8;       /* muted sage text */
+            --ng3:   #3a6a48;       /* dim green accent */
+            --ng-dim: #1a2820;      /* very dim green border */
+            --bg:    rgba(12,11,20,0.82);  /* deep dark purple-black — transparent for matrix */
+            --bg2:   rgba(17,15,28,0.78);  /* card bg — transparent */
+            --bg3:   rgba(24,21,40,0.75);  /* hover bg — transparent */
+            --v:     #b44aff;       /* VIOLET — primary accent */
+            --v2:    #9050cc;       /* violet dim */
+            --v3:    #6b3a8f;       /* violet very dim */
+            --v-dim: #1e1430;      /* violet border */
+            --pink:  #ff00aa;       /* hot pink */
+            --cyan:  #00e5ff;       /* electric cyan */
+            --yellow:#ffe033;       /* warm yellow */
+            --red:   #ff3366;       /* soft red */
+            --amber: #ffaa00;
+        }
+
+        /* === NAV === */
+        .nav-link { border-left: 3px solid transparent; transition: all 0.2s; }
+        .nav-link:hover { background: rgba(180,74,255,0.06); border-left-color: rgba(180,74,255,0.3); }
+        .nav-link.active { background: rgba(180,74,255,0.1); border-left-color: var(--v); color: var(--v); }
+
+        /* === PIXEL BORDER === */
+        .pixel-border { border: 1px solid var(--v-dim); }
+        .pixel-border:hover { border-color: rgba(180,74,255,0.3); }
+
+        /* === ANIMATIONS === */
+        @keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+        @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+        @keyframes scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(100vh); } }
+        @keyframes gradientShift { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+        .blink { animation: blink 1s step-end infinite; }
+        .pulse { animation: pulse 2s ease-in-out infinite; }
+
+        /* === MARKDOWN (terminal styled) === */
+        .md { color: var(--ng2); font-size: 14px; line-height: 1.7; }
+        .md h1 { color: var(--v); font-family: 'Press Start 2P', monospace; font-size: 13px; margin: 1.5rem 0 0.75rem; text-shadow: 0 0 10px rgba(180,74,255,0.4); }
+        .md h2 { color: var(--cyan); font-size: 15px; margin: 1.25rem 0 0.5rem; border-bottom: 1px dashed rgba(0,229,255,0.15); padding-bottom: 0.25rem; }
+        .md h3 { color: var(--v); font-size: 14px; margin: 1rem 0 0.375rem; opacity: 0.85; }
+        .md p { margin: 0.4rem 0; }
+        .md ul, .md ol { margin: 0.4rem 0; padding-left: 1.5rem; }
+        .md li { margin: 0.15rem 0; }
+        .md code { background: rgba(180,74,255,0.08); color: var(--v); padding: 1px 4px; font-size: 13px; }
+        .md pre { background: #08070f; border: 1px solid var(--v-dim); padding: 0.75rem; overflow-x: auto; margin: 0.5rem 0; }
+        .md pre code { background: none; padding: 0; color: var(--ng2); }
+        .md strong { color: var(--v); }
+        .md blockquote { border-left: 3px solid var(--pink); padding-left: 0.75rem; margin: 0.5rem 0; color: #4a3a5a; }
+        .md hr { border-color: var(--v-dim); margin: 1rem 0; }
+        .md table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 13px; }
+        .md th { border: 1px solid var(--v-dim); padding: 4px 8px; background: rgba(180,74,255,0.05); color: var(--v); text-align: left; font-weight: normal; }
+        .md td { border: 1px solid var(--v-dim); padding: 4px 8px; color: var(--ng2); }
+
+        /* === CAT CANVAS === */
+        .cat-frame { border: 2px solid var(--v-dim); image-rendering: pixelated; overflow: visible; box-shadow: 0 0 12px rgba(180,74,255,0.08); }
+
+        /* === TYPE BADGES === */
+        .t-bugfix { color: var(--red); background: rgba(255,51,54,0.08); }
+        .t-security { color: var(--amber); background: rgba(255,170,0,0.08); }
+        .t-feature { color: var(--cyan); background: rgba(0,229,255,0.08); }
+        .t-refactor { color: var(--v); background: rgba(180,74,255,0.1); }
+        .t-improvement { color: var(--ng); background: rgba(57,255,20,0.06); }
+        .t-docs { color: #cc88ff; background: rgba(204,136,255,0.08); }
+        .t-other { color: #555; background: rgba(85,85,85,0.06); }
+
+        /* === INPUTS === */
+        textarea.editor { tab-size: 4; font-family: 'VT323', monospace; }
+        textarea.editor:focus { outline: none; box-shadow: 0 0 0 1px var(--v), 0 0 16px rgba(180,74,255,0.15); }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--v2) !important; box-shadow: 0 0 12px rgba(180,74,255,0.2); }
+
+        /* === SYNTHWAVE GRADIENT TEXT (for logo) === */
+        .synth-text {
+            background: linear-gradient(135deg, var(--v) 0%, var(--cyan) 50%, var(--ng) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text; animation: gradientShift 6s ease-in-out infinite;
+        }
+
+        /* === SOFT HIGHLIGHT for selected items === */
+        .sel-glow { box-shadow: inset 0 0 20px rgba(180,74,255,0.06); border-color: var(--v2); }
+    </style>
+</head>
+<body class="text-[var(--ng2)] min-h-screen crt flicker" x-cloak x-data="app()">
+
+    <!-- Toast -->
+    <div class="fixed top-4 right-4 z-50" x-show="toast.show" x-transition.duration.200ms
+         :style="'background:' + (toast.type === 'success' ? '#1a0a2a' : toast.type === 'error' ? '#2a0a0a' : '#0a1a2a') + ';border:1px solid ' + (toast.type === 'success' ? 'var(--v2)' : toast.type === 'error' ? 'var(--red)' : 'var(--cyan)')"
+         class="px-4 py-2 text-sm font-bold tracking-wider"
+         :class="toast.type === 'success' ? 'text-[var(--v)]' : toast.type === 'error' ? 'text-[var(--red)]' : 'text-[var(--cyan)]'">
+        <span x-text="'> ' + toast.message"></span>
+    </div>
+
+    <div class="flex h-screen overflow-hidden relative z-10">
+
+        <!-- ========== SIDEBAR ========== -->
+        <aside class="w-64 bg-[var(--bg)] border-r-2 border-[var(--v-dim)] flex flex-col shrink-0">
+
+            <!-- Logo -->
+            <div class="p-4 border-b-2 border-[var(--v-dim)]">
+                <div class="font-bold text-xs tracking-widest synth-text" style="font-family:'Press Start 2P',monospace">
+                    AUTORESEARCH
+                </div>
+                <div class="text-[10px] tracking-[0.3em] text-[var(--v3)] mt-1">[ HACK THE PLANET ]</div>
+            </div>
+
+            <!-- Cat Companion -->
+            <div class="py-3 border-b-2 border-[var(--v-dim)] flex flex-col items-center">
+                <div class="cat-frame">
+                    <canvas id="cat-canvas" width="180" height="148"></canvas>
+                </div>
+                <div class="mt-1.5 text-center">
+                    <div class="text-[8px] tracking-widest text-[var(--v)]" style="font-family:'Press Start 2P',monospace">COMPANION</div>
+                    <div class="text-[10px] text-[var(--ng3)] mt-0.5">GEN <span x-text="String(stats.total_experiments || 0).padStart(3,'0')"></span></div>
+                </div>
+                <!-- Cat speech bubble -->
+                <div x-show="catSpeech" x-cloak
+                     class="mt-1 px-2 py-0.5 border border-[var(--v-dim)] bg-[var(--bg2)] text-[9px] text-[var(--cyan)] tracking-wider max-w-[200px] text-center truncate"
+                     x-text="'> ' + catSpeech"></div>
+            </div>
+
+            <!-- Nav -->
+            <nav class="flex-1 py-2">
+                <button @click="navigate('dashboard')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
+                        :class="page === 'dashboard' && 'active'">
+                    <span class="text-xs">[>]</span> DASHBOARD
+                </button>
+                <button @click="navigate('experiments')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
+                        :class="page === 'experiments' && 'active'">
+                    <span class="text-xs">[>]</span> EXPERIMENTS
+                    <span class="ml-auto text-[10px] text-[var(--v3)]" x-text="String(stats.total_experiments || 0).padStart(3,'0')"></span>
+                </button>
+                <button @click="navigate('changes')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
+                        :class="page === 'changes' && 'active'">
+                    <span class="text-xs">[>]</span> CHANGELOG
+                </button>
+                <div class="my-2 mx-4 border-t border-[var(--v-dim)]"></div>
+                <button @click="navigate('prompt')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
+                        :class="page === 'prompt' && 'active'">
+                    <span class="text-xs">[>]</span> PROMPT
+                </button>
+                <button @click="navigate('config')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
+                        :class="page === 'config' && 'active'">
+                    <span class="text-xs">[>]</span> CONFIG
+                </button>
+                <div class="my-2 mx-4 border-t border-[var(--v-dim)]"></div>
+                <button @click="navigate('run')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
+                        :class="page === 'run' && 'active'">
+                    <span class="text-xs">[>]</span> RUN HACK
+                    <span class="ml-auto w-2 h-2" :class="runStatus.running ? 'bg-[var(--v)] pulse' : 'bg-[var(--v3)]'"></span>
+                </button>
+            </nav>
+
+            <!-- Footer -->
+            <div class="p-3 border-t-2 border-[var(--v-dim)] flex items-center justify-between">
+                <span class="text-[10px] text-[var(--v3)]">v0.2.0</span>
+                <a href="/api/docs" target="_blank" class="text-[10px] text-[var(--v3)] hover:text-[var(--v)] transition-colors">API_</a>
+            </div>
+        </aside>
+
+        <!-- ========== MAIN ========== -->
+        <main class="flex-1 overflow-y-auto bg-[var(--bg)]">
+
+            <!-- ==================== DASHBOARD ==================== -->
+            <div x-show="page === 'dashboard'" class="p-6 max-w-7xl mx-auto">
+                <div class="mb-6">
+                    <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">SYSTEM OVERVIEW</h2>
+                    <p class="text-xs text-[var(--v3)] mt-1 tracking-wider">PROJECT EVOLUTION METRICS_</p>
+                </div>
+
+                <!-- Stats -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                    <div class="pixel-border bg-[var(--bg2)] p-3">
+                        <div class="text-[9px] tracking-widest text-[var(--v3)]">TOTAL_HACKS</div>
+                        <div class="text-3xl text-[var(--v)] mt-1 glow-sm" style="font-family:'Press Start 2P',monospace" x-text="String(stats.total_experiments || 0).padStart(3,'0')"></div>
+                    </div>
+                    <div class="pixel-border bg-[var(--bg2)] p-3">
+                        <div class="text-[9px] tracking-widest text-[var(--v3)]">AVG_QUALITY</div>
+                        <div class="text-3xl mt-1 text-[var(--v)] glow-sm" style="font-family:'Press Start 2P',monospace" x-text="(stats.avg_score || 0).toFixed(2)"></div>
+                    </div>
+                    <div class="pixel-border bg-[var(--bg2)] p-3">
+                        <div class="text-[9px] tracking-widest text-[var(--v3)]">KEEP/DISCARD</div>
+                        <div class="flex items-baseline gap-2 mt-1">
+                            <span class="text-3xl text-[var(--v)] glow-sm" style="font-family:'Press Start 2P',monospace" x-text="stats.keep_count || 0"></span>
+                            <span class="text-[var(--v3)]">/</span>
+                            <span class="text-2xl text-[var(--red)]/50" style="font-family:'Press Start 2P',monospace" x-text="stats.discard_count || 0"></span>
+                        </div>
+                        <div class="text-[9px] text-[var(--v3)] mt-1" x-text="stats.total_experiments ? ((stats.keep_count / stats.total_experiments) * 100).toFixed(0) + '% SURVIVAL' : ''"></div>
+                    </div>
+                    <div class="pixel-border bg-[var(--bg2)] p-3">
+                        <div class="text-[9px] tracking-widest text-[var(--v3)]">DIVERSITY</div>
+                        <div class="text-3xl text-[var(--pink)] mt-1 glow-sm" style="font-family:'Press Start 2P',monospace" x-text="Object.keys(stats.type_distribution || {}).length"></div>
+                        <div class="text-[9px] text-[var(--v3)] mt-1">TYPES DISCOVERED</div>
+                    </div>
+                </div>
+
+                <!-- Score Chart + Types -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                    <div class="lg:col-span-2 pixel-border bg-[var(--bg2)] p-4">
+                        <div class="text-[9px] tracking-widest text-[var(--v3)] mb-3">SCORE_TIMELINE_</div>
+                        <template x-if="!stats.score_trend || stats.score_trend.length === 0">
+                            <div class="text-center py-8 text-[var(--v3)] text-sm tracking-widest">NO_DATA</div>
+                        </template>
+                        <template x-if="stats.score_trend && stats.score_trend.length > 0">
+                            <div class="overflow-x-auto">
+                                <svg :viewBox="'0 0 ' + Math.max(stats.score_trend.length * 28 + 50, 200) + ' 90'" class="w-full h-24">
+                                    <line x1="40" y1="5" x2="40" y2="75" stroke="var(--v-dim)" stroke-width="0.5"/>
+                                    <line x1="40" y1="75" :x2="stats.score_trend.length * 28 + 40" y2="75" stroke="var(--v-dim)" stroke-width="0.5"/>
+                                    <line x1="40" y1="40" :x2="stats.score_trend.length * 28 + 40" y2="40" stroke="var(--v-dim)" stroke-width="0.3" stroke-dasharray="2 4"/>
+                                    <text x="8" y="9" fill="var(--v3)" font-size="7" font-family="'VT323',monospace">1.0</text>
+                                    <text x="8" y="44" fill="var(--v3)" font-size="7" font-family="'VT323',monospace">0.5</text>
+                                    <text x="8" y="79" fill="var(--v3)" font-size="7" font-family="'VT323',monospace">0.0</text>
+                                    <polygon :points="'40,75 ' + stats.score_trend.map((p,i) => (40+i*28)+','+(75-p.score*70)).join(' ') + ' ' + (40+(stats.score_trend.length-1)*28)+',75'"
+                                             fill="rgba(180,74,255,0.08)"/>
+                                    <polyline fill="none" stroke="var(--v)" stroke-width="1.5" stroke-linejoin="round" opacity="0.7"
+                                              :points="stats.score_trend.map((p,i) => (40+i*28)+','+(75-p.score*70)).join(' ')"/>
+                                    <template x-for="(p,i) in stats.score_trend" :key="'d'+i">
+                                        <circle :cx="40+i*28" :cy="75-p.score*70" r="2" :fill="p.decision==='KEEP'?'var(--v)':p.decision==='DISCARD'?'var(--red)':'var(--amber)'"/>
+                                    </template>
+                                    <template x-for="(p,i) in stats.score_trend" :key="'xl'+i">
+                                        <text x-show="i%5===0" :x="40+i*28" y="87" fill="var(--v3)" font-size="7" font-family="'VT323',monospace" text-anchor="middle" x-text="'#'+p.number"></text>
+                                    </template>
+                                </svg>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="pixel-border bg-[var(--bg2)] p-4">
+                        <div class="text-[9px] tracking-widest text-[var(--v3)] mb-3">GENOME_MAP_</div>
+                        <div class="space-y-2" x-show="stats.type_distribution">
+                            <template x-for="[type, count] in Object.entries(stats.type_distribution || {}).sort((a,b) => b[1]-a[1])" :key="type">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] px-1.5 py-px w-20 truncate" :class="typeBadgeCls(type)" x-text="type"></span>
+                                    <div class="flex-1 h-1.5 bg-[var(--bg)]">
+                                        <div class="h-full transition-all duration-500" :class="typeBarCls(type)"
+                                             :style="'width:' + (count / (stats.total_experiments||1) * 100) + '%'"></div>
+                                    </div>
+                                    <span class="text-[11px] text-[var(--v3)] w-6 text-right" x-text="count"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Last Experiment -->
+                <div x-show="stats.last_experiment" class="mt-3 pixel-border bg-[var(--bg2)] p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[9px] tracking-widest text-[var(--v3)]">LATEST_MUTATION_</span>
+                        <button @click="navigate('experiments'); $nextTick(() => loadExperiment(stats.last_experiment.number))" class="text-[10px] text-[var(--cyan)] hover:text-white tracking-wider">INSPECT_</button>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-[var(--v3)] text-xs mt-0.5" style="font-family:'Press Start 2P',monospace" x-text="'#'+String(stats.last_experiment.number).padStart(2,'0')"></span>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="text-sm text-[var(--ng2)]" x-text="stats.last_experiment.title"></span>
+                                <span class="text-[9px] px-1 py-px" :class="typeBadgeCls(stats.last_experiment.type)" x-text="stats.last_experiment.type"></span>
+                                <span class="text-[9px]" :class="decisionCls(stats.last_experiment.decision)" x-text="stats.last_experiment.decision"></span>
+                            </div>
+                            <div class="text-[10px] text-[var(--v3)] mt-0.5" x-text="stats.last_experiment.date"></div>
+                            <div class="text-xs text-[var(--ng3)] mt-1 line-clamp-2" x-text="stats.last_experiment.what_done"></div>
+                        </div>
+                        <div class="text-xl text-[var(--v)] glow-sm shrink-0" style="font-family:'Press Start 2P',monospace" x-text="stats.last_experiment.score"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== EXPERIMENTS ==================== -->
+            <div x-show="page === 'experiments'" class="p-6 max-w-7xl mx-auto">
+                <div class="flex items-end justify-between mb-5">
+                    <div>
+                        <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">EXPERIMENT_LOG</h2>
+                        <p class="text-xs text-[var(--ng3)] mt-1" x-text="filteredExperiments.length + ' RECORDS_'"></p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input x-model="expSearch" type="text" placeholder="SEARCH_"
+                               class="bg-[var(--bg2)] border border-[var(--v-dim)] rounded-sm px-2 py-1 text-sm text-[var(--v)] w-44 tracking-wider">
+                        <select x-model="expFilterType" class="bg-[var(--bg2)] border border-[var(--v-dim)] rounded-sm px-2 py-1 text-sm text-[var(--ng2)]">
+                            <option value="">ALL_TYPES</option>
+                            <option value="Bug Fix">BUG_FIX</option>
+                            <option value="Feature">FEATURE</option>
+                            <option value="Improvement">IMPROVE</option>
+                            <option value="Refactoring">REFACTOR</option>
+                            <option value="Security">SECURITY</option>
+                            <option value="Docs">DOCS</option>
+                            <option value="Other">OTHER</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Experiment List -->
+                <div class="space-y-1">
+                    <template x-for="exp in paginatedExperiments" :key="exp.number">
+                        <div>
+                            <!-- Row -->
+                            <div @click="toggleExperiment(exp.number)"
+                                 class="pixel-border bg-[var(--bg2)] px-3 py-2.5 cursor-pointer hover:bg-[var(--bg3)] transition-all"
+                                 :class="selectedExp === exp.number && 'bg-[rgba(180,74,255,0.05)] border-[var(--v3)]'">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-[var(--v3)] text-xs w-8 shrink-0" style="font-family:'Press Start 2P',monospace" x-text="'#'+String(exp.number).padStart(3,'0')"></span>
+                                    <div class="flex-1 min-w-0 flex items-center gap-2">
+                                        <span class="text-sm text-[var(--ng2)] truncate" x-text="exp.title"></span>
+                                        <span class="text-[9px] px-1 py-px shrink-0" :class="typeBadgeCls(exp.type)" x-text="exp.type"></span>
+                                    </div>
+                                    <span class="text-[10px] text-[var(--v3)] w-28 truncate shrink-0" x-text="exp.date"></span>
+                                    <span class="text-sm w-10 text-right shrink-0" :class="scoreCls(exp.score)" style="font-family:'Press Start 2P',monospace" x-text="exp.score"></span>
+                                    <span class="text-[10px] w-16 text-right shrink-0" :class="decisionCls(exp.decision)" x-text="exp.decision"></span>
+                                    <span class="text-[var(--v3)] text-xs transition-transform shrink-0" :class="selectedExp === exp.number && 'rotate-90 text-[var(--v)]'" x-text="selectedExp === exp.number ? 'v' : '>'"></span>
+                                </div>
+                            </div>
+                            <!-- Accordion Detail (inline, pushes rows below down) -->
+                            <div x-show="selectedExp === exp.number" x-collapse class="pixel-border border-t-0 bg-[var(--bg2)] overflow-hidden">
+                                <!-- Tabs -->
+                                <div class="flex border-b-2 border-[var(--v-dim)]">
+                                    <template x-for="tab in ['OUTPUT', 'PROMPT', 'SUMMARY']" :key="tab">
+                                        <button @click="expDetailTab = tab.toLowerCase()"
+                                                class="px-4 py-2 text-xs tracking-widest transition-colors"
+                                                :class="expDetailTab === tab.toLowerCase() ? 'text-[var(--v)] border-b-2 border-[var(--v)] -mb-[2px]' : 'text-[var(--v3)] hover:text-[var(--ng2)]'"
+                                                x-text="'[ ' + tab + ' ]'"></button>
+                                    </template>
+                                    <div class="flex-1"></div>
+                                    <button @click="selectedExp = null; selectedExpData = null" class="px-3 text-[var(--v3)] hover:text-[var(--red)] tracking-wider">[X]</button>
+                                </div>
+                                <!-- Content -->
+                                <div class="p-4 max-h-[65vh] overflow-y-auto">
+                                    <!-- Loading -->
+                                    <div x-show="expLoading" class="text-center py-8 text-[var(--v3)] tracking-widest">
+                                        <span class="blink">LOADING_</span>
+                                    </div>
+                                    <!-- Output -->
+                                    <template x-if="selectedExp === exp.number && expDetailTab === 'output' && !expLoading">
+                                        <div>
+                                            <div x-show="selectedExpData?.output" class="md" x-html="renderMarkdown(selectedExpData?.output)"></div>
+                                            <div x-show="!selectedExpData?.output" class="text-center py-6 text-[var(--v3)] text-xs tracking-widest">
+                                                NO_OUTPUT_GENERATED_<br>
+                                                <span class="text-[var(--v3)] text-[11px]">(experiment required no code changes)</span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <!-- Prompt -->
+                                    <template x-if="selectedExp === exp.number && expDetailTab === 'prompt' && !expLoading">
+                                        <div>
+                                            <div x-show="selectedExpData?.prompt" class="md" x-html="renderMarkdown(selectedExpData?.prompt)"></div>
+                                            <div x-show="!selectedExpData?.prompt" class="text-center py-6 text-[var(--v3)] text-xs tracking-widest">NO_PROMPT_DATA_</div>
+                                        </div>
+                                    </template>
+                                    <!-- Summary -->
+                                    <template x-if="selectedExp === exp.number && expDetailTab === 'summary' && !expLoading">
+                                        <div>
+                                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+                                                <div class="bg-[var(--bg)] p-2 pixel-border"><div class="text-[8px] text-[var(--v3)] tracking-widest">EXP</div><div class="text-xs text-[var(--v)] mt-1" x-text="'#'+(selectedExpData?.number||'')+' '+(selectedExpData?.title||'')"></div></div>
+                                                <div class="bg-[var(--bg)] p-2 pixel-border"><div class="text-[8px] text-[var(--v3)] tracking-widest">TYPE</div><span class="text-[10px] px-1 py-px mt-1 inline-block" :class="typeBadgeCls(selectedExpData?.type)" x-text="selectedExpData?.type"></span></div>
+                                                <div class="bg-[var(--bg)] p-2 pixel-border"><div class="text-[8px] text-[var(--v3)] tracking-widest">SCORE</div><div class="text-sm mt-1" :class="scoreCls(selectedExpData?.score)" style="font-family:'Press Start 2P',monospace" x-text="selectedExpData?.score"></div></div>
+                                                <div class="bg-[var(--bg)] p-2 pixel-border"><div class="text-[8px] text-[var(--v3)] tracking-widest">DECISION</div><div class="text-xs mt-1" :class="decisionCls(selectedExpData?.decision)" x-text="selectedExpData?.decision"></div></div>
+                                            </div>
+                                            <div x-show="selectedExpData?.files_modified?.length" class="mb-3">
+                                                <div class="text-[9px] text-[var(--v3)] tracking-widest mb-1">FILES_MODIFIED_</div>
+                                                <div class="flex flex-wrap gap-1">
+                                                    <template x-for="f in (selectedExpData?.files_modified || [])" :key="f">
+                                                        <code class="text-[10px] bg-[var(--bg)] text-[var(--cyan)] px-1.5 py-0.5 pixel-border" x-text="f"></code>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                            <div x-show="selectedExpData?.notes" class="bg-[var(--bg)] p-3 pixel-border">
+                                                <div class="text-[9px] text-[var(--pink)] tracking-widest mb-1">NOTES_FOR_NEXT_</div>
+                                                <p class="text-xs text-[var(--ng3)]" x-text="selectedExpData?.notes"></p>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-show="filteredExperiments.length === 0" class="text-center py-10 text-[var(--v3)] tracking-widest">NO_MATCHES_</div>
+                </div>
+
+                <!-- Pagination -->
+                <div class="mt-3 flex items-center justify-between text-[10px] text-[var(--v3)] tracking-wider">
+                    <span x-text="'RECORDS ' + (expPage * 50 + 1) + '-' + Math.min((expPage+1)*50, filteredExperiments.length) + '/' + filteredExperiments.length"></span>
+                    <div class="flex gap-1">
+                        <button @click="expPage = Math.max(0, expPage-1)" :disabled="expPage===0" class="px-2 py-0.5 border border-[var(--v-dim)] hover:border-[var(--v)] disabled:opacity-30 tracking-wider">&lt; PREV</button>
+                        <button @click="expPage = Math.min(expTotalPages-1, expPage+1)" :disabled="expPage>=expTotalPages-1" class="px-2 py-0.5 border border-[var(--v-dim)] hover:border-[var(--v)] disabled:opacity-30 tracking-wider">NEXT &gt;</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== CHANGES LOG ==================== -->
+            <div x-show="page === 'changes'" class="p-6 max-w-5xl mx-auto">
+                <div class="flex items-end justify-between mb-5">
+                    <div>
+                        <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">CHANGES_LOG</h2>
+                        <p class="text-xs text-[var(--ng3)] mt-1">MUTATION_CHRONICLE_</p>
+                    </div>
+                    <button @click="loadChangesLog()" class="text-[10px] text-[var(--v3)] hover:text-[var(--v)] tracking-wider border border-[var(--v-dim)] hover:border-[var(--v)] px-2 py-1 transition-all">REFRESH_</button>
+                </div>
+                <div class="pixel-border bg-[var(--bg2)] p-5 max-h-[80vh] overflow-y-auto md" x-html="renderMarkdown(changesLog)"></div>
+            </div>
+
+            <!-- ==================== PROMPT EDITOR ==================== -->
+            <div x-show="page === 'prompt'" class="p-6 max-w-5xl mx-auto">
+                <div class="flex items-end justify-between mb-5">
+                    <div>
+                        <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">PROMPT_ENGINE</h2>
+                        <p class="text-xs text-[var(--ng3)] mt-1">AGENT_DIRECTIVE_TEMPLATE_</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-[10px] text-[var(--v3)]" x-text="prompt.length + ' CHARS'"></span>
+                        <button @click="savePrompt()" :disabled="promptSaving"
+                                class="bg-[var(--bg2)] border border-[var(--v2)] text-[var(--v)] text-xs tracking-wider px-4 py-1.5 hover:bg-[rgba(180,74,255,0.1)] disabled:opacity-40 transition-all"
+                                x-text="promptSaving ? 'SAVING...' : '[COMPILE]'"></button>
+                    </div>
+                </div>
+                <div class="pixel-border bg-[var(--bg2)] overflow-hidden">
+                    <div class="flex items-center justify-between px-3 py-1.5 bg-[var(--bg)] border-b border-[var(--v-dim)]">
+                        <span class="text-[9px] text-[var(--v3)] tracking-wider">config/default_prompt.md</span>
+                        <span class="text-[9px] text-[var(--v3)]">VARS: {iteration} {total} {project_name} {goals} {tech_stack} {constraints} {focus_areas}</span>
+                    </div>
+                    <textarea x-model="prompt" @keydown.tab.prevent="insertTab($event)"
+                              class="editor w-full h-[70vh] p-4 bg-transparent text-[var(--ng2)] text-sm leading-relaxed resize-none border-none"
+                              placeholder="INITIALIZING..."></textarea>
+                </div>
+            </div>
+
+            <!-- ==================== CONFIG ==================== -->
+            <div x-show="page === 'config'" class="p-6 max-w-4xl mx-auto">
+                <div class="flex items-end justify-between mb-5">
+                    <div>
+                        <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">CONFIG_MATRIX</h2>
+                        <p class="text-xs text-[var(--ng3)] mt-1">.autoresearch.json_</p>
+                    </div>
+                    <button @click="saveConfig()" :disabled="configSaving"
+                            class="bg-[var(--bg2)] border border-[var(--v2)] text-[var(--v)] text-xs tracking-wider px-4 py-1.5 hover:bg-[rgba(180,74,255,0.1)] disabled:opacity-40 transition-all"
+                            x-text="configSaving ? 'SAVING...' : '[COMMIT]'"></button>
+                </div>
+                <div class="space-y-3">
+                    <div class="pixel-border bg-[var(--bg2)] p-3">
+                        <label class="text-[9px] tracking-widest text-[var(--v3)]">PROJECT_NAME</label>
+                        <input x-model="config.name" type="text" class="mt-1 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]">
+                    </div>
+                    <div class="pixel-border bg-[var(--bg2)] p-3">
+                        <label class="text-[9px] tracking-widest text-[var(--v3)]">DESCRIPTION</label>
+                        <textarea x-model="config.description" rows="2" class="mt-1 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)] resize-none"></textarea>
+                    </div>
+                    <div class="pixel-border bg-[var(--bg2)] p-3">
+                        <div class="flex justify-between mb-2"><label class="text-[9px] tracking-widest text-[var(--v3)]">GOALS_</label><span class="text-[9px] text-[var(--cyan)]" x-text="config.goals.length + ' ACTIVE'"></span></div>
+                        <div class="space-y-1">
+                            <template x-for="(g,i) in config.goals" :key="'g'+i">
+                                <div class="flex items-center gap-1.5"><span class="text-[9px] text-[var(--v3)] w-4">G</span><input x-model="config.goals[i]" class="flex-1 bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1 text-sm text-[var(--ng2)]"><button @click="config.goals.splice(i,1)" class="text-[var(--v3)] hover:text-[var(--red)] text-xs px-1">X</button></div>
+                            </template>
+                            <button @click="config.goals.push('')" class="text-[10px] text-[var(--cyan)] hover:text-white tracking-wider">+ ADD_GOAL</button>
+                        </div>
+                    </div>
+                    <div class="pixel-border bg-[var(--bg2)] p-3">
+                        <div class="flex justify-between mb-2"><label class="text-[9px] tracking-widest text-[var(--v3)]">CONSTRAINTS_</label><span class="text-[9px] text-[var(--pink)]" x-text="config.constraints.length + ' ACTIVE'"></span></div>
+                        <div class="space-y-1">
+                            <template x-for="(c,i) in config.constraints" :key="'c'+i">
+                                <div class="flex items-center gap-1.5"><span class="text-[9px] text-[var(--v3)] w-4">C</span><input x-model="config.constraints[i]" class="flex-1 bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1 text-sm text-[var(--ng2)]"><button @click="config.constraints.splice(i,1)" class="text-[var(--v3)] hover:text-[var(--red)] text-xs px-1">X</button></div>
+                            </template>
+                            <button @click="config.constraints.push('')" class="text-[10px] text-[var(--pink)] hover:text-white tracking-wider">+ ADD_CONSTRAINT</button>
+                        </div>
+                    </div>
+                    <div class="pixel-border bg-[var(--bg2)] p-3">
+                        <div class="flex justify-between mb-2"><label class="text-[9px] tracking-widest text-[var(--v3)]">FOCUS_AREAS_</label><span class="text-[9px] text-[var(--v)]" x-text="config.focus_areas.length + ' ACTIVE'"></span></div>
+                        <div class="space-y-1">
+                            <template x-for="(f,i) in config.focus_areas" :key="'f'+i">
+                                <div class="flex items-center gap-1.5"><span class="text-[9px] text-[var(--v3)] w-4">F</span><input x-model="config.focus_areas[i]" class="flex-1 bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1 text-sm text-[var(--ng2)]"><button @click="config.focus_areas.splice(i,1)" class="text-[var(--v3)] hover:text-[var(--red)] text-xs px-1">X</button></div>
+                            </template>
+                            <button @click="config.focus_areas.push('')" class="text-[10px] text-[var(--v)] hover:text-white tracking-wider">+ ADD_FOCUS</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== RUN CONTROL ==================== -->
+            <div x-show="page === 'run'" class="p-6 max-w-5xl mx-auto">
+                <div class="mb-5">
+                    <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">EVOLUTION_CONTROL</h2>
+                    <p class="text-xs text-[var(--ng3)] mt-1">INITIATE_HACK_SEQUENCE_</p>
+                </div>
+
+                <div>
+                    <!-- config + logs -->
+                        <!-- Config panel (collapses when running) -->
+                        <div x-show="!runStatus.running" x-transition class="pixel-border bg-[var(--bg2)] p-4 mb-3">
+                            <div class="text-[9px] tracking-widest text-[var(--v3)] mb-3">LAUNCH_PARAMETERS_</div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div><label class="text-[9px] text-[var(--v3)] tracking-wider">PROJECT_PATH</label><input x-model="runConfig.project" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]" placeholder="."></div>
+                                <div><label class="text-[9px] text-[var(--v3)] tracking-wider">ITERATIONS</label><input x-model.number="runConfig.iterations" type="number" min="1" max="500" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
+                                <div><label class="text-[9px] text-[var(--v3)] tracking-wider">INTERVAL_MIN</label><input x-model.number="runConfig.timeout" type="number" min="0" max="60" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
+                                <div><label class="text-[9px] text-[var(--v3)] tracking-wider">MAX_TIME_SEC</label><input x-model.number="runConfig.max_time" type="number" min="60" max="3600" step="60" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
+                            </div>
+                            <div class="mt-3 flex gap-2">
+                                <button @click="startRun()" class="border border-[var(--v)] text-[var(--v)] text-xs tracking-wider px-5 py-2 hover:bg-[rgba(180,74,255,0.1)] transition-all">[> INITIATE]</button>
+                            </div>
+                        </div>
+
+                        <!-- Running controls (shown when active) -->
+                        <div x-show="runStatus.running" x-transition class="pixel-border bg-[var(--bg2)] p-4 mb-3">
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="w-2 h-2 bg-[var(--v)] pulse"></span>
+                                <span class="text-xs text-[var(--v)] tracking-widest">HACKING_IN_PROGRESS_</span>
+                                <span class="text-[10px] text-[var(--cyan)]" x-text="runStatus.current_exp ? 'EXP_' + runStatus.current_exp + '/' + runStatus.total_exps : ''"></span>
+                                <span class="text-[10px] text-[var(--v3)]" x-text="runStatus.started_at"></span>
+                                <button @click="stopRun()" class="ml-auto border border-[var(--red)] text-[var(--red)] text-xs tracking-wider px-5 py-1.5 hover:bg-[rgba(255,51,51,0.1)] transition-all">[X TERMINATE]</button>
+                            </div>
+                            <!-- Progress bar -->
+                            <div x-show="runStatus.total_exps > 0" class="mt-2 h-1.5 bg-[var(--bg)] pixel-border overflow-hidden">
+                                <div class="h-full bg-[var(--v)] transition-all duration-500" :style="'width:' + Math.max(0, Math.min(100, (runStatus.current_exp / runStatus.total_exps) * 100)) + '%'"></div>
+                            </div>
+                        </div>
+
+                        <!-- Logs -->
+                        <div class="pixel-border bg-[var(--bg2)] p-4">
+                            <div class="flex items-center gap-3 mb-3">
+                                <span class="text-[9px] tracking-widest text-[var(--v3)]">SYSTEM_STATUS_</span>
+                                <span class="flex items-center gap-1.5 text-[10px] tracking-wider" :class="runStatus.running ? 'text-[var(--v)]' : 'text-[var(--v3)]'">
+                                    <span class="w-1.5 h-1.5" :class="runStatus.running ? 'bg-[var(--v)] pulse' : 'bg-[var(--v3)]'"></span>
+                                    <span x-text="runStatus.running ? 'ACTIVE' : runStatus.error ? 'ERROR' : 'STANDBY'"></span>
+                                </span>
+                                <button @click="pollRunStatus()" class="ml-auto text-[10px] text-[var(--v3)] hover:text-[var(--cyan)] tracking-wider">PING_</button>
+                            </div>
+                            <div x-show="runStatus.recent_logs && runStatus.recent_logs.length > 0" class="bg-[var(--bg)] pixel-border p-3 max-h-80 overflow-y-auto text-[11px] leading-relaxed">
+                                <template x-for="(line,i) in runStatus.recent_logs" :key="'rl'+i">
+                                    <div :class="line.includes('ERROR') ? 'text-[var(--red)]' : line.includes('WARNING') ? 'text-[var(--amber)]' : 'text-[var(--v3)]'" x-text="line"></div>
+                                </template>
+                            </div>
+                            <div x-show="!runStatus.recent_logs || !runStatus.recent_logs.length" class="text-center py-8 text-[var(--v3)] text-xs tracking-widest">NO_TRANSMISSION_</div>
+                            <div x-show="runStatus.error" class="mt-3 bg-[rgba(255,51,51,0.05)] pixel-border p-2" style="border-color:rgba(255,51,51,0.3)">
+                                <div class="text-[9px] text-[var(--red)] tracking-widest mb-1">ERROR_REPORT_</div>
+                                <pre class="text-[10px] text-[var(--red)]/60 whitespace-pre-wrap" x-text="runStatus.error"></pre>
+                            </div>
+                        </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function app() {
+            return {
+                page: 'dashboard',
+                stats: {},
+                experiments: [],
+                selectedExp: null,
+                selectedExpData: null,
+                expLoading: false,
+                expDetailTab: 'output',
+                expSearch: '',
+                expFilterType: '',
+                expPage: 0,
+                config: { name:'', description:'', goals:[], constraints:[], tech_stack:[], focus_areas:[] },
+                prompt: '',
+                changesLog: '',
+                promptSaving: false,
+                configSaving: false,
+                runConfig: { iterations:10, timeout:5, max_time:600, project:'.' },
+                runStatus: { running:false, current_exp:0, total_exps:0, started_at:null, recent_logs:[], error:null },
+                toast: { show:false, message:'', type:'success' },
+                catSpeech: '',  // reactive trigger for cat speech bubble
+
+                // Pagination
+                get filteredExperiments() {
+                    let list = this.experiments;
+                    if (this.expSearch) { const q = this.expSearch.toLowerCase(); list = list.filter(e => e.title.toLowerCase().includes(q) || e.type.toLowerCase().includes(q) || String(e.number).includes(q)); }
+                    if (this.expFilterType) list = list.filter(e => e.type === this.expFilterType);
+                    return list;
+                },
+                get expTotalPages() { return Math.max(1, Math.ceil(this.filteredExperiments.length / 50)); },
+                get paginatedExperiments() { const s = this.expPage * 50; return this.filteredExperiments.slice(s, s + 50); },
+
+                // Pet events tracking
+                _lastExpCount: 0,
+
+                // Init
+                async init() {
+                    // Matrix rain background
+                    if (window.MatrixRain) MatrixRain.init();
+                    await Promise.all([this.loadStats(), this.loadExperiments()]);
+                    this._lastExpCount = this.stats.total_experiments || 0;
+                    // Start cat companion in sidebar immediately
+                    this.$nextTick(() => {
+                        setTimeout(() => {
+                            if (window.CatModule && !CatModule.isActive()) {
+                                const el = document.getElementById('cat-canvas');
+                                if (el) CatModule.start(el, 'neutral', 4);
+                            }
+                        }, 100);
+                    });
+                    setInterval(async () => {
+                        if (this.page==='dashboard') await this.loadStats();
+                        if (this.page==='run') await this.pollRunStatus();
+                        // Cat: poll speech bubble for reactivity
+                        if (window.CatModule && CatModule.isActive()) {
+                            this.catSpeech = CatModule.getSpeech();
+                        }
+                    }, 1000);
+                },
+
+                api(url, opts={}) { return fetch(url, opts).then(r => { if(!r.ok) throw new Error(); return r.json(); }); },
+
+                navigate(page) {
+                    this.page = page; this.selectedExp = null; this.selectedExpData = null;
+                    if (page==='experiments') { this.loadExperiments(); this.expPage=0; }
+                    if (page==='changes') this.loadChangesLog();
+                    if (page==='prompt') this.loadPrompt();
+                    if (page==='config') this.loadConfig();
+                    if (page==='dashboard') this.loadStats();
+                    if (page==='run') this.pollRunStatus();
+                },
+
+                async loadStats() {
+                    try {
+                        const prevTotal = this.stats.total_experiments || 0;
+                        this.stats = await this.api('/api/stats');
+                        const newTotal = this.stats.total_experiments || 0;
+                        // Pet: detect new experiments
+                        if (newTotal > prevTotal) {
+                            const lastExp = this.stats.last_experiment;
+                            if (lastExp && (lastExp.decision === 'KEEP' || lastExp.decision === 'ACCEPT')) {
+                                if (window.CatModule) { CatModule.setExpression('happy'); CatModule.say('success'); setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000); }
+                            } else if (lastExp && lastExp.decision === 'DISCARD') {
+                                if (window.CatModule) { CatModule.setExpression('angry'); CatModule.say('angry'); setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000); }
+                            }
+                        }
+                    } catch(e) {}
+                },
+                async loadExperiments() { try { this.experiments = (await this.api('/api/experiments')).reverse(); } catch(e) {} },
+
+                toggleExperiment(n) {
+                    console.log('[toggleExperiment]', n, 'current:', this.selectedExp);
+                    if (this.selectedExp === n) { this.selectedExp = null; this.selectedExpData = null; return; }
+                    this.loadExperiment(n);
+                },
+
+                async loadExperiment(n) {
+                    this.selectedExp = n;
+                    this.expLoading = true;
+                    this.expDetailTab = 'output';
+                    try {
+                        const data = await this.api('/api/experiments/' + n);
+                        this.selectedExpData = data;
+                    } catch(e) {
+                        console.error('[loadExperiment] FAILED:', e);
+                        this.showToast('LOAD FAILED', 'error');
+                        this.selectedExp = null;
+                        this.selectedExpData = null;
+                    } finally {
+                        this.expLoading = false;
+                    }
+                },
+
+                async loadChangesLog() { try { this.changesLog = (await this.api('/api/changes-log')).content; } catch(e) {} },
+                async loadPrompt() { try { this.prompt = (await this.api('/api/prompt')).content; } catch(e) {} },
+                async savePrompt() {
+                    this.promptSaving = true;
+                    try { await this.api('/api/prompt', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({content:this.prompt}) }); this.showToast('PROMPT COMPILED', 'success'); }
+                    catch(e) { this.showToast('COMPILE FAILED', 'error'); } finally { this.promptSaving = false; }
+                },
+                async loadConfig() { try { this.config = await this.api('/api/config'); } catch(e) {} },
+                async saveConfig() {
+                    this.configSaving = true;
+                    try { await this.api('/api/config', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(this.config) }); this.showToast('CONFIG COMMITTED', 'success'); }
+                    catch(e) { this.showToast('COMMIT FAILED', 'error'); } finally { this.configSaving = false; }
+                },
+                async startRun() {
+                    try {
+                        console.log('[startRun] config:', JSON.stringify(this.runConfig));
+                        const res = await this.api('/api/run', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(this.runConfig) });
+                        console.log('[startRun] response:', res);
+                        this.showToast('HACK INITIATED', 'success');
+                        if (window.CatModule) CatModule.setExpression('working');
+                        await this.pollRunStatus();
+                    }
+                    catch(e) { console.error('[startRun] FAILED:', e); this.showToast('LAUNCH FAILED', 'error'); }
+                },
+                async stopRun() {
+                    try {
+                        await this.api('/api/run/stop', { method:'POST' });
+                        this.showToast('TERMINATED', 'success');
+                        if (window.CatModule) CatModule.setExpression('neutral');
+                        await this.pollRunStatus();
+                    }
+                    catch(e) { this.showToast('TERMINATE FAILED', 'error'); }
+                },
+                async pollRunStatus() { try { this.runStatus = await this.api('/api/run/status'); } catch(e) {} },
+
+                renderMarkdown(t) { if(!t) return ''; try { const html = marked.parse(t, { breaks: true }); const str = typeof html === 'string' ? html : String(html); return DOMPurify.sanitize(str); } catch(e) { console.error('[renderMarkdown]', e); return t.replace(/</g,'&lt;').replace(/\n/g,'<br>'); } },
+                insertTab(e) { const ta=e.target, s=ta.selectionStart; ta.value=ta.value.substring(0,s)+'    '+ta.value.substring(ta.selectionEnd); ta.selectionStart=ta.selectionEnd=s+4; this.prompt=ta.value; },
+                showToast(msg, type='success') { this.toast={show:true,message:msg,type}; setTimeout(()=>{this.toast.show=false},3000); },
+
+                typeBadgeCls(t) { return { 'Bug Fix':'t-bugfix','Security':'t-security','Feature':'t-feature','Refactoring':'t-refactor','Improvement':'t-improvement','Docs':'t-docs' }[t]||'t-other'; },
+                typeBarCls(t) { return { 'Bug Fix':'bg-[var(--red)]','Security':'bg-[var(--amber)]','Feature':'bg-[var(--cyan)]','Refactoring':'bg-[var(--pink)]','Improvement':'bg-[var(--ng)]','Docs':'bg-[#cc88ff]' }[t]||'bg-[#555]'; },
+                scoreCls(s) { try { const v=parseFloat(s); return v>=0.85?'text-[var(--v)] glow-sm':v>=0.7?'text-[var(--amber)]':'text-[var(--red)]'; } catch(e) { return 'text-[var(--v3)]'; } },
+                decisionCls(d) { return d==='KEEP'||d==='ACCEPT'?'text-[var(--ng)]':d==='DISCARD'?'text-[var(--red)]':'text-[var(--amber)]'; },
+            };
+        }
+    </script>
+
+    <!-- Matrix rain toggle (inside x-data scope via x-data on body) -->
+    <div x-data="{ matrixPaused: false }" class="contents">
+        <button @click="matrixPaused = window.MatrixRain ? MatrixRain.toggle() : true"
+                class="fixed bottom-4 right-4 z-50 px-2 py-1 text-[10px] tracking-widest border border-[var(--v-dim)] bg-[rgba(12,11,20,0.7)] text-[var(--v3)] hover:text-[var(--v)] hover:border-[var(--v2)] transition-all"
+                x-text="matrixPaused ? '> RESUME' : '> PAUSE'">
+        </button>
+    </div>
+</body>
+</html>
