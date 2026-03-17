@@ -607,6 +607,28 @@ def _smart_truncate(text: str, max_chars: int = 1500) -> str:
     return text[:max_chars]
 
 
+
+def _classify_experiment_type(title: str) -> str:
+    """Classify experiment type by title keywords.
+
+    Used as fallback when agent doesn't explicitly report Type.
+    Helps the agent enforce "don't do 3+ experiments of same type" rule.
+    """
+    t = title.lower()
+    if any(kw in t for kw in ("fix", "bug", "crash", "nameerror", "error", "truncat", "hang")):
+        return "Bug Fix"
+    if any(kw in t for kw in ("security", "xss", "injection", "owasp", "path traversal", "protect")):
+        return "Security"
+    if any(kw in t for kw in ("add", "new", "implement", "introduce", "enable")):
+        return "Feature"
+    if any(kw in t for kw in ("refactor", "simplif", "clean", "extract", "consolidat", "compress")):
+        return "Refactoring"
+    if any(kw in t for kw in ("improve", "enhance", "optim", "align")):
+        return "Improvement"
+    if any(kw in t for kw in ("document", "readme", "guide")):
+        return "Docs"
+    return "Other"
+
 def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
     """Парсит отчет эксперимента из вывода агента.
 
@@ -632,6 +654,14 @@ def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
     match = re.search(r'\*\*Title:\*\*\s*(.+)', output)
     if match:
         title = match.group(1).strip()
+
+    # Type (self-reported with heuristic fallback for backward compatibility)
+    exp_type = ""
+    type_match = re.search(r'\*\*Type:\*\*\s*(.+)', output)
+    if type_match:
+        exp_type = type_match.group(1).strip()
+    else:
+        exp_type = _classify_experiment_type(title)
 
     # Hypothesis (used as what_done — шаблон не имеет секции "What Was Done")
     # Captures multi-line text until next bold line or heading
@@ -712,6 +742,7 @@ def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
         "what_done": what_done,
         "files_modified": [f for f in files_modified if f][:10],
         "results": results,
+        "exp_type": exp_type,
         "agent_decision": agent_decision,
         "notes_next": notes_next,
         "date": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -769,7 +800,7 @@ def _read_experiment_history(exp_dir: Path, max_entries: int = 5) -> str:
     """Read compact experiment history from accumulation_context.md.
 
     Returns a markdown table with the last N experiments:
-    number, title, quality score, and decision.
+    number, type, title, quality score, and decision.
     Used by build_agent_prompt() for diversity awareness.
     """
     import re
@@ -791,6 +822,13 @@ def _read_experiment_history(exp_dir: Path, max_entries: int = 5) -> str:
         num = header_match.group(1)
         title = header_match.group(2).strip()
 
+        # Extract explicit Type from entry or classify from title (backward compat)
+        type_match = re.search(r'\*\*Type:\*\*\s*(\S+)', section)
+        if type_match:
+            exp_type = type_match.group(1).strip()
+        else:
+            exp_type = _classify_experiment_type(title)
+
         # Format 1: **Score:** X | **Decision:** Y (well-formed entries)
         score_match = re.search(
             r'\*\*Score:\*\*\s*([\d.]+|N/A)\s*\|\s*\*\*Decision:\*\*\s*(\w+)',
@@ -805,7 +843,7 @@ def _read_experiment_history(exp_dir: Path, max_entries: int = 5) -> str:
             score = score_m.group(1) if score_m else "N/A"
             decision = result_m.group(1) if result_m else "N/A"
 
-        entries.append((num, title, score, decision))
+        entries.append((num, exp_type, title, score, decision))
 
     if not entries:
         return ""
@@ -814,13 +852,15 @@ def _read_experiment_history(exp_dir: Path, max_entries: int = 5) -> str:
     entries = entries[-max_entries:]
 
     lines = [
-        "| # | Title | Score | Decision |",
-        "|---|-------|-------|----------|"
+        "| # | Type        | Title | Score | Decision |",
+        "|---|-------------|-------|-------|----------|"
     ]
-    for num, title, score, decision in entries:
-        if len(title) > 55:
-            title = title[:52] + "..."
-        lines.append(f"| {num} | {title} | {score} | {decision} |")
+    for num, exp_type, title, score, decision in entries:
+        if len(title) > 40:
+            title = title[:37] + "..."
+        if len(exp_type) > 12:
+            exp_type = exp_type[:11] + "..."
+        lines.append(f"| {num} | {exp_type:<12} | {title} | {score} | {decision} |")
 
     return "\n".join(lines)
 
@@ -876,6 +916,7 @@ def save_accumulation_context(project_dir: Path, experiment: Dict[str, Any]):
 ## Experiment {experiment['number']} — {experiment.get('title', 'Untitled')}
 
 **Date:** {experiment.get('date', '')}
+**Type:** {experiment.get('exp_type', 'Other')}
 
 ### What Was Done
 
