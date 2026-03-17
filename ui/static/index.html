@@ -193,30 +193,36 @@
                 <button @click="navigate('dashboard')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
                         :class="page === 'dashboard' && 'active'">
                     <span class="text-xs">[>]</span> DASHBOARD
+                    <span class="ml-auto text-[9px] text-[var(--v-dim)] font-mono">Alt+1</span>
                 </button>
                 <button @click="navigate('experiments')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
                         :class="page === 'experiments' && 'active'">
                     <span class="text-xs">[>]</span> EXPERIMENTS
                     <span class="ml-auto text-[10px] text-[var(--v3)]" x-text="String(stats.total_experiments || 0).padStart(3,'0')"></span>
+                    <span class="text-[9px] text-[var(--v-dim)] font-mono">Alt+2</span>
                 </button>
                 <button @click="navigate('changes')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
                         :class="page === 'changes' && 'active'">
                     <span class="text-xs">[>]</span> CHANGELOG
+                    <span class="ml-auto text-[9px] text-[var(--v-dim)] font-mono">Alt+3</span>
                 </button>
                 <div class="my-2 mx-4 border-t border-[var(--v-dim)]"></div>
                 <button @click="navigate('prompt')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
                         :class="page === 'prompt' && 'active'">
                     <span class="text-xs">[>]</span> PROMPT
+                    <span class="ml-auto text-[9px] text-[var(--v-dim)] font-mono">Alt+4</span>
                 </button>
                 <button @click="navigate('config')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
                         :class="page === 'config' && 'active'">
                     <span class="text-xs">[>]</span> CONFIG
+                    <span class="ml-auto text-[9px] text-[var(--v-dim)] font-mono">Alt+5</span>
                 </button>
                 <div class="my-2 mx-4 border-t border-[var(--v-dim)]"></div>
                 <button @click="navigate('run')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
                         :class="page === 'run' && 'active'">
                     <span class="text-xs">[>]</span> RUN HACK
-                    <span class="ml-auto w-2 h-2" :class="runStatus.running ? 'bg-[var(--v)] pulse' : 'bg-[var(--v3)]'"></span>
+                    <span class="w-2 h-2" :class="runStatus.running ? 'bg-[var(--v)] pulse' : 'bg-[var(--v3)]'"></span>
+                    <span class="ml-auto text-[9px] text-[var(--v-dim)] font-mono">Alt+6</span>
                 </button>
             </nav>
 
@@ -663,6 +669,27 @@
                             this.catSpeech = CatModule.getSpeech();
                         }
                     }, 1000);
+
+                    // Keyboard shortcuts
+                    const PAGES = ['dashboard','experiments','changes','prompt','config','run'];
+                    window.addEventListener('keydown', (e) => {
+                        // Alt+1..6 → navigate to sidebar pages
+                        if (e.altKey && e.key >= '1' && e.key <= '6') {
+                            e.preventDefault();
+                            this.navigate(PAGES[parseInt(e.key) - 1]);
+                        }
+                        // Escape → close experiment detail
+                        if (e.key === 'Escape' && this.selectedExp !== null) {
+                            this.selectedExp = null;
+                            this.selectedExpData = null;
+                        }
+                        // "/" → focus search on experiments page
+                        if (e.key === '/' && this.page === 'experiments' && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
+                            e.preventDefault();
+                            const searchEl = document.querySelector('input[placeholder="SEARCH_"]');
+                            if (searchEl) searchEl.focus();
+                        }
+                    });
                 },
 
                 api(url, opts={}) { return fetch(url, opts).then(r => { if(!r.ok) throw new Error(); return r.json(); }); },
@@ -675,6 +702,28 @@
                     if (page==='config') this.loadConfig();
                     if (page==='dashboard') this.loadStats();
                     if (page==='run') this.pollRunStatus();
+                    // Cat: contextual speech based on page
+                    if (window.CatModule && CatModule.isActive()) {
+                        const tips = {
+                            dashboard: ['Наблюдаю за метриками_', '*осматривается*', 'Всё под контролем!'],
+                            experiments: ['Хмм, что тут интересного...', 'Ищешь баги?', 'Полезные были эти хаки!'],
+                            changes: ['История мутаций_ *шуршит страницами*', 'Много чего натворили...'],
+                            prompt: ['Секретные инструкции! *широко открывает глаза*', 'Правильный промпт — половина успеха!'],
+                            config: ['Настройки режимов_', '*тычет лапой в параметры*'],
+                            run: ['Запуск хака! *вздрагивает*', 'Погнали! Мяу!'],
+                        };
+                        CatModule.setExpression('thinking');
+                        setTimeout(() => {
+                            if (window.CatModule && CatModule.isActive()) {
+                                CatModule.setExpression('neutral');
+                                const pool = tips[page];
+                                if (pool) {
+                                    const msg = pool[Math.floor(Math.random() * pool.length)];
+                                    CatModule.setSpeechText(msg, 5000);
+                                }
+                            }
+                        }, 800);
+                    }
                 },
 
                 async loadStats() {

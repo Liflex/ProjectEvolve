@@ -427,6 +427,15 @@
             return currentSpeech;
         },
 
+        /** Set speech text directly (for external page-aware tips). */
+        setSpeechText(text, durationMs) {
+            currentSpeech = text || '';
+            if (speechTimer) clearTimeout(speechTimer);
+            if (durationMs && text) {
+                speechTimer = setTimeout(() => { currentSpeech = ''; }, durationMs);
+            }
+        },
+
         /** Is animation running? */
         isActive() {
             return animating;
