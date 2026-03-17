@@ -331,6 +331,7 @@ async def start_run(data: RunRequest):
     env.pop("CLAUDECODE", None)
     env.pop("CLAUDE_SESSION_ID", None)
     env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
 
     try:
         process = subprocess.Popen(

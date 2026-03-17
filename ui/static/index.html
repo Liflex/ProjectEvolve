@@ -13,6 +13,8 @@
     <script src="/modules/cat.js"></script>
     <!-- Matrix rain background -->
     <script src="/modules/matrix.js"></script>
+    <!-- Organism evolution visualizer -->
+    <script src="/modules/organism.js"></script>
     <style>
         [x-cloak] { display: none !important; }
         * { scrollbar-width: thin; scrollbar-color: #1a1028 #0c0b14; }
@@ -101,6 +103,9 @@
         /* === CAT CANVAS === */
         .cat-frame { border: 2px solid var(--v-dim); image-rendering: pixelated; overflow: visible; box-shadow: 0 0 12px rgba(180,74,255,0.08); }
 
+        /* === ORGANISM === */
+        .organism-frame { border: 1px solid var(--v-dim); image-rendering: auto; box-shadow: 0 0 8px rgba(0,229,255,0.05); }
+
         /* === TYPE BADGES === */
         .t-bugfix { color: var(--red); background: rgba(255,51,54,0.08); }
         .t-security { color: var(--amber); background: rgba(255,170,0,0.08); }
@@ -162,6 +167,17 @@
                 <div x-show="catSpeech" x-cloak
                      class="mt-1 px-2 py-0.5 border border-[var(--v-dim)] bg-[var(--bg2)] text-[9px] text-[var(--cyan)] tracking-wider max-w-[200px] text-center truncate"
                      x-text="'> ' + catSpeech"></div>
+            </div>
+
+            <!-- Project Organism -->
+            <div class="py-2 border-b-2 border-[var(--v-dim)] flex flex-col items-center">
+                <div class="organism-frame w-32 h-32">
+                    <div x-html="organismSVG"></div>
+                </div>
+                <div class="mt-1 text-center">
+                    <div class="text-[8px] tracking-widest text-[var(--cyan)]" style="font-family:'Press Start 2P',monospace"
+                         x-text="organismStage"></div>
+                </div>
             </div>
 
             <!-- Nav -->
@@ -600,6 +616,8 @@
                 runStatus: { running:false, current_exp:0, total_exps:0, started_at:null, recent_logs:[], error:null },
                 toast: { show:false, message:'', type:'success' },
                 catSpeech: '',  // reactive trigger for cat speech bubble
+                organismSVG: '',  // organism visualizer SVG
+                organismStage: 'DORMANT',  // organism evolution stage name
 
                 // Pagination
                 get filteredExperiments() {
@@ -664,6 +682,15 @@
                             } else if (lastExp && lastExp.decision === 'DISCARD') {
                                 if (window.CatModule) { CatModule.setExpression('angry'); CatModule.say('angry'); setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000); }
                             }
+                        }
+                        // Organism: update visualizer
+                        if (window.OrganismModule) {
+                            const totalExp = this.stats.total_experiments || 0;
+                            const avgScore = this.stats.avg_score || 0;
+                            const typeDist = this.stats.type_distribution || {};
+                            const isRunning = this.runStatus.running;
+                            this.organismSVG = OrganismModule.renderSVG(totalExp, avgScore, typeDist, isRunning);
+                            this.organismStage = OrganismModule.getStage(totalExp).name;
                         }
                     } catch(e) {}
                 },
