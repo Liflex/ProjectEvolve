@@ -395,16 +395,22 @@ def run_quality_gate(project_dir: Path) -> Dict[str, Any]:
         loop = QualityLoop(project_dir)
         state = loop.run(
             max_iterations=1,  # Single snapshot — just check current state
-            threshold_a=0.6,
-            threshold_b=0.7,
+            # Используем QualityLoop defaults: threshold_a=0.7, threshold_b=0.85
             quiet=True  # Подавляем console output — log() в autoresearch.py достаточно
         )
 
-        decision = "KEEP" if state.score >= 0.6 else "REVIEW"
+        # Делегируем decision QualityLoop вместо кастомной логики с несовпадающими порогами
+        decision_text = loop._make_decision()
+        if "KEEP" in decision_text:
+            decision = "KEEP"
+        elif "ACCEPT" in decision_text:
+            decision = "ACCEPT"
+        else:
+            decision = "DISCARD"
 
         result = {
             "score": state.score,
-            "passed": state.score >= 0.6,
+            "passed": state.score >= state.threshold_a,
             "phase": state.phase.value,
             "iterations": state.iteration - 1,
             "stop_reason": state.stop_reason,
