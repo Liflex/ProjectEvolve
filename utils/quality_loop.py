@@ -140,11 +140,14 @@ class MetricRunner:
     def __init__(self, project_dir: Path, config: QualityConfig):
         self.project_dir = project_dir
         self.config = config
-        self.tech_stack = self._detect_tech_stack()
+        self.tech_stacks = self._detect_tech_stacks()
 
-    def _detect_tech_stack(self) -> str:
-        """Автодетект стека технологий"""
-        # Проверяем файлы проекта
+    def _detect_tech_stacks(self) -> List[str]:
+        """Автодетект всех стеков технологий проекта.
+
+        Возвращает список всех обнаруженных стеков (с дедупликацией).
+        Проект со смешанными стеками (JS+Python) получат метрики для каждого.
+        """
         checks = [
             ("package.json", "javascript"),
             ("tsconfig.json", "typescript"),
@@ -157,30 +160,39 @@ class MetricRunner:
             ("build.gradle", "java"),
         ]
 
+        stacks = []
+        seen = set()
         for filename, tech in checks:
-            if (self.project_dir / filename).exists():
-                return tech
+            if (self.project_dir / filename).exists() and tech not in seen:
+                stacks.append(tech)
+                seen.add(tech)
 
-        return "unknown"
+        return stacks if stacks else ["unknown"]
 
     def _find_command(self, metric_type: str) -> Optional[str]:
         """Находит команду для метрики по типу проекта.
 
-        Проверяет config auto_detect, затем fallback на DEFAULT_AUTO_DETECT.
+        Проверяет config auto_detect для всех обнаруженных стеков,
+        затем fallback на DEFAULT_AUTO_DETECT.
         Использует shutil.which() для быстрой проверки без subprocess spawn.
         """
         auto_detect = self.config.config.get("auto_detect", {})
-        commands = auto_detect.get(self.tech_stack, {}).get(metric_type, [])
 
-        # Fallback to built-in defaults if config has no auto_detect for this metric
-        if not commands:
-            commands = DEFAULT_AUTO_DETECT.get(self.tech_stack, {}).get(metric_type, [])
+        # Check config auto_detect for all detected tech stacks
+        for stack in self.tech_stacks:
+            commands = auto_detect.get(stack, {}).get(metric_type, [])
+            for cmd in commands:
+                base_cmd = shlex.split(cmd)[0]
+                if shutil.which(base_cmd):
+                    return cmd
 
-        # Пробуем каждую команду — проверяем что base command доступна через PATH
-        for cmd in commands:
-            base_cmd = shlex.split(cmd)[0]
-            if shutil.which(base_cmd):
-                return cmd
+        # Fallback to built-in defaults for all detected stacks
+        for stack in self.tech_stacks:
+            commands = DEFAULT_AUTO_DETECT.get(stack, {}).get(metric_type, [])
+            for cmd in commands:
+                base_cmd = shlex.split(cmd)[0]
+                if shutil.which(base_cmd):
+                    return cmd
 
         return None
 
@@ -205,7 +217,7 @@ class MetricRunner:
                 return MetricResult(
                     name=name,
                     passed=True,
-                    output=f"No {name} command found for {self.tech_stack}",
+                    output=f"No {name} command found for {', '.join(self.tech_stacks)}",
                     duration=0.0,
                     score=0.5  # Neutral score
                 )
@@ -269,11 +281,12 @@ class MetricRunner:
         """Запускает все метрики и возвращает результаты с общим score"""
         metrics_config = dict(self.config.config.get("metrics", {}))
 
-        # Auto-add built-in metrics for detected tech stack (if not already in config)
-        stack_defaults = DEFAULT_AUTO_DETECT.get(self.tech_stack, {})
-        for metric_name in stack_defaults:
-            if metric_name not in metrics_config:
-                metrics_config[metric_name] = {"enabled": True}
+        # Auto-add built-in metrics for all detected tech stacks (if not already in config)
+        for stack in self.tech_stacks:
+            stack_defaults = DEFAULT_AUTO_DETECT.get(stack, {})
+            for metric_name in stack_defaults:
+                if metric_name not in metrics_config:
+                    metrics_config[metric_name] = {"enabled": True}
 
         required_checks = self.config.get_required_checks(phase)
 
@@ -338,7 +351,7 @@ class QualityLoop:
         _print("Quality Loop - Started")
         _print("=" * 70)
         _print(f"Project: {self.project_dir.name}")
-        _print(f"Tech Stack: {self.runner.tech_stack}")
+        _print(f"Tech Stack: {', '.join(self.runner.tech_stacks)}")
         _print(f"Max Iterations: {max_iterations}")
         _print()
 
@@ -550,7 +563,7 @@ def main():
         }
         print(json.dumps(output, indent=2))
 
-    return 0 if state.score >= 0.7 else 1
+    return 0 if state.score >= state.threshold_a else 1
 
 
 if __name__ == "__main__":
