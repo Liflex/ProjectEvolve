@@ -1229,6 +1229,13 @@ def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: O
                 # Автоматический git commit (code changes, не state-файлы)
                 _auto_commit_experiment(project_dir, exp_data)
 
+                # Enrich result with parsed data for summary and summary.json
+                result["exp_number"] = i
+                result["exp_title"] = exp_data.get("title", "")
+                result["exp_quality_score"] = exp_data.get("quality_score")
+                result["exp_quality_decision"] = exp_data.get("quality_decision", "")
+                result["exp_is_complete"] = is_complete
+
                 if not is_complete:
                     log(f"Эксперимент {i} сохранён как incomplete (нет маркера завершения)", "WARNING", project_dir)
 
@@ -1259,11 +1266,41 @@ def _print_summary(results: list, iterations: int, project_dir: Path):
     log("AutoResearch завершён", project_dir=project_dir)
     log("=" * 70, project_dir=project_dir)
 
+    total = len(results)
     successful = sum(1 for r in results if r.get("status") == "success")
     interrupted = sum(1 for r in results if r.get("status") == "interrupted")
     incomplete = sum(1 for r in results if r.get("status") == "incomplete")
     errors = sum(1 for r in results if r.get("status") == "error")
-    log(f"Успешно: {successful}/{len(results)} | Прервано: {interrupted} | Неполных: {incomplete} | Ошибок: {errors}", project_dir=project_dir)
+    log(f"Всего: {total} | Успешно: {successful} | Прервано: {interrupted} | Неполных: {incomplete} | Ошибок: {errors}", project_dir=project_dir)
+
+    # Per-experiment breakdown with quality scores
+    enriched = [r for r in results if r.get("exp_title")]
+    if enriched:
+        log("", project_dir=project_dir)
+        log("| # | Status     | Score | Decision | Title", project_dir=project_dir)
+        log("|---|------------|-------|----------|-------", project_dir=project_dir)
+        for r in enriched:
+            num = r.get("exp_number", "?")
+            status = (r.get("status", "?")[:9] + ("…" if len(r.get("status", "")) > 9 else ""))
+            score = r.get("exp_quality_score")
+            score_str = f"{score:.2f}" if score is not None else "  N/A"
+            decision = r.get("exp_quality_decision", "N/A")
+            title = r.get("exp_title", "Untitled")[:45]
+            log(f"| {num} | {status:<10} | {score_str:>5} | {decision:<8} | {title}", project_dir=project_dir)
+
+        # Average quality score
+        scores = [r["exp_quality_score"] for r in enriched if r.get("exp_quality_score") is not None]
+        if scores:
+            avg_score = sum(scores) / len(scores)
+            log("", project_dir=project_dir)
+            log(f"Средний Quality Gate score: {avg_score:.2f} (из {len(scores)} оценённых)", project_dir=project_dir)
+
+    # Total wall-clock time
+    durations = [r.get("duration", 0) or 0 for r in results]
+    total_duration = sum(durations)
+    if total_duration > 0:
+        mins, secs = divmod(int(total_duration), 60)
+        log(f"Общее время: {mins}m {secs}s", project_dir=project_dir)
 
 # =============================================================================
 # MAIN
