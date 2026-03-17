@@ -581,6 +581,26 @@ def build_agent_prompt(config: ProjectConfig, iteration: int, total: int) -> str
 
     return prompt
 
+def _smart_truncate(text: str, max_chars: int = 1500) -> str:
+    """Truncate text at the last complete line before max_chars.
+
+    Avoids mid-sentence cuts that produce confusing partial text like
+    "main() return code: `0 if s..." in last_experiment.md.
+    Falls back to character-level truncation if text has no newlines.
+    """
+    text = text.strip()
+    if len(text) <= max_chars:
+        return text
+
+    # Find the last newline before the limit
+    cut_point = text.rfind('\n', 0, max_chars)
+    if cut_point > max_chars // 2:
+        return text[:cut_point]
+
+    # No suitable newline — hard truncate
+    return text[:max_chars]
+
+
 def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
     """Парсит отчет эксперимента из вывода агента.
 
@@ -608,7 +628,8 @@ def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
         title = match.group(1).strip()
 
     # Hypothesis (used as what_done — шаблон не имеет секции "What Was Done")
-    match = re.search(r'\*\*Hypothesis:\*\*\s*(.+)', output)
+    # Captures multi-line text until next bold line or heading
+    match = re.search(r'\*\*Hypothesis:\*\*\s*(.+?)(?=\n\*\*|\n### |\Z)', output, re.DOTALL)
     if match:
         hypothesis = match.group(1).strip()
 
@@ -664,12 +685,18 @@ def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
     # Results — между ### Results и ### Decision
     match = re.search(r'### Results\s*\n(.*?)(?=\n### )', output, re.DOTALL)
     if match:
-        results = match.group(1).strip()[:500]
+        results = _smart_truncate(match.group(1).strip(), max_chars=1500)
+
+    # Agent's self-decision from ### Decision section
+    agent_decision = ""
+    match = re.search(r'\*\*Result:\*\*\s*(KEEP|DISCARD|MANUAL_REVIEW)', output)
+    if match:
+        agent_decision = match.group(1)
 
     # Notes for Next — после **Notes for Next:** до >>>EXPERIMENT_COMPLETE<<<
     match = re.search(r'\*\*Notes for Next:\*\*\s*(.*?)(?=\n>>>|$)', output, re.DOTALL)
     if match:
-        notes_next = match.group(1).strip()[:500]
+        notes_next = _smart_truncate(match.group(1).strip(), max_chars=1000)
 
     what_done = hypothesis if hypothesis else "N/A"
 
@@ -679,6 +706,7 @@ def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
         "what_done": what_done,
         "files_modified": [f for f in files_modified if f][:10],
         "results": results,
+        "agent_decision": agent_decision,
         "notes_next": notes_next,
         "date": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
@@ -823,6 +851,7 @@ def save_last_experiment_summary(project_dir: Path, experiment: Dict[str, Any]):
 
 **Score:** {experiment['quality_score']:.2f}
 **Decision:** {experiment.get('quality_decision', 'N/A')}
+**Agent self-assessment:** {experiment.get('agent_decision', 'N/A')}
 """
     summary += f"""
 ## For Next Iteration
