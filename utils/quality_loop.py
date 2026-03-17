@@ -528,11 +528,12 @@ def main():
     state = loop.run(
         max_iterations=args.max_iterations,
         threshold_a=args.threshold_a,
-        threshold_b=args.threshold_b
+        threshold_b=args.threshold_b,
+        quiet=args.json  # --json suppresses human-readable output for clean parsing
     )
 
     if args.json:
-        # Вывод в JSON для парсинга
+        # Вывод в JSON для парсинга — только JSON, без лишнего текста
         output = {
             "score": state.score,
             "phase": state.phase.value,
