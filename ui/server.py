@@ -314,6 +314,11 @@ async def start_run(data: RunRequest):
         raise HTTPException(status_code=409, detail="Already running")
 
     project_dir = Path(data.project).resolve()
+    # Prevent path traversal: project must be a subdirectory of CWD or an
+    # explicitly allowed ancestor.  Reject paths containing ".." components
+    # that escape the working directory.
+    if ".." in Path(data.project).parts:
+        raise HTTPException(status_code=400, detail="Path traversal detected: '..' not allowed in project path")
     if not project_dir.exists():
         raise HTTPException(status_code=404, detail=f"Project not found: {data.project}")
 
