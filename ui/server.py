@@ -328,10 +328,16 @@ async def get_experiment(n: int):
         "results": "", "notes": "",
     }
 
+    def _safe_read(path: Path) -> str:
+        try:
+            return path.read_text(encoding="utf-8") if path.exists() else ""
+        except (UnicodeDecodeError, OSError):
+            return f"[Error reading {path.name}]"
+
     return {
         **base,
-        "prompt": prompt_file.read_text(encoding="utf-8") if prompt_file.exists() else "",
-        "output": output_file.read_text(encoding="utf-8") if output_file.exists() else "",
+        "prompt": _safe_read(prompt_file),
+        "output": _safe_read(output_file),
     }
 
 
@@ -340,7 +346,10 @@ async def get_changes_log():
     log_file = get_exp_dir() / "changes_log.md"
     if not log_file.exists():
         return {"content": "# No changes log yet\n\nStart experiments to see changes here."}
-    return {"content": log_file.read_text(encoding="utf-8")}
+    try:
+        return {"content": log_file.read_text(encoding="utf-8")}
+    except (UnicodeDecodeError, OSError):
+        return {"content": "# Error reading changes log"}
 
 
 @app.get("/api/prompt")
@@ -348,7 +357,10 @@ async def get_prompt():
     prompt_file = AUTORESEARCH_HOME / "config" / "default_prompt.md"
     if not prompt_file.exists():
         return {"content": "# Prompt template not found"}
-    return {"content": prompt_file.read_text(encoding="utf-8")}
+    try:
+        return {"content": prompt_file.read_text(encoding="utf-8")}
+    except (UnicodeDecodeError, OSError):
+        return {"content": "# Error reading prompt template"}
 
 
 class PromptUpdate(BaseModel):
@@ -369,8 +381,12 @@ async def get_config():
     if not config_file.exists():
         return {"name": "", "description": "", "goals": [], "constraints": [],
                 "tech_stack": [], "focus_areas": []}
-    with open(config_file, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(config_file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return {"name": "", "description": "", "goals": [], "constraints": [],
+                "tech_stack": [], "focus_areas": [], "_error": "Malformed config file"}
 
 
 class ConfigUpdate(BaseModel):
@@ -387,8 +403,11 @@ async def update_config(data: ConfigUpdate):
     config_file = get_project_dir() / ".autoresearch.json"
     existing = {}
     if config_file.exists():
-        with open(config_file, "r", encoding="utf-8") as f:
-            existing = json.load(f)
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass  # Start fresh if existing config is corrupted
     existing.update({
         "name": data.name, "description": data.description,
         "goals": data.goals, "constraints": data.constraints,
@@ -480,8 +499,8 @@ async def start_run(data: RunRequest):
                 if prefix:
                     text = prefix + text
                 run_state["logs"].append(text)
-                if len(run_state["logs"]) > 200:
-                    run_state["logs"] = run_state["logs"][-200:]
+                if len(run_state["logs"]) > 500:
+                    run_state["logs"] = run_state["logs"][-500:]
 
                 # Parse experiment progress from log lines
                 m = _EXP_PROGRESS_RE.search(text)
@@ -525,7 +544,7 @@ async def get_run_status():
         "project": run_state["project"],
         "started_at": run_state["started_at"],
         "error": run_state["error"],
-        "recent_logs": run_state["logs"][-50:],
+        "recent_logs": run_state["logs"][-200:],
     }
 
 

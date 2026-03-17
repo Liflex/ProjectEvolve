@@ -253,6 +253,18 @@
             '*покусывает губы*',
             'Нужно подумать...',
         ],
+        tip: [
+            'Попробуй улучшить prompt...',
+            'Не забудь проверить changelog_',
+            'Качество > количество, мяу!',
+            'Посмотри последний эксперимент...',
+            'Настрой фокус-области в CONFIG_',
+            'Запусти HACK чтобы я заработал!',
+            'Изучи тренд на DASHBOARD_',
+            'Чем выше score, тем лучше_',
+            'DISCARD — не конец, а опыт!',
+            'Каждый KEEP = эволюция проекта.',
+        ],
     };
 
     // ================================================================
@@ -266,6 +278,7 @@
     let animTimer = null;
     let canvas = null;
     let ctx = null;
+    let tipTimer = null;
     let ps = 4; // pixel size
     let currentSpeech = '';
     let speechTimer = null;
@@ -366,6 +379,23 @@
         speechTimer = setTimeout(() => { currentSpeech = ''; }, 6000);
     }
 
+    function startTips() {
+        if (tipTimer) clearInterval(tipTimer);
+        const showTip = () => {
+            if (!animating || currentSpeech) return; // don't override active speech
+            setSpeech('tip');
+        };
+        // first tip after 8s, then every 15-25s
+        tipTimer = setTimeout(() => {
+            showTip();
+            tipTimer = setInterval(showTip, 15000 + Math.random() * 10000);
+        }, 8000);
+    }
+
+    function stopTips() {
+        if (tipTimer) { clearTimeout(tipTimer); clearInterval(tipTimer); tipTimer = null; }
+    }
+
     // ================================================================
     //  PUBLIC API
     // ================================================================
@@ -399,6 +429,7 @@
             console.log('[CatModule] render() done, starting interval');
             animTimer = setInterval(tick, 120);
             setSpeech('working');
+            startTips();
             console.log('[CatModule] start() complete');
         },
 
@@ -406,6 +437,7 @@
         stop() {
             animating = false;
             if (animTimer) { clearInterval(animTimer); animTimer = null; }
+            stopTips();
             canvas = null;
             ctx = null;
         },

@@ -574,6 +574,7 @@
                                 <span class="text-xs text-[var(--v)] tracking-widest">HACKING_IN_PROGRESS_</span>
                                 <span class="text-[10px] text-[var(--cyan)]" x-text="runStatus.current_exp ? 'EXP_' + runStatus.current_exp + '/' + runStatus.total_exps : ''"></span>
                                 <span class="text-[10px] text-[var(--v3)]" x-text="runStatus.started_at"></span>
+                                <span class="text-[10px] text-[var(--yellow)] tabular-nums" x-text="runElapsed"></span>
                                 <button @click="stopRun()" class="ml-auto border border-[var(--red)] text-[var(--red)] text-xs tracking-wider px-5 py-1.5 hover:bg-[rgba(255,51,51,0.1)] transition-all">[X TERMINATE]</button>
                             </div>
                             <!-- Progress bar -->
@@ -592,9 +593,12 @@
                                 </span>
                                 <button @click="pollRunStatus()" class="ml-auto text-[10px] text-[var(--v3)] hover:text-[var(--cyan)] tracking-wider">PING_</button>
                             </div>
-                            <div x-show="runStatus.recent_logs && runStatus.recent_logs.length > 0" class="bg-[var(--bg)] pixel-border p-3 max-h-80 overflow-y-auto text-[11px] leading-relaxed">
+                            <div x-show="runStatus.recent_logs && runStatus.recent_logs.length > 0"
+                                 x-ref="logContainer"
+                                 class="bg-[var(--bg)] pixel-border p-3 max-h-96 overflow-y-auto text-[11px] leading-relaxed font-mono">
                                 <template x-for="(line,i) in runStatus.recent_logs" :key="'rl'+i">
-                                    <div :class="line.includes('ERROR') ? 'text-[var(--red)]' : line.includes('WARNING') ? 'text-[var(--amber)]' : 'text-[var(--v3)]'" x-text="line"></div>
+                                    <div :class="line.includes('ERROR') ? 'text-[var(--red)]' : line.includes('[INIT]') ? 'text-[var(--cyan)]' : line.includes('SUCCESS') || line.includes('KEEP') ? 'text-[var(--ng)]' : line.includes('WARNING') || line.includes('DISCARD') ? 'text-[var(--amber)]' : (line.match(/(?:Эксперимент|Experiment)\s+\d+\/\d+/) || line.includes('[COMPLETE]')) ? 'text-[var(--v)]' : 'text-[var(--v3)]'"
+                                         x-text="line"></div>
                                 </template>
                             </div>
                             <div x-show="!runStatus.recent_logs || !runStatus.recent_logs.length" class="text-center py-8 text-[var(--v3)] text-xs tracking-widest">NO_TRANSMISSION_</div>
@@ -632,6 +636,7 @@
                 catSpeech: '',  // reactive trigger for cat speech bubble
                 organismSVG: '',  // organism visualizer SVG
                 organismStage: 'DORMANT',  // organism evolution stage name
+                runElapsed: '',  // elapsed time since run started
 
                 // Pagination
                 get filteredExperiments() {
@@ -667,6 +672,15 @@
                         // Cat: poll speech bubble for reactivity
                         if (window.CatModule && CatModule.isActive()) {
                             this.catSpeech = CatModule.getSpeech();
+                        }
+                        // Elapsed time
+                        if (this.runStatus.running && this.runStatus.started_at) {
+                            const diff = Math.floor((Date.now() - new Date(this.runStatus.started_at).getTime()) / 1000);
+                            const m = String(Math.floor(diff / 60)).padStart(2, '0');
+                            const s = String(diff % 60).padStart(2, '0');
+                            this.runElapsed = m + ':' + s;
+                        } else if (!this.runStatus.running) {
+                            this.runElapsed = '';
                         }
                     }, 1000);
 
@@ -809,7 +823,18 @@
                     }
                     catch(e) { this.showToast('TERMINATE FAILED', 'error'); }
                 },
-                async pollRunStatus() { try { this.runStatus = await this.api('/api/run/status'); } catch(e) {} },
+                async pollRunStatus() {
+                    try {
+                        this.runStatus = await this.api('/api/run/status');
+                        // Auto-scroll logs to bottom when running
+                        if (this.runStatus.running) {
+                            this.$nextTick(() => {
+                                const el = this.$refs.logContainer;
+                                if (el) el.scrollTop = el.scrollHeight;
+                            });
+                        }
+                    } catch(e) {}
+                },
 
                 renderMarkdown(t) { if(!t) return ''; try { const html = marked.parse(t, { breaks: true }); const str = typeof html === 'string' ? html : String(html); return DOMPurify.sanitize(str); } catch(e) { console.error('[renderMarkdown]', e); return t.replace(/</g,'&lt;').replace(/\n/g,'<br>'); } },
                 insertTab(e) { const ta=e.target, s=ta.selectionStart; ta.value=ta.value.substring(0,s)+'    '+ta.value.substring(ta.selectionEnd); ta.selectionStart=ta.selectionEnd=s+4; this.prompt=ta.value; },
