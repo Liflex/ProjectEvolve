@@ -76,6 +76,8 @@ class LoopState:
     results: List[MetricResult]
     started_at: str
     stop_reason: Optional[str] = None
+    threshold_a: float = 0.7
+    threshold_b: float = 0.85
 
 
 class QualityConfig:
@@ -355,7 +357,9 @@ class QualityLoop:
             baseline_score=0.0,
             last_score=None,
             results=[],
-            started_at=datetime.now().isoformat()
+            started_at=datetime.now().isoformat(),
+            threshold_a=threshold_a,
+            threshold_b=threshold_b
         )
 
         stagnation_count = 0
@@ -444,7 +448,7 @@ class QualityLoop:
 
         for result in results:
             icon = "✓" if result.passed else "✗"
-            print(f"  {icon} {result.name}: {result.score:.0f} ({result.duration:.1f}s)")
+            print(f"  {icon} {result.name}: {result.score:.1f} ({result.duration:.1f}s)")
 
             # Выводим output если есть ошибка
             if not result.passed and result.output:
@@ -474,15 +478,14 @@ class QualityLoop:
 
     def _make_decision(self) -> str:
         """Принимает решение: сохранить или отбросить изменения"""
-        score_improved = self.state.last_score is None or self.state.score > self.state.last_score
         no_failures = all(r.passed for r in self.state.results)
 
-        if score_improved and no_failures:
-            return "✓ KEEP - Score improved, all checks passed"
-        elif self.state.score > 0.7:
-            return "⚠ ACCEPT - Good quality, minor issues"
+        if self.state.score >= self.state.threshold_b and no_failures:
+            return "✓ KEEP - All checks passed (strict quality)"
+        elif self.state.score >= self.state.threshold_a:
+            return "⚠ ACCEPT - Quality meets baseline"
         else:
-            return "✗ DISCARD - Quality too low"
+            return "✗ DISCARD - Quality below threshold"
 
 
 def main():
@@ -534,11 +537,14 @@ def main():
 
     if args.json:
         # Вывод в JSON для парсинга — только JSON, без лишнего текста
+        decision_text = loop._make_decision()
+        decision_key = "KEEP" if "KEEP" in decision_text else ("ACCEPT" if "ACCEPT" in decision_text else "DISCARD")
         output = {
             "score": state.score,
             "phase": state.phase.value,
             "iterations": state.iteration - 1,
             "stop_reason": state.stop_reason,
+            "decision": decision_key,
             "results": [
                 {
                     "name": r.name,
