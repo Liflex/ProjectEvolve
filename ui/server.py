@@ -26,7 +26,7 @@ try:
     from fastapi import FastAPI, HTTPException
     from fastapi.responses import HTMLResponse, FileResponse
     from fastapi.staticfiles import StaticFiles
-    from pydantic import BaseModel
+    from pydantic import BaseModel, Field, field_validator
 except ImportError:
     print("ERROR: FastAPI not installed. Run:")
     print("  pip install fastapi uvicorn")
@@ -51,6 +51,9 @@ run_state = {
     "logs": [],
     "error": None,
 }
+
+# Regex to detect experiment progress from autoresearch.py log output
+_EXP_PROGRESS_RE = re.compile(r"(?:Эксперимент|Experiment)\s+(\d+)/(\d+)")
 
 
 # =============================================================================
@@ -266,9 +269,9 @@ async def update_config(data: ConfigUpdate):
 
 
 class RunRequest(BaseModel):
-    iterations: int = 10
-    timeout: int = 5
-    max_time: int = 600
+    iterations: int = Field(default=10, ge=1, le=1000)
+    timeout: int = Field(default=5, ge=0, le=1440)
+    max_time: int = Field(default=600, ge=30, le=3600)
     project: str = "."
 
 
@@ -314,16 +317,22 @@ async def start_run(data: RunRequest):
     })
 
     def _stream_pipe(pipe, prefix=""):
-        """Read lines from a pipe and append to run_state["logs"] in real-time."""
+        """Read lines from a pipe, parse experiment progress, and append to logs."""
         try:
             for line in iter(pipe.readline, ''):
                 text = line.rstrip("\n\r")
-                if text:
-                    if prefix:
-                        text = prefix + text
-                    run_state["logs"].append(text)
-                    if len(run_state["logs"]) > 200:
-                        run_state["logs"] = run_state["logs"][-200:]
+                if not text:
+                    continue
+                if prefix:
+                    text = prefix + text
+                run_state["logs"].append(text)
+                if len(run_state["logs"]) > 200:
+                    run_state["logs"] = run_state["logs"][-200:]
+
+                # Parse experiment progress from log lines
+                m = _EXP_PROGRESS_RE.search(text)
+                if m:
+                    run_state["current_exp"] = int(m.group(1))
         except Exception:
             pass
         finally:
