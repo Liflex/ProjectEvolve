@@ -300,7 +300,7 @@ async def start_run(data: RunRequest):
         process = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, encoding="utf-8", errors="replace",
-            cwd=project_dir, env=env,
+            cwd=project_dir, env=env, bufsize=1,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to start: {e}")
@@ -313,15 +313,41 @@ async def start_run(data: RunRequest):
         "logs": [], "error": None,
     })
 
+    def _stream_pipe(pipe, prefix=""):
+        """Read lines from a pipe and append to run_state["logs"] in real-time."""
+        try:
+            for line in iter(pipe.readline, ''):
+                text = line.rstrip("\n\r")
+                if text:
+                    if prefix:
+                        text = prefix + text
+                    run_state["logs"].append(text)
+                    if len(run_state["logs"]) > 200:
+                        run_state["logs"] = run_state["logs"][-200:]
+        except Exception:
+            pass
+        finally:
+            try:
+                pipe.close()
+            except Exception:
+                pass
+
     def monitor():
         global run_state
-        stdout, stderr = process.communicate()
-        run_state["logs"] = (stdout.split("\n") if stdout else [])[-100:]
-        if stderr:
-            run_state["logs"].extend(stderr.split("\n")[-50:])
+        # Stream stdout/stderr in real-time via threads (cross-platform)
+        t_out = threading.Thread(target=_stream_pipe, args=(process.stdout,), daemon=True)
+        t_err = threading.Thread(target=_stream_pipe, args=(process.stderr,), daemon=True)
+        t_out.start()
+        t_err.start()
+
+        process.wait()  # Block until process exits
+        t_out.join(timeout=5)
+        t_err.join(timeout=5)
+
         run_state["running"] = False
         if process.returncode != 0:
-            run_state["error"] = stderr[:500] if stderr else f"Exit code {process.returncode}"
+            stderr_lines = [l for l in run_state["logs"] if "ERROR" in l or "Traceback" in l or "error" in l.lower()]
+            run_state["error"] = "\n".join(stderr_lines[:5]) if stderr_lines else f"Exit code {process.returncode}"
 
     threading.Thread(target=monitor, daemon=True).start()
     return {"status": "started", "iterations": data.iterations}
