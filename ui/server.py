@@ -167,6 +167,9 @@ def parse_experiments() -> List[Dict[str, Any]]:
     Results are cached by file modification time — repeated calls return
     the cached list without re-reading the file, reducing I/O from ~6 reads
     per page load to 1.
+
+    When cache misses, the file is read ONCE and content is passed to both
+    parse_accumulation_context() and section enrichment (avoids double I/O).
     """
     global _cache
 
@@ -182,12 +185,13 @@ def parse_experiments() -> List[Dict[str, Any]]:
     if _cache["data"] is not None and _cache["mtime"] == current_mtime:
         return _cache["data"]
 
-    base_entries = parse_accumulation_context(ctx_file)
+    # Read file ONCE — pass content to parse_accumulation_context() and reuse for sections
+    content = ctx_file.read_text(encoding="utf-8")
+    base_entries = parse_accumulation_context(ctx_file, content=content)
     if not base_entries:
         return []
 
-    # Re-split to get raw sections for enrichment
-    content = ctx_file.read_text(encoding="utf-8")
+    # Re-split to get raw sections for enrichment (reuses already-read content)
     sections = re.split(r"(?=^## Experiment \d+)", content, flags=re.MULTILINE)
 
     section_map = {}

@@ -14,6 +14,7 @@ Works with:
 """
 
 import os
+import re
 import sys
 import json
 import shutil
@@ -531,7 +532,17 @@ def classify_experiment_type(title: str) -> str:
     return "Other"
 
 
-def parse_accumulation_context(ctx_file: Path) -> List[Dict[str, Any]]:
+# Pre-compiled regex patterns for parse_accumulation_context()
+_RE_EXP_SPLIT = re.compile(r"(?=^## Experiment \d+)", re.MULTILINE)
+_RE_EXP_HEADER = re.compile(r"## Experiment (\d+) — (.+)")
+_RE_DATE = re.compile(r"\*\*Date:\*\*\s*(.+)")
+_RE_TYPE = re.compile(r"\*\*Type:\*\*\s*(.+)")
+_RE_SCORE_DECISION = re.compile(r"\*\*Score:\*\*\s*([\d.]+|N/A)\s*\|\s*\*\*Decision:\*\*\s*(\w+)")
+_RE_QUALITY_SCORE = re.compile(r"\*\*Quality Gate Score:\*\*\s*([\d.]+)")
+_RE_RESULT = re.compile(r"\*\*Result:\*\*\s*(KEEP|DISCARD|MANUAL_REVIEW)")
+
+
+def parse_accumulation_context(ctx_file: Path, content: str = None) -> List[Dict[str, Any]]:
     """Parse experiment entries from accumulation_context.md.
 
     Shared between autoresearch.py and ui/server.py to prevent drift.
@@ -541,43 +552,41 @@ def parse_accumulation_context(ctx_file: Path) -> List[Dict[str, Any]]:
 
     Args:
         ctx_file: Path to accumulation_context.md
+        content: Pre-read file content (avoids double I/O when caller already read it)
 
     Returns:
         List of dicts with keys: number, title, date, type, score, decision
     """
-    import re
+    if content is None:
+        if not ctx_file.exists():
+            return []
+        content = ctx_file.read_text(encoding="utf-8")
 
-    if not ctx_file.exists():
-        return []
-
-    content = ctx_file.read_text(encoding="utf-8")
-    sections = re.split(r"(?=^## Experiment \d+)", content, flags=re.MULTILINE)
+    sections = _RE_EXP_SPLIT.split(content)
 
     experiments = []
     for section in sections:
-        header_match = re.match(r"## Experiment (\d+) — (.+)", section)
+        header_match = _RE_EXP_HEADER.match(section)
         if not header_match:
             continue
 
         num = int(header_match.group(1))
         title = header_match.group(2).strip()
 
-        date_match = re.search(r"\*\*Date:\*\*\s*(.+)", section)
+        date_match = _RE_DATE.search(section)
         date = date_match.group(1).strip() if date_match else ""
 
-        type_match = re.search(r"\*\*Type:\*\*\s*(.+)", section)
+        type_match = _RE_TYPE.search(section)
         exp_type = type_match.group(1).strip() if type_match else classify_experiment_type(title)
 
         # Format 1: **Score:** X | **Decision:** Y
-        score_match = re.search(
-            r"\*\*Score:\*\*\s*([\d.]+|N/A)\s*\|\s*\*\*Decision:\*\*\s*(\w+)", section
-        )
+        score_match = _RE_SCORE_DECISION.search(section)
         if score_match:
             score, decision = score_match.group(1), score_match.group(2)
         else:
             # Format 2: **Quality Gate Score:** X + **Result:** Y (legacy)
-            score_m = re.search(r"\*\*Quality Gate Score:\*\*\s*([\d.]+)", section)
-            result_m = re.search(r"\*\*Result:\*\*\s*(KEEP|DISCARD|MANUAL_REVIEW)", section)
+            score_m = _RE_QUALITY_SCORE.search(section)
+            result_m = _RE_RESULT.search(section)
             score = score_m.group(1) if score_m else "N/A"
             decision = result_m.group(1) if result_m else "N/A"
 

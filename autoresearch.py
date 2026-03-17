@@ -364,9 +364,6 @@ def run_quality_gate(project_dir: Path) -> Dict[str, Any]:
         }
     """
     try:
-        # Импортируем QualityLoop
-        from quality_loop import QualityLoop
-
         log("Запуск Quality Gate...", "INFO", project_dir)
 
         loop = QualityLoop(project_dir)

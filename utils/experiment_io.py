@@ -17,6 +17,32 @@ from quality_loop import classify_experiment_type, parse_accumulation_context  #
 
 
 # =============================================================================
+# PRE-COMPILED REGEX PATTERNS — avoids recompilation on every call
+# =============================================================================
+
+_RE_TITLE = re.compile(r'\*\*Title:\*\*\s*(.+)')
+_RE_TYPE = re.compile(r'\*\*Type:\*\*\s*(.+)')
+_RE_HYPOTHESIS = re.compile(r'\*\*Hypothesis:\*\*\s*(.+?)(?=\n\*\*|\n### |\Z)', re.DOTALL)
+_RE_FILES_INLINE = re.compile(r'\*\*Files Modified:\*\*\s*(.+?)(?:\n###|\n\*\*[A-Z]|\Z)', re.DOTALL)
+_RE_FILES_HEADER = re.compile(r'### Files Modified\s*\n(.*?)(?=\n### |\Z)', re.DOTALL)
+_RE_RESULTS = re.compile(r'### Results\s*\n(.*?)(?=\n### )', re.DOTALL)
+_RE_AGENT_DECISION = re.compile(r'\*\*Result:\*\*\s*(KEEP|DISCARD|MANUAL_REVIEW)')
+_RE_NOTES_NEXT = re.compile(r'\*\*Notes for Next:\*\*\s*(.*?)(?=\n>>>|$)', re.DOTALL)
+_RE_BULLET = re.compile(r'\s*[-*]\s+')
+_RE_MD_CHARS = re.compile(r'[`*\[\]]')
+_RE_SECTION_HEADER = re.compile(r'^(Test Plan|Hypothesis|Target|Complexity|Metric|Notes for Next):', re.IGNORECASE)
+_RE_DASH = re.compile(r'\s*[—–]\s+')
+_RE_HYPHEN = re.compile(r'\s+-\s+')
+
+# Patterns for _read_experiment_history()
+_RE_EXP_HEADER = re.compile(r'^## Experiment (\d+) — (.+)', re.MULTILINE)
+_RE_EXP_TYPE = re.compile(r'\*\*Type:\*\*\s*(.+)')
+_RE_SCORE_DECISION = re.compile(r'\*\*Score:\*\*\s*([\d.]+|N/A)\s*\|\s*\*\*Decision:\*\*\s*(\w+)')
+_RE_QUALITY_SCORE = re.compile(r'\*\*Quality Gate Score:\*\*\s*([\d.]+)')
+_RE_RESULT = re.compile(r'\*\*Result:\*\*\s*(KEEP|DISCARD|MANUAL_REVIEW)')
+
+
+# =============================================================================
 # TRUNCATION
 # =============================================================================
 
@@ -64,13 +90,13 @@ def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
     notes_next = "N/A"
 
     # Title
-    match = re.search(r'\*\*Title:\*\*\s*(.+)', output)
+    match = _RE_TITLE.search(output)
     if match:
         title = match.group(1).strip()
 
     # Type (self-reported with heuristic fallback for backward compatibility)
     exp_type = ""
-    type_match = re.search(r'\*\*Type:\*\*\s*(.+)', output)
+    type_match = _RE_TYPE.search(output)
     if type_match:
         exp_type = type_match.group(1).strip()
     else:
@@ -78,7 +104,7 @@ def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
 
     # Hypothesis (used as what_done)
     # Captures multi-line text until next bold line or heading
-    match = re.search(r'\*\*Hypothesis:\*\*\s*(.+?)(?=\n\*\*|\n### |\Z)', output, re.DOTALL)
+    match = _RE_HYPOTHESIS.search(output)
     if match:
         hypothesis = match.group(1).strip()
 
@@ -89,19 +115,19 @@ def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
     files_text = ""
 
     # Format 1: inline bold **Files Modified:**
-    match = re.search(r'\*\*Files Modified:\*\*\s*(.+?)(?:\n###|\n\*\*[A-Z]|\Z)', output, re.DOTALL)
+    match = _RE_FILES_INLINE.search(output)
     if match:
         files_text = match.group(1).strip()
     else:
         # Format 2/3: ### Files Modified (markdown header)
-        match = re.search(r'### Files Modified\s*\n(.*?)(?=\n### |\Z)', output, re.DOTALL)
+        match = _RE_FILES_HEADER.search(output)
         if match:
             files_text = match.group(1).strip()
 
     if files_text:
         lines = files_text.split('\n')
         # Detect bullet list by checking if lines start with "- " or "* "
-        is_bullet = any(re.match(r'\s*[-*]\s+', line) for line in lines if line.strip())
+        is_bullet = any(_RE_BULLET.match(line) for line in lines if line.strip())
         if not is_bullet and len(lines) <= 2 and ',' in files_text:
             # Inline: "file1.py, file2.py, file3.md"
             files_modified = [f.strip() for f in files_text.split(',') if f.strip()]
@@ -116,14 +142,14 @@ def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
         cleaned = []
         for f in files_modified:
             # Strip all markdown formatting chars first
-            f = re.sub(r'[`*\[\]]', '', f.strip())
+            f = _RE_MD_CHARS.sub('', f.strip())
             # Reject non-filename patterns (false positives from report sections)
-            if re.match(r'^(Test Plan|Hypothesis|Target|Complexity|Metric|Notes for Next):', f, re.IGNORECASE):
+            if _RE_SECTION_HEADER.match(f):
                 continue
             # Strip trailing description (after em-dash, en-dash, or long dash)
-            f = re.split(r'\s*[—–]\s+', f, maxsplit=1)[0]
+            f = _RE_DASH.split(f, maxsplit=1)[0]
             # Strip trailing after "—" with spaces (Unicode dash)
-            f = re.split(r'\s+-\s+', f, maxsplit=1)[0]
+            f = _RE_HYPHEN.split(f, maxsplit=1)[0]
             f = f.strip(' ,:;')
             # Don't strip leading dots (.gitignore, .env, .autoresearch/)
             f = f.strip()
@@ -132,18 +158,18 @@ def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
         files_modified = cleaned
 
     # Results — between ### Results and ### Decision
-    match = re.search(r'### Results\s*\n(.*?)(?=\n### )', output, re.DOTALL)
+    match = _RE_RESULTS.search(output)
     if match:
         results = _smart_truncate(match.group(1).strip(), max_chars=1500)
 
     # Agent's self-decision from ### Decision section
     agent_decision = ""
-    match = re.search(r'\*\*Result:\*\*\s*(KEEP|DISCARD|MANUAL_REVIEW)', output)
+    match = _RE_AGENT_DECISION.search(output)
     if match:
         agent_decision = match.group(1)
 
     # Notes for Next — after **Notes for Next:** until >>>EXPERIMENT_COMPLETE<<<
-    match = re.search(r'\*\*Notes for Next:\*\*\s*(.*?)(?=\n>>>|$)', output, re.DOTALL)
+    match = _RE_NOTES_NEXT.search(output)
     if match:
         notes_next = _smart_truncate(match.group(1).strip(), max_chars=1000)
 
@@ -225,9 +251,8 @@ def _read_experiment_history(exp_dir: Path, max_entries: int = 5) -> str:
     number, type, title, quality score, and decision.
     Used by build_agent_prompt() for diversity awareness.
 
-    Performance: uses reverse scan to find only the last N entries
-    without parsing the entire file — important as accumulation_context.md
-    grows with each experiment (1180+ lines for 45 experiments).
+    Performance: scans headers via pre-compiled regex, extracts sections
+    only for the last N entries — avoids creating strings for all experiments.
     """
     ctx_file = exp_dir / "accumulation_context.md"
     if not ctx_file.exists():
@@ -235,10 +260,9 @@ def _read_experiment_history(exp_dir: Path, max_entries: int = 5) -> str:
 
     content = ctx_file.read_text(encoding="utf-8")
 
-    # Find all experiment headers and their start positions
-    # Reverse scan to get only the last max_entries without parsing everything
+    # Find all experiment header positions (pre-compiled regex)
     positions = []
-    for m in re.finditer(r"^## Experiment (\d+) — (.+)", content, re.MULTILINE):
+    for m in _RE_EXP_HEADER.finditer(content):
         positions.append((m.start(), int(m.group(1)), m.group(2).strip()))
 
     if not positions:
@@ -247,7 +271,7 @@ def _read_experiment_history(exp_dir: Path, max_entries: int = 5) -> str:
     # Take only the last max_entries
     recent = positions[-max_entries:]
 
-    # Extract data from each recent entry (still need regex for type/score/decision)
+    # Extract data from each recent entry using pre-compiled patterns
     entries = []
     for idx, (start, num, title) in enumerate(recent):
         end = len(content)
@@ -257,17 +281,15 @@ def _read_experiment_history(exp_dir: Path, max_entries: int = 5) -> str:
             end = positions[full_idx + 1][0]
         section = content[start:end]
 
-        type_match = re.search(r"\*\*Type:\*\*\s*(.+)", section)
+        type_match = _RE_EXP_TYPE.search(section)
         exp_type = type_match.group(1).strip() if type_match else classify_experiment_type(title)
 
-        score_match = re.search(
-            r"\*\*Score:\*\*\s*([\d.]+|N/A)\s*\|\s*\*\*Decision:\*\*\s*(\w+)", section
-        )
+        score_match = _RE_SCORE_DECISION.search(section)
         if score_match:
             score, decision = score_match.group(1), score_match.group(2)
         else:
-            score_m = re.search(r"\*\*Quality Gate Score:\*\*\s*([\d.]+)", section)
-            result_m = re.search(r"\*\*Result:\*\*\s*(KEEP|DISCARD|MANUAL_REVIEW)", section)
+            score_m = _RE_QUALITY_SCORE.search(section)
+            result_m = _RE_RESULT.search(section)
             score = score_m.group(1) if score_m else "N/A"
             decision = result_m.group(1) if result_m else "N/A"
 
