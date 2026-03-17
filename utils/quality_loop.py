@@ -16,6 +16,7 @@ Works with:
 import os
 import sys
 import json
+import shutil
 import time
 import shlex
 import subprocess
@@ -166,6 +167,7 @@ class MetricRunner:
         """Находит команду для метрики по типу проекта.
 
         Проверяет config auto_detect, затем fallback на DEFAULT_AUTO_DETECT.
+        Использует shutil.which() для быстрой проверки без subprocess spawn.
         """
         auto_detect = self.config.config.get("auto_detect", {})
         commands = auto_detect.get(self.tech_stack, {}).get(metric_type, [])
@@ -174,20 +176,11 @@ class MetricRunner:
         if not commands:
             commands = DEFAULT_AUTO_DETECT.get(self.tech_stack, {}).get(metric_type, [])
 
-        # Пробуем каждую команду
+        # Пробуем каждую команду — проверяем что base command доступна через PATH
         for cmd in commands:
-            try:
-                # Проверяем что команда существует
-                base_cmd = cmd.split()[0]
-                subprocess.run(
-                    [base_cmd, "--version"],
-                    capture_output=True,
-                    timeout=5,
-                    check=False
-                )
+            base_cmd = shlex.split(cmd)[0]
+            if shutil.which(base_cmd):
                 return cmd
-            except (subprocess.SubprocessError, OSError, FileNotFoundError):
-                continue
 
         return None
 
