@@ -34,6 +34,55 @@ from typing import Dict, Any, Optional, List
 UTILS_DIR = Path(__file__).parent / "utils"
 sys.path.insert(0, str(UTILS_DIR))
 
+
+# =============================================================================
+# BUFFERED LOG FILE WRITER — avoids open/close on every log() call
+# =============================================================================
+
+class _BufferedLogWriter:
+    """Buffers log writes and flushes periodically or on demand.
+
+    Without this, every log() call opens/closes the log file.
+    During one experiment this happens ~15-20 times, meaning 15-20
+    unnecessary syscalls. This writer batches them.
+    """
+
+    def __init__(self):
+        self._path: Optional[Path] = None
+        self._buffer: list[str] = []
+        self._flush_interval = 5.0  # seconds
+        self._last_flush = time.monotonic()
+
+    def _ensure_dir(self, path: Path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+    def write(self, path: Path, line: str):
+        """Buffer a log line. Flushes if path changed or buffer is large."""
+        if self._path is not None and self._path != path:
+            self.flush()
+        self._path = path
+        self._buffer.append(line)
+        # Auto-flush on size or time
+        now = time.monotonic()
+        if len(self._buffer) >= 10 or (now - self._last_flush) >= self._flush_interval:
+            self.flush()
+
+    def flush(self):
+        """Write buffered lines to file."""
+        if not self._buffer or not self._path:
+            return
+        try:
+            self._ensure_dir(self._path)
+            with open(self._path, "a", encoding="utf-8") as f:
+                f.writelines(line + "\n" for line in self._buffer)
+        except OSError:
+            pass
+        self._buffer.clear()
+        self._last_flush = time.monotonic()
+
+
+_log_writer = _BufferedLogWriter()
+
 from quality_loop import QualityLoop  # noqa: E402 — used by run_quality_gate()
 from experiment_io import (  # noqa: E402 — extracted from this file
     parse_experiment_report,
@@ -95,19 +144,19 @@ def get_next_experiment_number(exp_dir: Path) -> int:
     return max_num + 1
 
 def log(msg: str, level: str = "INFO", project_dir: Optional[Path] = None):
-    """Логирование в консоль и файл."""
+    """Логирование в консоль и файл.
+
+    File writes are buffered via _BufferedLogWriter to avoid open/close
+    syscall overhead on every log() call (~15-20 calls per experiment).
+    """
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     prefix = f"{timestamp} | {level:8s} |"
     print(f"{prefix} {msg}")
 
-    # Лог в файл если указана директория проекта
+    # Лог в файл через буферизованный writer
     if project_dir:
-        log_dir = project_dir / ".autoresearch" / "logs"
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_file = log_dir / "autoresearch.log"
-
-        with open(log_file, "a", encoding="utf-8") as f:
-            f.write(f"{prefix} {msg}\n")
+        log_file = project_dir / ".autoresearch" / "logs" / "autoresearch.log"
+        _log_writer.write(log_file, f"{prefix} {msg}")
 
 # =============================================================================
 # CLAUDE CLI DETECTION
@@ -404,27 +453,41 @@ def _auto_commit_experiment(project_dir: Path, experiment: Dict[str, Any]):
 
         # 2. Stage new files explicitly listed in files_modified (with path validation)
         project_dir_resolved = project_dir.resolve()
-        for f in experiment.get("files_modified", []):
-            # Strip path traversal attempts and normalize
-            fpath = (project_dir / f).resolve()
+        files_modified = experiment.get("files_modified", [])
 
-            # Security: reject paths outside project directory
-            if not str(fpath).startswith(str(project_dir_resolved) + os.sep) and fpath != project_dir_resolved:
-                log(f"Auto-commit: skipping path outside project: {f}", "WARNING", project_dir)
-                continue
+        if files_modified:
+            # Batch: query which files are already tracked (one subprocess call)
+            # instead of per-file git ls-files (N subprocess calls)
+            validated_paths = []
+            rel_paths = []
+            for f in files_modified:
+                fpath = (project_dir / f).resolve()
+                # Security: reject paths outside project directory
+                if not str(fpath).startswith(str(project_dir_resolved) + os.sep) and fpath != project_dir_resolved:
+                    log(f"Auto-commit: skipping path outside project: {f}", "WARNING", project_dir)
+                    continue
+                if fpath.exists() and not fpath.is_dir():
+                    validated_paths.append(str(fpath))
+                    rel_paths.append(os.path.relpath(fpath, project_dir))
 
-            if fpath.exists() and not fpath.is_dir():
-                # Only add if untracked (git add -u already handles tracked files)
-                rel_path = os.path.relpath(fpath, project_dir)
+            if rel_paths:
+                # Single subprocess: check all paths at once
                 ls_result = subprocess.run(
-                    ["git", "ls-files", "--error-unmatch", rel_path],
+                    ["git", "ls-files", "--error-unmatch"] + rel_paths,
                     cwd=project_dir,
                     capture_output=True,
+                    text=True,
                     check=False
                 )
-                if ls_result.returncode != 0:
+                # ls-files outputs tracked files one per line; untracked paths cause error
+                tracked_output = ls_result.stdout.strip()
+                tracked_files = set(tracked_output.split("\n")) if tracked_output else set()
+
+                # Add only untracked files
+                untracked = [p for p, rel in zip(validated_paths, rel_paths) if rel not in tracked_files]
+                if untracked:
                     subprocess.run(
-                        ["git", "add", str(fpath)],
+                        ["git", "add"] + untracked,
                         cwd=project_dir,
                         capture_output=True,
                         check=False
@@ -722,10 +785,14 @@ def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: O
         log("", project_dir=project_dir)
         log("Ctrl+C получен — завершаю с сохранением данных...", "WARNING", project_dir)
 
+    # Flush buffered logs before summary
+    _log_writer.flush()
+
     # Итоги
     _print_summary(results, iterations, project_dir)
 
     # Сохраняем итоги (без raw output — они уже в output_N.md)
+    _log_writer.flush()  # Ensure all logs written before saving summary
     summary_file = project_dir / ".autoresearch" / "experiments" / "summary.json"
     lean_results = []
     for r in results:

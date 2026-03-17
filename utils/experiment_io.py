@@ -224,13 +224,57 @@ def _read_experiment_history(exp_dir: Path, max_entries: int = 5) -> str:
     Returns a markdown table with the last N experiments:
     number, type, title, quality score, and decision.
     Used by build_agent_prompt() for diversity awareness.
+
+    Performance: uses reverse scan to find only the last N entries
+    without parsing the entire file — important as accumulation_context.md
+    grows with each experiment (1180+ lines for 45 experiments).
     """
     ctx_file = exp_dir / "accumulation_context.md"
-    entries = parse_accumulation_context(ctx_file)
-    if not entries:
+    if not ctx_file.exists():
         return ""
 
-    entries = entries[-max_entries:]
+    content = ctx_file.read_text(encoding="utf-8")
+
+    # Find all experiment headers and their start positions
+    # Reverse scan to get only the last max_entries without parsing everything
+    positions = []
+    for m in re.finditer(r"^## Experiment (\d+) — (.+)", content, re.MULTILINE):
+        positions.append((m.start(), int(m.group(1)), m.group(2).strip()))
+
+    if not positions:
+        return ""
+
+    # Take only the last max_entries
+    recent = positions[-max_entries:]
+
+    # Extract data from each recent entry (still need regex for type/score/decision)
+    entries = []
+    for idx, (start, num, title) in enumerate(recent):
+        end = len(content)
+        # Find next experiment start (next in the full positions list after this one)
+        full_idx = len(positions) - len(recent) + idx
+        if full_idx + 1 < len(positions):
+            end = positions[full_idx + 1][0]
+        section = content[start:end]
+
+        type_match = re.search(r"\*\*Type:\*\*\s*(.+)", section)
+        exp_type = type_match.group(1).strip() if type_match else classify_experiment_type(title)
+
+        score_match = re.search(
+            r"\*\*Score:\*\*\s*([\d.]+|N/A)\s*\|\s*\*\*Decision:\*\*\s*(\w+)", section
+        )
+        if score_match:
+            score, decision = score_match.group(1), score_match.group(2)
+        else:
+            score_m = re.search(r"\*\*Quality Gate Score:\*\*\s*([\d.]+)", section)
+            result_m = re.search(r"\*\*Result:\*\*\s*(KEEP|DISCARD|MANUAL_REVIEW)", section)
+            score = score_m.group(1) if score_m else "N/A"
+            decision = result_m.group(1) if result_m else "N/A"
+
+        entries.append({
+            "number": num, "title": title, "type": exp_type,
+            "score": score, "decision": decision
+        })
 
     lines = [
         "| # | Type        | Title | Score | Decision |",
