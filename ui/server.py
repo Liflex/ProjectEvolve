@@ -8,6 +8,7 @@ Usage:
     python ui/server.py --port 3000            # Custom port
 """
 
+import collections
 import json
 import os
 import re
@@ -72,6 +73,104 @@ class CSPMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(CSPMiddleware)
+
+
+# =============================================================================
+# RATE LIMITING — in-memory sliding-window rate limiter
+# =============================================================================
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """In-memory sliding-window rate limiter for API endpoints.
+
+    Prevents brute-force (e.g. /api/run flooding) and general API abuse.
+    Uses client IP as key; per-endpoint limits for sensitive routes.
+    """
+
+    # Per-route overrides: {path_prefix: (max_requests, window_seconds)}
+    # None = use defaults
+    ROUTE_LIMITS = {
+        "/api/run": (5, 60),       # 5 starts per minute — expensive operation
+        "/api/run/stop": (10, 60), # 10 stops per minute
+    }
+
+    # Defaults for all other /api/* routes
+    DEFAULT_LIMIT = (60, 60)  # 60 requests per minute
+
+    # Shared state across all instances (singleton via module-level dict)
+    _buckets: Dict[str, collections.deque] = {}
+    _lock = threading.Lock()
+
+    @classmethod
+    def _is_allowed(cls, key: str, limit: int, window: float) -> bool:
+        """Check if request is within rate limit using sliding window."""
+        now = time.monotonic()
+        cutoff = now - window
+
+        with cls._lock:
+            bucket = cls._buckets.get(key)
+            if bucket is None:
+                cls._buckets[key] = collections.deque([now])
+                return True
+
+            # Prune expired entries
+            while bucket and bucket[0] < cutoff:
+                bucket.popleft()
+
+            if len(bucket) >= limit:
+                return False
+
+            bucket.append(now)
+            return True
+
+    @classmethod
+    def _prune_all(cls):
+        """Remove empty buckets to prevent memory leak (called periodically)."""
+        now = time.monotonic()
+        with cls._lock:
+            # Remove buckets older than 5 minutes
+            stale_keys = [k for k, v in cls._buckets.items()
+                          if not v or v[-1] < now - 300]
+            for k in stale_keys:
+                del cls._buckets[k]
+
+    async def dispatch(self, request, call_next):
+        # Only rate-limit /api/ routes (skip static files, docs, etc.)
+        path = request.url.path
+        if not path.startswith("/api/"):
+            return await call_next(request)
+
+        # Determine limit for this route
+        limit, window = self.DEFAULT_LIMIT
+        for prefix, (lim, win) in self.ROUTE_LIMITS.items():
+            if path.startswith(prefix):
+                limit, window = lim, win
+                break
+
+        # Use client IP + route as bucket key
+        client_ip = request.client.host if request.client else "unknown"
+        key = f"{client_ip}:{path}"
+
+        # Periodic cleanup (roughly every 100 API requests)
+        if hash(key) % 100 == 0:
+            self._prune_all()
+
+        if not self._is_allowed(key, limit, window):
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Rate limit exceeded. Try again later."},
+                headers={"Retry-After": str(window)},
+            )
+
+        response = await call_next(request)
+        # Add rate limit info headers
+        remaining = limit - len(self._buckets.get(key, []))
+        response.headers["X-RateLimit-Limit"] = str(limit)
+        response.headers["X-RateLimit-Remaining"] = str(max(0, remaining))
+        return response
+
+
+app.add_middleware(RateLimitMiddleware)
 
 run_state = {
     "running": False,
