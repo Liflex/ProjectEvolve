@@ -36,5 +36,6 @@ env/
 .DS_Store
 Thumbs.db
 
-# AutoResearch specific (можно включить в git)
-# .autoresearch/  # Раскомментируйте, если не хотите коммитить конфиг
+# AutoResearch runtime state (project-specific, not for version control)
+.autoresearch/
+.claude/

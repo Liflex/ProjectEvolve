@@ -17,13 +17,27 @@ import os
 import sys
 import json
 import time
+import shlex
 import subprocess
-import yaml
 from pathlib import Path
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, asdict
 from enum import Enum
+
+
+# Built-in auto-detect defaults for common tech stacks
+# Used when config doesn't specify auto_detect for a metric
+DEFAULT_AUTO_DETECT = {
+    "python": {
+        "syntax": ["python -m compileall -q ."],
+    },
+}
 
 
 class Phase(Enum):
@@ -73,29 +87,38 @@ class QualityConfig:
         self.config = self._load_config()
 
     def _load_config(self) -> Dict:
-        """Загружает конфигурацию из YAML файла"""
-        if not self.config_file.exists():
-            # Создаём дефолтный конфиг
-            default_config = {
-                "project_name": self.project_dir.name,
-                "metrics": {"tests": {"enabled": True}},
-                "thresholds": {
-                    "a": {"min_score": 0.7, "required_checks": ["tests"]},
-                    "b": {"min_score": 0.85, "required_checks": ["tests"]}
-                },
-                "loop": {
-                    "max_iterations": 4,
-                    "stagnation_limit": 2,
-                    "stagnation_delta": 0.02
-                }
+        """Загружает конфигурацию из YAML файла (с fallback на JSON)"""
+        default_config = {
+            "project_name": self.project_dir.name,
+            "metrics": {"tests": {"enabled": True}, "syntax": {"enabled": True}},
+            "thresholds": {
+                "a": {"min_score": 0.7, "required_checks": []},
+                "b": {"min_score": 0.85, "required_checks": []}
+            },
+            "loop": {
+                "max_iterations": 4,
+                "stagnation_limit": 2,
+                "stagnation_delta": 0.02
             }
+        }
+
+        if not self.config_file.exists():
             self.config_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.config_file, "w", encoding="utf-8") as f:
-                yaml.dump(default_config, f, default_flow_style=False, allow_unicode=True)
+            if yaml:
+                with open(self.config_file, "w", encoding="utf-8") as f:
+                    yaml.dump(default_config, f, default_flow_style=False, allow_unicode=True)
+            else:
+                # Fallback: сохраняем как JSON если yaml недоступен
+                json_file = self.config_file.with_suffix(".json")
+                with open(json_file, "w", encoding="utf-8") as f:
+                    json.dump(default_config, f, indent=2, ensure_ascii=False)
             return default_config
 
         with open(self.config_file, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
+            if yaml and self.config_file.suffix in (".yml", ".yaml"):
+                return yaml.safe_load(f)
+            else:
+                return json.load(f)
 
     def get_phase_threshold(self, phase: Phase) -> float:
         """Возвращает порог для фазы"""
@@ -138,9 +161,16 @@ class MetricRunner:
         return "unknown"
 
     def _find_command(self, metric_type: str) -> Optional[str]:
-        """Находит команду для метрики по типу проекта"""
+        """Находит команду для метрики по типу проекта.
+
+        Проверяет config auto_detect, затем fallback на DEFAULT_AUTO_DETECT.
+        """
         auto_detect = self.config.config.get("auto_detect", {})
         commands = auto_detect.get(self.tech_stack, {}).get(metric_type, [])
+
+        # Fallback to built-in defaults if config has no auto_detect for this metric
+        if not commands:
+            commands = DEFAULT_AUTO_DETECT.get(self.tech_stack, {}).get(metric_type, [])
 
         # Пробуем каждую команду
         for cmd in commands:
@@ -154,7 +184,7 @@ class MetricRunner:
                     check=False
                 )
                 return cmd
-            except:
+            except (subprocess.SubprocessError, OSError, FileNotFoundError):
                 continue
 
         return None
@@ -192,8 +222,8 @@ class MetricRunner:
 
         try:
             result = subprocess.run(
-                command,
-                shell=True,
+                shlex.split(command),
+                shell=False,
                 cwd=self.project_dir,
                 capture_output=True,
                 text=True,
@@ -242,7 +272,14 @@ class MetricRunner:
 
     def run_all_metrics(self, phase: Phase) -> Tuple[List[MetricResult], float]:
         """Запускает все метрики и возвращает результаты с общим score"""
-        metrics_config = self.config.config.get("metrics", {})
+        metrics_config = dict(self.config.config.get("metrics", {}))
+
+        # Auto-add built-in metrics for detected tech stack (if not already in config)
+        stack_defaults = DEFAULT_AUTO_DETECT.get(self.tech_stack, {})
+        for metric_name in stack_defaults:
+            if metric_name not in metrics_config:
+                metrics_config[metric_name] = {"enabled": True}
+
         required_checks = self.config.get_required_checks(phase)
 
         results = []
@@ -252,6 +289,11 @@ class MetricRunner:
         for metric_name, metric_config in metrics_config.items():
             result = self.run_metric(metric_name, metric_config)
             results.append(result)
+
+            # Skip "not applicable" metrics (score 0.5 = no command found)
+            # They still appear in results for info, but don't affect the score
+            if result.score == 0.5 and result.passed:
+                continue
 
             # required checks имеют вес 2, остальные 1
             weight = 2.0 if metric_name in required_checks else 1.0
@@ -279,7 +321,8 @@ class QualityLoop:
         self,
         max_iterations: int = 4,
         threshold_a: float = 0.7,
-        threshold_b: float = 0.85
+        threshold_b: float = 0.85,
+        quiet: bool = False
     ) -> LoopState:
         """Запускает Quality Loop
 
@@ -287,17 +330,22 @@ class QualityLoop:
             max_iterations: Максимальное количество итераций
             threshold_a: Порог для Phase A
             threshold_b: Порог для Phase B
+            quiet: Подавить console output (для программного использования)
 
         Returns:
             Финальное состояние loop
         """
-        print("=" * 70)
-        print("Quality Loop - Started")
-        print("=" * 70)
-        print(f"Project: {self.project_dir.name}")
-        print(f"Tech Stack: {self.runner.tech_stack}")
-        print(f"Max Iterations: {max_iterations}")
-        print()
+        def _print(msg=""):
+            if not quiet:
+                print(msg)
+
+        _print("=" * 70)
+        _print("Quality Loop - Started")
+        _print("=" * 70)
+        _print(f"Project: {self.project_dir.name}")
+        _print(f"Tech Stack: {self.runner.tech_stack}")
+        _print(f"Max Iterations: {max_iterations}")
+        _print()
 
         # Инициализация состояния
         self.state = LoopState(
@@ -318,10 +366,10 @@ class QualityLoop:
             # Определяем порог для текущей фазы
             threshold = threshold_a if self.state.phase == Phase.A else threshold_b
 
-            print(f"\n{'=' * 70}")
-            print(f"Iteration {self.state.iterition}/{max_iterations} | Phase {self.state.phase.value}")
-            print(f"Threshold: {threshold:.2f}")
-            print(f"{'=' * 70}\n")
+            _print(f"\n{'=' * 70}")
+            _print(f"Iteration {self.state.iteration}/{max_iterations} | Phase {self.state.phase.value}")
+            _print(f"Threshold: {threshold:.2f}")
+            _print(f"{'=' * 70}\n")
 
             # Запуск метрик
             results, score = self.runner.run_all_metrics(self.state.phase)
@@ -329,17 +377,17 @@ class QualityLoop:
             self.state.score = score
 
             # Вывод результатов
-            self._print_results(results, score, threshold)
+            self._print_results(results, score, threshold, quiet)
 
             # Проверка условий остановки
-            stop_reason = self._check_stop_conditions(score, threshold, stagnation_count, loop_config)
+            stop_reason = self._check_stop_conditions(score, threshold, stagnation_count, loop_config, quiet)
             if stop_reason:
                 self.state.stop_reason = stop_reason.value
                 break
 
             # Проверка перехода Phase A → B
             if self.state.phase == Phase.A and score >= threshold:
-                print(f"\n✓ Phase A passed! Advancing to Phase B...")
+                _print(f"\n✓ Phase A passed! Advancing to Phase B...")
                 self.state.phase = Phase.B
                 self.state.iteration += 1
                 continue
@@ -357,7 +405,7 @@ class QualityLoop:
             self.state.iteration += 1
 
         # Финальный отчёт
-        self._print_summary()
+        self._print_summary(quiet)
 
         return self.state
 
@@ -366,7 +414,8 @@ class QualityLoop:
         score: float,
         threshold: float,
         stagnation_count: int,
-        loop_config: Dict
+        loop_config: Dict,
+        quiet: bool = False
     ) -> Optional[StopReason]:
         """Проверяет условия остановки loop"""
         # Phase B passed
@@ -376,13 +425,17 @@ class QualityLoop:
         # Stagnation
         stagnation_limit = loop_config.get("stagnation_limit", 2)
         if stagnation_count >= stagnation_limit:
-            print(f"\n⚠ Stagnation detected (no improvement for {stagnation_count} iterations)")
+            if not quiet:
+                print(f"\n⚠ Stagnation detected (no improvement for {stagnation_count} iterations)")
             return StopReason.stagnation
 
         return None
 
-    def _print_results(self, results: List[MetricResult], score: float, threshold: float):
+    def _print_results(self, results: List[MetricResult], score: float, threshold: float, quiet: bool = False):
         """Выводит результаты итерации"""
+        if quiet:
+            return
+
         passed = score >= threshold
         status = "✓ PASS" if passed else "✗ FAIL"
 
@@ -400,8 +453,11 @@ class QualityLoop:
                 for line in lines:
                     print(f"      {line}")
 
-    def _print_summary(self):
+    def _print_summary(self, quiet: bool = False):
         """Выводит финальный отчёт"""
+        if quiet:
+            return
+
         print(f"\n{'=' * 70}")
         print("Quality Loop - Summary")
         print(f"{'=' * 70}")

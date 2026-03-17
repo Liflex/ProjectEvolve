@@ -41,7 +41,8 @@ sys.path.insert(0, str(UTILS_DIR))
 AUTORESEARCH_HOME = Path(__file__).parent.resolve()
 DEFAULT_PROJECT = Path.cwd()
 DEFAULT_ITERATIONS = 10
-DEFAULT_TIMEOUT = 5  # минут
+DEFAULT_TIMEOUT = 5  # минут (пауза между экспериментами)
+DEFAULT_MAX_TIME = 600  # секунд (максимальная длительность одного эксперимента, 10 минут)
 
 # Директории
 CONFIG_DIR = AUTORESEARCH_HOME / "config"
@@ -78,7 +79,7 @@ def get_next_experiment_number(exp_dir: Path) -> int:
             try:
                 num = int(match)
                 existing.append(num)
-            except:
+            except (ValueError, TypeError):
                 continue
 
     if not existing:
@@ -102,20 +103,19 @@ def log(msg: str, level: str = "INFO", project_dir: Optional[Path] = None):
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(f"{prefix} {msg}\n")
 
-def read_last_entries(path: Path, max_entries: int = 5) -> str:
-    """Читает ТОЛЬКО записи помеченные [CRITICAL] или [IMPORTANT].
+def read_last_entries(path: Path, max_entries: int = 5, max_bytes: int = 10240) -> str:
+    """Читает записи помеченные [CRITICAL] или [IMPORTANT] с лимитом по размеру.
 
-    Логика:
-    1. Включаются только записи с метками [CRITICAL] или [IMPORTANT]
-    2. Обычные записи без меток НЕ включаются
-    3. Это ограничивает контекст до 30-50 KB вместо 200+ KB
+    Приоритет: [CRITICAL] > [IMPORTANT]. Записи добавляются до лимита max_bytes.
+    Каждая запись обрезается до 40 строк чтобы предотвратить bloat.
 
     Args:
         path: Путь к файлу памяти (lessons.md, patterns.md, architecture.md)
-        max_entries: Игнорируется (для совместимости с вызовами)
+        max_entries: Максимум записей (по умолчанию 5)
+        max_bytes: Лимит общего размера в байтах (по умолчанию 10KB)
 
     Returns:
-        str: Содержимое только помеченных записей
+        str: Содержимое помеченных записей в рамках лимита
     """
     if not path.exists():
         return ""
@@ -130,7 +130,6 @@ def read_last_entries(path: Path, max_entries: int = 5) -> str:
 
     for line in lines:
         if line.startswith("## "):
-            # Сохраняем предыдущую запись
             if current_entry:
                 entries.append({"header": current_header, "content": "\n".join(current_entry)})
             current_header = line
@@ -139,18 +138,41 @@ def read_last_entries(path: Path, max_entries: int = 5) -> str:
             if current_entry is not None:
                 current_entry.append(line)
 
-    # Сохраняем последнюю запись
     if current_entry:
         entries.append({"header": current_header, "content": "\n".join(current_entry)})
 
-    # Берем только помеченные записи
-    marked_entries = []
-    for entry in entries:
-        header = entry["header"]
-        if "[CRITICAL]" in header or "[IMPORTANT]" in header:
-            marked_entries.append(entry)
+    # Фильтруем и сортируем: CRITICAL первые, затем IMPORTANT
+    critical = [e for e in entries if "[CRITICAL]" in e["header"]]
+    important = [e for e in entries if "[IMPORTANT]" in e["header"]]
+    marked = critical + important
 
-    return "\n".join(e["content"] for e in marked_entries)
+    # Собираем с лимитами
+    result_parts = []
+    total_bytes = 0
+    count = 0
+    max_lines_per_entry = 40
+
+    for entry in marked:
+        if count >= max_entries:
+            break
+
+        # Обрезаем длинные записи
+        entry_lines = entry["content"].split("\n")
+        if len(entry_lines) > max_lines_per_entry:
+            entry_text = "\n".join(entry_lines[:max_lines_per_entry]) + "\n[...truncated]"
+        else:
+            entry_text = entry["content"]
+
+        entry_size = len(entry_text.encode("utf-8"))
+
+        if total_bytes + entry_size > max_bytes and result_parts:
+            break  # Лимит по размеру (но хотя бы одну запись включаем)
+
+        result_parts.append(entry_text)
+        total_bytes += entry_size
+        count += 1
+
+    return "\n".join(result_parts)
 
 # =============================================================================
 # CLAUDE CLI DETECTION
@@ -161,54 +183,25 @@ def read_last_entries(path: Path, max_entries: int = 5) -> str:
 def get_claude_command() -> str:
     """Auto-detects the command to run Claude CLI on any platform.
 
-    Cross-platform implementation following INSTALL.md guidelines:
-    - Windows: Uses PowerShell with ExecutionPolicy Bypass
-    - Linux/macOS: Uses direct 'claude' command
-    - Falls back to trying all available methods
+    Uses shutil.which() for reliable cross-platform detection:
+    - Windows: Finds claude.CMD in npm global directory
+    - Linux/macOS: Finds claude binary in PATH
 
     Returns:
-        str: Command string to run Claude CLI
+        str: Command string to run Claude CLI, or "claude" as fallback
     """
-    # Auto-detect OS and use appropriate method
-    if sys.platform == "win32":
-        # Windows: Try PowerShell (see INSTALL.md Step 2 - Windows)
-        try:
-            result = subprocess.run(
-                ["powershell.exe", "-Command", "Get-Command claude | Select-Object -ExpandProperty Source"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                ps1_path = result.stdout.strip()
-                if ps1_path.endswith(".ps1"):
-                    return f'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{ps1_path}"'
-        except:
-            pass
+    import shutil
 
-        # Fallback: Try cmd.exe where command
-        try:
-            result = subprocess.run(
-                ["cmd", "/c", "where claude.ps1"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                ps1_path = result.stdout.strip().split('\n')[0].strip()
-                return f'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{ps1_path}"'
-        except:
-            pass
+    claude_path = shutil.which("claude")
+    if claude_path:
+        return claude_path
 
-    # Unix-like systems (Linux, macOS) - see INSTALL.md Step 2
     return "claude"
 
 def check_claude_cli() -> bool:
     """Checks if Claude CLI is installed and accessible.
 
-    Validates installation following INSTALL.md Step 5 (Validation).
+    Validates by running `claude --version`.
     Works on all platforms: Windows, Linux, macOS.
 
     Returns:
@@ -216,28 +209,17 @@ def check_claude_cli() -> bool:
     """
     claude_cmd = get_claude_command()
 
-    # Platform-specific validation
-    if sys.platform == "win32" and "powershell.exe" in claude_cmd:
-        import re
-        match = re.search(r'-File\s+"([^"]+)"', claude_cmd)
-        if not match:
-            match = re.search(r'-File\s+(\S+)', claude_cmd)
-
-        if match:
-            ps1_path = match.group(1)
-            if Path(ps1_path).exists():
-                return True
-
-    # Cross-platform: try running --version
-    result = subprocess.run(
-        claude_cmd.split() + ["--version"],
-        capture_output=True,
-        text=True,
-        timeout=15,
-        check=False
-    )
-
-    return result.returncode == 0
+    try:
+        result = subprocess.run(
+            [claude_cmd, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False
+        )
+        return result.returncode == 0
+    except (subprocess.SubprocessError, OSError, FileNotFoundError):
+        return False
 
 # =============================================================================
 # PROJECT CONFIG
@@ -412,9 +394,10 @@ def run_quality_gate(project_dir: Path) -> Dict[str, Any]:
 
         loop = QualityLoop(project_dir)
         state = loop.run(
-            max_iterations=2,  # Quick check
+            max_iterations=1,  # Single snapshot — just check current state
             threshold_a=0.6,
-            threshold_b=0.7
+            threshold_b=0.7,
+            quiet=True  # Подавляем console output — log() в autoresearch.py достаточно
         )
 
         decision = "KEEP" if state.score >= 0.6 else "REVIEW"
@@ -441,9 +424,9 @@ def run_quality_gate(project_dir: Path) -> Dict[str, Any]:
 
         return result
 
-    except ImportError:
+    except ImportError as e:
         # quality_loop не доступен - возвращаем нейтральный результат
-        log("Quality Loop module not found, skipping...", "WARNING", project_dir)
+        log(f"Quality Loop module not available: {e}", "WARNING", project_dir)
         return {
             "score": 0.5,
             "passed": None,
@@ -549,9 +532,9 @@ def build_agent_prompt(config: ProjectConfig, iteration: int, total: int) -> str
     # Читаем память проекта с приоритетами (только [CRITICAL] и [IMPORTANT])
     project_memory = ""
     if memory_dir.exists():
-        lessons = read_last_entries(memory_dir / "lessons.md", 5)
-        patterns = read_last_entries(memory_dir / "patterns.md", 5)
-        architecture = read_last_entries(memory_dir / "architecture.md", 5)
+        lessons = read_last_entries(memory_dir / "lessons.md", max_entries=10, max_bytes=8192)
+        patterns = read_last_entries(memory_dir / "patterns.md", max_entries=7, max_bytes=8192)
+        architecture = read_last_entries(memory_dir / "architecture.md", max_entries=5, max_bytes=5120)
 
         if lessons or patterns or architecture:
             project_memory += "\n\n## Память проекта\n\n"
@@ -570,6 +553,12 @@ def build_agent_prompt(config: ProjectConfig, iteration: int, total: int) -> str
         project_memory += "## Последний эксперимент\n\n"
         project_memory += last_experiment + "\n\n"
 
+    # Добавляем компактную историю последних экспериментов (для diversity awareness)
+    history = _read_experiment_history(exp_dir, max_entries=5)
+    if history:
+        project_memory += "## История экспериментов\n\n"
+        project_memory += history + "\n\n"
+
     # Добавляем текущее состояние проекта (git status)
     try:
         result = subprocess.run(
@@ -584,7 +573,7 @@ def build_agent_prompt(config: ProjectConfig, iteration: int, total: int) -> str
             project_memory += "### Изменённые файлы (git status)\n```\n"
             project_memory += result.stdout.strip()
             project_memory += "\n```\n\n"
-    except:
+    except (subprocess.SubprocessError, OSError, FileNotFoundError):
         pass
 
     if project_memory:
@@ -595,6 +584,9 @@ def build_agent_prompt(config: ProjectConfig, iteration: int, total: int) -> str
 def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
     """Парсит отчет эксперимента из вывода агента.
 
+    Соответствует формату шаблона из default_prompt.md:
+    **Title:** / **Hypothesis:** / **Files Modified:** / ### Results / **Notes for Next:**
+
     Args:
         output: Вывод Claude CLI
         iteration: Номер эксперимента
@@ -604,52 +596,205 @@ def parse_experiment_report(output: str, iteration: int) -> Dict[str, Any]:
     """
     import re
 
-    # Извлекаем данные из отчета
     title = "Untitled"
-    what_done = "N/A"
+    hypothesis = ""
     files_modified = []
     results = "N/A"
     notes_next = "N/A"
 
-    # Ищем Title
-    match = re.search(r'\*\*Title:\*\*\s*(.+?)(?:\n|\*)', output)
+    # Title
+    match = re.search(r'\*\*Title:\*\*\s*(.+)', output)
     if match:
         title = match.group(1).strip()
 
-    # Ищем секции
-    sections = re.split(r'\n#{1,3}\s+', output)
+    # Hypothesis (used as what_done — шаблон не имеет секции "What Was Done")
+    match = re.search(r'\*\*Hypothesis:\*\*\s*(.+)', output)
+    if match:
+        hypothesis = match.group(1).strip()
 
-    for section in sections:
-        if "What Was Done" in section or "Changes Made" in section:
-            what_done = section.strip()[:500]  # Ограничиваем размер
-        elif "Files Modified" in section:
-            # Извлекаем список файлов
-            for line in section.split('\n'):
-                if '-' in line and '.' in line:
-                    files_modified.append(line.strip('- *').strip())
-        elif "Evaluation Results" in section or "Results" in section:
-            results = section.strip()[:500]
-        elif "Notes for Next" in section:
-            notes_next = section.strip()[:500]
+    # Files Modified — три поддерживаемых формата:
+    # 1. Inline bold: **Files Modified:** file1.py, file2.py
+    # 2. Header + bullet: ### Files Modified\n- `file1.py` — desc\n- `file2.py`
+    # 3. Header + inline: ### Files Modified\nfile1.py, file2.py
+    files_text = ""
+
+    # Формат 1: inline bold **Files Modified:**
+    match = re.search(r'\*\*Files Modified:\*\*\s*(.+?)(?:\n###|\n\*\*[A-Z]|\Z)', output, re.DOTALL)
+    if match:
+        files_text = match.group(1).strip()
+    else:
+        # Формат 2/3: ### Files Modified (markdown header)
+        match = re.search(r'### Files Modified\s*\n(.*?)(?=\n### |\Z)', output, re.DOTALL)
+        if match:
+            files_text = match.group(1).strip()
+
+    if files_text:
+        lines = files_text.split('\n')
+        # Detect bullet list by checking if lines start with "- " or "* "
+        is_bullet = any(re.match(r'\s*[-*]\s+', line) for line in lines if line.strip())
+        if not is_bullet and len(lines) <= 2 and ',' in files_text:
+            # Inline: "file1.py, file2.py, file3.md"
+            files_modified = [f.strip() for f in files_text.split(',') if f.strip()]
+        else:
+            # Bullet list: "- file1.py\n- file2.py" (or fallback for multi-line)
+            for line in lines:
+                line = line.strip().lstrip('- *').strip()
+                if line:
+                    files_modified.append(line)
+
+        # Strip markdown formatting and trailing descriptions from filenames
+        cleaned = []
+        for f in files_modified:
+            # Strip all markdown formatting chars first
+            f = re.sub(r'[`*\[\]]', '', f.strip())
+            # Reject non-filename patterns (false positives from report sections)
+            if re.match(r'^(Test Plan|Hypothesis|Target|Complexity|Metric|Notes for Next):', f, re.IGNORECASE):
+                continue
+            # Strip trailing description (after em-dash, en-dash, or long dash)
+            f = re.split(r'\s*[—–]\s+', f, maxsplit=1)[0]
+            # Strip trailing after "—" with spaces (Unicode dash)
+            f = re.split(r'\s+-\s+', f, maxsplit=1)[0]
+            f = f.strip(' ,:;')
+            # Don't strip leading dots (.gitignore, .env, .autoresearch/)
+            f = f.strip()
+            if f and f not in ('.', 'None', 'none', 'N/A'):
+                cleaned.append(f)
+        files_modified = cleaned
+
+    # Results — между ### Results и ### Decision
+    match = re.search(r'### Results\s*\n(.*?)(?=\n### )', output, re.DOTALL)
+    if match:
+        results = match.group(1).strip()[:500]
+
+    # Notes for Next — после **Notes for Next:** до >>>EXPERIMENT_COMPLETE<<<
+    match = re.search(r'\*\*Notes for Next:\*\*\s*(.*?)(?=\n>>>|$)', output, re.DOTALL)
+    if match:
+        notes_next = match.group(1).strip()[:500]
+
+    what_done = hypothesis if hypothesis else "N/A"
 
     return {
         "number": iteration,
         "title": title,
         "what_done": what_done,
-        "files_modified": files_modified[:10],  # Максимум 10 файлов
+        "files_modified": [f for f in files_modified if f][:10],
         "results": results,
         "notes_next": notes_next,
         "date": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
 
+def _replace_entry(content: str, marker: str, new_entry: str) -> str:
+    """Заменяет существующую запись эксперимента в контенте.
+
+    Ищет marker (например '## Experiment 5 '), удаляет старую запись
+    до следующего '## Experiment' (не включая) и вставляет новую.
+
+    Note: '---' is NOT a separator — it's part of each entry format.
+    Only '\n## Experiment' marks the start of the next entry.
+    """
+    start = content.find(marker)
+    if start == -1:
+        return content + new_entry
+
+    # Находим начало следующей записи
+    rest = content[start:]
+    end = len(rest)
+    pos = rest.find('\n## Experiment ', 1)
+    if pos != -1:
+        end = pos
+
+    return content[:start] + new_entry + rest[end:]
+
+
+def _append_experiment_entry(
+    file_path: Path,
+    header: str,
+    entry: str,
+    exp_number: int = None
+):
+    """Добавляет или обновляет запись эксперимента в лог-файл.
+
+    Если exp_number указан и запись с таким номером уже существует —
+    старая запись заменяется новой (deduplication).
+    """
+    marker = f"## Experiment {exp_number} " if exp_number else None
+
+    if file_path.exists():
+        content = file_path.read_text(encoding="utf-8")
+        if marker and marker in content:
+            content = _replace_entry(content, marker, entry)
+        else:
+            content += entry
+    else:
+        content = f"# {header}\n\n{entry}"
+
+    file_path.write_text(content, encoding="utf-8")
+
+
+def _read_experiment_history(exp_dir: Path, max_entries: int = 5) -> str:
+    """Read compact experiment history from accumulation_context.md.
+
+    Returns a markdown table with the last N experiments:
+    number, title, quality score, and decision.
+    Used by build_agent_prompt() for diversity awareness.
+    """
+    import re
+
+    ctx_file = exp_dir / "accumulation_context.md"
+    if not ctx_file.exists():
+        return ""
+
+    content = ctx_file.read_text(encoding="utf-8")
+
+    # Split into experiment sections for independent score extraction
+    sections = re.split(r'(?=^## Experiment \d+)', content, flags=re.MULTILINE)
+
+    entries = []
+    for section in sections:
+        header_match = re.match(r'## Experiment (\d+) — (.+)', section)
+        if not header_match:
+            continue
+        num = header_match.group(1)
+        title = header_match.group(2).strip()
+
+        # Format 1: **Score:** X | **Decision:** Y (well-formed entries)
+        score_match = re.search(
+            r'\*\*Score:\*\*\s*([\d.]+|N/A)\s*\|\s*\*\*Decision:\*\*\s*(\w+)',
+            section
+        )
+        if score_match:
+            score, decision = score_match.group(1), score_match.group(2)
+        else:
+            # Format 2: **Quality Gate Score:** X ... + **Result:** KEEP (legacy format)
+            score_m = re.search(r'\*\*Quality Gate Score:\*\*\s*([\d.]+)', section)
+            result_m = re.search(r'\*\*Result:\*\*\s*(KEEP|DISCARD|MANUAL_REVIEW)', section)
+            score = score_m.group(1) if score_m else "N/A"
+            decision = result_m.group(1) if result_m else "N/A"
+
+        entries.append((num, title, score, decision))
+
+    if not entries:
+        return ""
+
+    # Take last N
+    entries = entries[-max_entries:]
+
+    lines = [
+        "| # | Title | Score | Decision |",
+        "|---|-------|-------|----------|"
+    ]
+    for num, title, score, decision in entries:
+        if len(title) > 55:
+            title = title[:52] + "..."
+        lines.append(f"| {num} | {title} | {score} | {decision} |")
+
+    return "\n".join(lines)
+
+
 def save_last_experiment_summary(project_dir: Path, experiment: Dict[str, Any]):
     """Сохраняет краткую сводку ТОЛЬКО последнего эксперимента для агента.
 
     Этот файл перезаписывается каждой итерацией — в контекст попадает только последний!
-
-    Args:
-        project_dir: Директория проекта
-        experiment: Данные эксперимента
     """
     exp_dir = project_dir / ".autoresearch" / "experiments"
     last_exp_file = exp_dir / "last_experiment.md"
@@ -658,6 +803,7 @@ def save_last_experiment_summary(project_dir: Path, experiment: Dict[str, Any]):
 
 **Experiment #{experiment['number']}** — {experiment.get('title', 'Untitled')}
 **Date:** {experiment.get('date', '')}
+**Duration:** {experiment.get('duration', 0):.0f}s
 
 ## What Was Done
 
@@ -670,7 +816,15 @@ def save_last_experiment_summary(project_dir: Path, experiment: Dict[str, Any]):
 ## Key Results
 
 {experiment.get('results', 'N/A')}
+"""
+    if experiment.get("quality_score") is not None:
+        summary += f"""
+## Independent Quality Gate
 
+**Score:** {experiment['quality_score']:.2f}
+**Decision:** {experiment.get('quality_decision', 'N/A')}
+"""
+    summary += f"""
 ## For Next Iteration
 
 {experiment.get('notes_next', 'N/A')}
@@ -680,14 +834,8 @@ def save_last_experiment_summary(project_dir: Path, experiment: Dict[str, Any]):
     log(f"Saved last_experiment.md", "DEBUG", project_dir)
 
 def save_accumulation_context(project_dir: Path, experiment: Dict[str, Any]):
-    """Добавляет эксперимент в полный лог всех экспериментов.
-
-    Args:
-        project_dir: Директория проекта
-        experiment: Данные эксперимента
-    """
+    """Добавляет эксперимент в полный лог всех экспериментов (с dedup)."""
     exp_dir = project_dir / ".autoresearch" / "experiments"
-    context_file = exp_dir / "accumulation_context.md"
 
     entry = f"""
 ## Experiment {experiment['number']} — {experiment.get('title', 'Untitled')}
@@ -706,6 +854,9 @@ def save_accumulation_context(project_dir: Path, experiment: Dict[str, Any]):
 
 {experiment.get('results', 'N/A')}
 
+### Quality Gate (Independent)
+**Score:** {experiment.get('quality_score', 'N/A')} | **Decision:** {experiment.get('quality_decision', 'N/A')}
+
 ### Notes for Next
 
 {experiment.get('notes_next', 'N/A')}
@@ -713,28 +864,22 @@ def save_accumulation_context(project_dir: Path, experiment: Dict[str, Any]):
 ---
 """
 
-    if context_file.exists():
-        content = context_file.read_text(encoding="utf-8")
-        content += entry
-    else:
-        content = f"# AutoResearch Experiment Log\n\n{entry}"
-
-    context_file.write_text(content, encoding="utf-8")
+    _append_experiment_entry(
+        exp_dir / "accumulation_context.md",
+        "AutoResearch Experiment Log",
+        entry,
+        experiment['number']
+    )
     log(f"Updated accumulation_context.md", "DEBUG", project_dir)
 
 def save_changes_log(project_dir: Path, experiment: Dict[str, Any]):
-    """Добавляет запись в хронологию изменений.
-
-    Args:
-        project_dir: Директория проекта
-        experiment: Данные эксперимента
-    """
+    """Добавляет запись в хронологию изменений (с dedup)."""
     exp_dir = project_dir / ".autoresearch" / "experiments"
-    changes_log_file = exp_dir / "changes_log.md"
 
     entry = f"""## Experiment {experiment['number']} — {experiment.get('title', 'Untitled')}
 
 **Time:** {experiment.get('date', '')}
+**Duration:** {experiment.get('duration', 0):.0f}s
 
 **Files:** {', '.join(experiment.get('files_modified', [])) if experiment.get('files_modified') else 'None'}
 
@@ -746,29 +891,127 @@ def save_changes_log(project_dir: Path, experiment: Dict[str, Any]):
 
 {experiment.get('results', 'N/A')}
 
+**Quality Gate:** {experiment.get('quality_score', 'N/A')} ({experiment.get('quality_decision', 'N/A')})
+
 
 """
 
-    if changes_log_file.exists():
-        content = changes_log_file.read_text(encoding="utf-8")
-        content += entry
-    else:
-        content = f"# AutoResearch Changes Log\n\n{entry}"
-
-    changes_log_file.write_text(content, encoding="utf-8")
+    _append_experiment_entry(
+        exp_dir / "changes_log.md",
+        "AutoResearch Changes Log",
+        entry,
+        experiment['number']
+    )
     log(f"Updated changes_log.md", "DEBUG", project_dir)
+
+# =============================================================================
+# GIT AUTO-COMMIT
+# =============================================================================
+
+def _auto_commit_experiment(project_dir: Path, experiment: Dict[str, Any]):
+    """Создаёт git commit после успешного эксперимента.
+
+    Коммитит только tracked-файлы (git add -u), чтобы не добавлять
+    untracked state (.autoresearch/, .claude/, .env и т.д.).
+    Новые файлы из files_modified добавляются явно после валидации.
+    """
+    number = experiment.get("number", "?")
+    title = experiment.get("title", "Untitled")
+    score = experiment.get("quality_score")
+    decision = experiment.get("quality_decision", "N/A")
+    is_complete = experiment.get("is_complete", True)
+
+    try:
+        # 1. Stage all modified/deleted tracked files
+        subprocess.run(
+            ["git", "add", "-u"],
+            cwd=project_dir,
+            capture_output=True,
+            check=False
+        )
+
+        # 2. Stage new files explicitly listed in files_modified (with path validation)
+        project_dir_resolved = project_dir.resolve()
+        for f in experiment.get("files_modified", []):
+            # Strip path traversal attempts and normalize
+            fpath = (project_dir / f).resolve()
+
+            # Security: reject paths outside project directory
+            if not str(fpath).startswith(str(project_dir_resolved) + os.sep) and fpath != project_dir_resolved:
+                log(f"Auto-commit: skipping path outside project: {f}", "WARNING", project_dir)
+                continue
+
+            if fpath.exists() and not fpath.is_dir():
+                # Only add if untracked (git add -u already handles tracked files)
+                rel_path = os.path.relpath(fpath, project_dir)
+                ls_result = subprocess.run(
+                    ["git", "ls-files", "--error-unmatch", rel_path],
+                    cwd=project_dir,
+                    capture_output=True,
+                    check=False
+                )
+                if ls_result.returncode != 0:
+                    subprocess.run(
+                        ["git", "add", str(fpath)],
+                        cwd=project_dir,
+                        capture_output=True,
+                        check=False
+                    )
+
+        # 3. Check if there's anything to commit
+        diff_check = subprocess.run(
+            ["git", "diff", "--cached", "--quiet"],
+            cwd=project_dir,
+            capture_output=True,
+            check=False
+        )
+        if diff_check.returncode == 0:
+            log(f"Auto-commit skipped: no changes to commit for experiment {number}", "DEBUG", project_dir)
+            return
+
+        # 4. Build commit message
+        status = "complete" if is_complete else "incomplete"
+        subject = f"autoresearch(exp{number}): {title}"
+        body_parts = [f"Experiment: {number}/{status}"]
+        if score is not None:
+            body_parts.append(f"Quality Gate: {score:.2f} ({decision})")
+        body = "\n".join(body_parts)
+
+        msg = f"{subject}\n\n{body}"
+
+        result = subprocess.run(
+            ["git", "commit", "-m", msg],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+            check=False
+        )
+
+        if result.returncode == 0:
+            log(f"Auto-committed experiment {number}: {title}", "INFO", project_dir)
+        else:
+            log(f"Auto-commit failed for experiment {number}: {result.stderr[:200].strip()}", "WARNING", project_dir)
+
+    except Exception as e:
+        log(f"Auto-commit error: {e}", "WARNING", project_dir)
+
 
 # =============================================================================
 # EXPERIMENT LOOP
 # =============================================================================
 
-def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> Dict[str, Any]:
-    """Запускает один эксперимент."""
+def run_single_experiment(config: ProjectConfig, iteration: int, total: int, max_time: int = DEFAULT_MAX_TIME) -> Dict[str, Any]:
+    """Запускает один эксперимент.
+
+    Args:
+        max_time: Максимальная длительность одного эксперимента в секундах (default: 600)
+    """
     project_dir = config.project_dir
     exp_dir = project_dir / ".autoresearch" / "experiments"
     exp_dir.mkdir(parents=True, exist_ok=True)
 
     log(f"Запуск эксперимента {iteration}/{total}", "INFO", project_dir)
+    experiment_start = time.time()
 
     # Строим промпт
     prompt = build_agent_prompt(config, iteration, total)
@@ -786,25 +1029,8 @@ def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> 
     output_file = exp_dir / f"output_{iteration}.md"
 
     try:
-        # Parse command based on platform (see INSTALL.md Step 2)
-        if sys.platform == "win32" and "powershell.exe" in claude_cmd:
-            # Windows: Extract .ps1 path and build PowerShell command
-            import re
-            match = re.search(r'-File\s+"([^"]+)"', claude_cmd)
-            if match:
-                ps1_path = match.group(1)
-                cmd_args = [
-                    "powershell.exe",
-                    "-NoProfile",
-                    "-ExecutionPolicy", "Bypass",
-                    "-File", ps1_path,
-                    "--print",
-                ]
-            else:
-                raise ValueError("Cannot parse PowerShell command")
-        else:
-            # Unix-like (Linux, macOS): direct command
-            cmd_args = claude_cmd.split() + ["--print"]
+        # Build command args — shutil.which returns full path on all platforms
+        cmd_args = [claude_cmd, "--print", "--dangerously-skip-permissions"]
 
         env = os.environ.copy()
         env['PYTHONIOENCODING'] = 'utf-8'
@@ -831,10 +1057,14 @@ def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> 
 
         try:
             # communicate с timeout - возвращает (stdout, stderr)
-            stdout, stderr = process.communicate(input=prompt, timeout=7200)
+            stdout, stderr = process.communicate(input=prompt, timeout=max_time)
 
             if process.returncode != 0:
                 log(f"Claude CLI error (code {process.returncode}): {stderr}", "ERROR", project_dir)
+                # Сохраняем даже partial output при ошибке
+                if stdout.strip():
+                    output_file.write_text(stdout, encoding="utf-8")
+                    log(f"Partial output saved to {output_file.name}", "DEBUG", project_dir)
                 return {"status": "error", "error": stderr}
 
             # Логируем stderr для отладки (даже при успехе)
@@ -844,39 +1074,63 @@ def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> 
             # Сохраняем вывод
             output_file.write_text(stdout, encoding="utf-8")
 
-            # Проверяем маркер завершения
-            if ">>>EXPERIMENT_COMPLETE<<<" in stdout:
-                log(f"Эксперимент {iteration} завершён", "INFO", project_dir)
-                return {"status": "success", "output": stdout}
+            # Проверяем маркер завершения (допускаем частичный маркер — Claude может обрезать)
+            duration = time.time() - experiment_start
+            if ">>>EXPERIMENT_COMPLETE" in stdout:
+                log(f"Эксперимент {iteration} завершён ({duration:.0f}s)", "INFO", project_dir)
+                return {"status": "success", "output": stdout, "duration": duration}
             else:
-                log(f"Эксперимент {iteration} завершён без маркера", "WARNING", project_dir)
-                return {"status": "incomplete", "output": stdout}
+                log(f"Эксперимент {iteration} завершён без маркера ({duration:.0f}s)", "WARNING", project_dir)
+                return {"status": "incomplete", "output": stdout, "duration": duration}
 
         except subprocess.TimeoutExpired:
             # При timeout сначала убиваем процесс, потом получаем остатки вывода
             process.kill()
-            stdout, stderr = process.communicate()
+            try:
+                stdout, stderr = process.communicate(timeout=10)
+            except (subprocess.TimeoutExpired, subprocess.SubprocessError):
+                stdout, stderr = "", ""
 
-            log(f"Claude CLI timeout after 2 hours!", "ERROR", project_dir)
-            log(f"Experiment {iteration} timed out - may be stuck on permission prompt or hanging", "ERROR", project_dir)
-            return {"status": "error", "error": f"Timeout after 2 hours. Claude CLI may be waiting for permission approval or stuck."}
+            # ВСЕГДА сохраняем partial output при timeout
+            if stdout.strip():
+                output_file.write_text(stdout, encoding="utf-8")
+                log(f"Partial output saved ({len(stdout)} chars) before timeout kill", "WARNING", project_dir)
+
+            log(f"Claude CLI timeout after {max_time}s!", "ERROR", project_dir)
+            log(f"Experiment {iteration} timed out - increase with --max-time if needed", "ERROR", project_dir)
+            return {"status": "error", "error": f"Timeout after {max_time}s. Increase --max-time if the experiment needs more time.", "partial_output": stdout, "duration": time.time() - experiment_start}
+
+    except KeyboardInterrupt:
+        # Ctrl+C — сохраняем partial output перед завершением
+        duration = time.time() - experiment_start
+        partial = ""
+        if 'process' in locals():
+            if process.poll() is None:
+                try:
+                    stdout, _ = process.communicate(timeout=5)
+                    partial = stdout or ""
+                except (subprocess.TimeoutExpired, subprocess.SubprocessError):
+                    partial = ""
+        if partial.strip():
+            output_file.write_text(partial, encoding="utf-8")
+            log(f"Interrupted: partial output saved ({len(partial)} chars)", "WARNING", project_dir)
+        return {"status": "interrupted", "output": partial, "duration": duration}
 
     except Exception as e:
         log(f"Ошибка запуска: {e}", "ERROR", project_dir)
-        return {"status": "error", "error": str(e)}
+        return {"status": "error", "error": str(e), "duration": time.time() - experiment_start}
 
     finally:
         # Гарантированная очистка процесса
-        if 'process' in locals() and process is not None:
-            if process.poll() is None:
-                try:
-                    process.kill()
-                    process.wait(timeout=5)
-                    log(f"Process {process.pid} forcefully terminated", "DEBUG", project_dir)
-                except:
-                    pass
+        if 'process' in locals() and process.poll() is None:
+            try:
+                process.kill()
+                process.wait(timeout=5)
+                log(f"Process {process.pid} forcefully terminated", "DEBUG", project_dir)
+            except (subprocess.SubprocessError, OSError):
+                pass
 
-def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: Optional[ProjectConfig] = None, start_from: int = 1):
+def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: Optional[ProjectConfig] = None, start_from: int = 1, max_time: int = DEFAULT_MAX_TIME):
     """Главный цикл AutoResearch."""
     # Вычисляем конечный номер эксперимента
     max_experiment_number = start_from + iterations - 1
@@ -889,6 +1143,7 @@ def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: O
     log(f"Всего итераций: {iterations}", project_dir=project_dir)
     log(f"Завершить на: Experiment {max_experiment_number}", project_dir=project_dir)
     log(f"Интервал: {timeout} мин", project_dir=project_dir)
+    log(f"Макс. время эксперимента: {max_time}с ({max_time // 60} мин)", project_dir=project_dir)
     log("", project_dir=project_dir)
 
     # Проверка Claude CLI
@@ -915,27 +1170,53 @@ def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: O
             check=True
         )
         log(f"Создана ветка: {branch}", "INFO", project_dir)
+
+        # Initial commit: capture pre-existing uncommitted changes as baseline
+        subprocess.run(["git", "add", "-u"], cwd=project_dir, capture_output=True, check=False)
+        diff_check = subprocess.run(
+            ["git", "diff", "--cached", "--quiet"],
+            cwd=project_dir, capture_output=True, check=False
+        )
+        if diff_check.returncode != 0:
+            subprocess.run(
+                ["git", "commit", "-m", "autoresearch: baseline (pre-existing changes)"],
+                cwd=project_dir, capture_output=True, text=True, check=False
+            )
+            log("Создан baseline commit", "INFO", project_dir)
     except Exception as e:
         log(f"Не удалось создать ветку: {e}", "WARNING", project_dir)
 
     # Главный цикл
     results = []
 
-    for i in range(start_from, max_experiment_number + 1):
-        log("", project_dir=project_dir)
-        log(f"=" * 70, project_dir=project_dir)
-        log(f"Эксперимент {i}/{max_experiment_number}", project_dir=project_dir)
-        log("=" * 70, project_dir=project_dir)
+    try:
+        for i in range(start_from, max_experiment_number + 1):
+            log("", project_dir=project_dir)
+            log(f"=" * 70, project_dir=project_dir)
+            log(f"Эксперимент {i}/{max_experiment_number}", project_dir=project_dir)
+            log("=" * 70, project_dir=project_dir)
 
-        result = run_single_experiment(config, i, max_experiment_number)
-        results.append(result)
+            result = run_single_experiment(config, i, max_experiment_number, max_time=max_time)
+            results.append(result)
 
-        # Сохраняем last_experiment.md и accumulation_context.md после успешного эксперимента
-        if result.get("status") in ["success", "incomplete"]:
-            output = result.get("output", "")
-            if output and ">>>EXPERIMENT_COMPLETE<<<" in output:
+            # Сохраняем last_experiment.md и accumulation_context.md после эксперимента
+            # (включая incomplete и interrupted — агент мог сделать изменения)
+            if result.get("status") in ["success", "incomplete", "interrupted"]:
+                output = result.get("output", "")
+            is_complete = ">>>EXPERIMENT_COMPLETE" in output if output else False
+
+            if output and len(output.strip()) > 50:
                 # Парсим отчет эксперимента
                 exp_data = parse_experiment_report(output, i)
+                exp_data["is_complete"] = is_complete
+                exp_data["duration"] = result.get("duration", 0)
+
+                # Независимая оценка качества (не зависит от самооценки агента)
+                log("Запуск независимой оценки качества...", "INFO", project_dir)
+                quality = run_quality_gate(project_dir)
+                exp_data["quality_score"] = quality.get("score", 0.5)
+                exp_data["quality_decision"] = quality.get("decision", "MANUAL_REVIEW")
+                log(f"Quality Gate: {exp_data['quality_decision']} (score: {exp_data['quality_score']:.2f})", "INFO", project_dir)
 
                 # Сохраняем краткую сводку для агента (перезаписывается)
                 save_last_experiment_summary(project_dir, exp_data)
@@ -946,20 +1227,24 @@ def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: O
                 # Добавляем в хронологию изменений
                 save_changes_log(project_dir, exp_data)
 
+                # Автоматический git commit (code changes, не state-файлы)
+                _auto_commit_experiment(project_dir, exp_data)
+
+                if not is_complete:
+                    log(f"Эксперимент {i} сохранён как incomplete (нет маркера завершения)", "WARNING", project_dir)
+
         # Пауза перед следующей итерацией
         if i < max_experiment_number and timeout > 0:
             log(f"Ожидание {timeout} минут до следующей итерации...", "INFO", project_dir)
             log(f"Следующий эксперимент в {datetime.now().strftime('%H:%M:%S')}", "INFO", project_dir)
             time.sleep(timeout * 60)
 
-    # Итоги
-    log("", project_dir=project_dir)
-    log("=" * 70, project_dir=project_dir)
-    log("AutoResearch завершён", project_dir=project_dir)
-    log("=" * 70, project_dir=project_dir)
+    except KeyboardInterrupt:
+        log("", project_dir=project_dir)
+        log("Ctrl+C получен — завершаю с сохранением данных...", "WARNING", project_dir)
 
-    successful = sum(1 for r in results if r.get("status") == "success")
-    log(f"Успешно: {successful}/{iterations}", project_dir=project_dir)
+    # Итоги
+    _print_summary(results, iterations, project_dir)
 
     # Сохраняем итоги
     summary_file = project_dir / ".autoresearch" / "experiments" / "summary.json"
@@ -967,6 +1252,19 @@ def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: O
         json.dump(results, f, indent=2, ensure_ascii=False)
 
     return 0
+
+def _print_summary(results: list, iterations: int, project_dir: Path):
+    """Выводит итоги работы AutoResearch (используется при нормальном завершении и при Ctrl+C)."""
+    log("", project_dir=project_dir)
+    log("=" * 70, project_dir=project_dir)
+    log("AutoResearch завершён", project_dir=project_dir)
+    log("=" * 70, project_dir=project_dir)
+
+    successful = sum(1 for r in results if r.get("status") == "success")
+    interrupted = sum(1 for r in results if r.get("status") == "interrupted")
+    incomplete = sum(1 for r in results if r.get("status") == "incomplete")
+    errors = sum(1 for r in results if r.get("status") == "error")
+    log(f"Успешно: {successful}/{len(results)} | Прервано: {interrupted} | Неполных: {incomplete} | Ошибок: {errors}", project_dir=project_dir)
 
 # =============================================================================
 # MAIN
@@ -982,6 +1280,7 @@ def main():
   python autoresearch.py --project /path/to/project   # Указать проект
   python autoresearch.py . 10 1                         # 10 итераций, 1 мин пауза (кратко)
   python autoresearch.py --project . --iter 10 --timeout 2  # Полный формат
+  python autoresearch.py . 10 --max-time 300               # 10 итераций, макс. 5 мин/эксперимент
   python autoresearch.py . 10 --start-from 25            # Продолжение с Experiment 25
         """
     )
@@ -1030,7 +1329,15 @@ def main():
         "--timeout", "-t",
         type=int,
         dest="timeout_opt",
-        help="Интервал между итерациями (переопределяет позиционный)"
+        help="Пауза между итерациями в минутах (переопределяет позиционный)"
+    )
+
+    parser.add_argument(
+        "--max-time", "-m",
+        type=int,
+        dest="max_time",
+        default=DEFAULT_MAX_TIME,
+        help=f"Максимальная длительность одного эксперимента в секундах (default: {DEFAULT_MAX_TIME})"
     )
 
     parser.add_argument(
@@ -1051,6 +1358,12 @@ def main():
         "--reconfigure", "-r",
         action="store_true",
         help="Перенастроить проект"
+    )
+
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Показать prompt без запуска Claude CLI (для отладки)"
     )
 
     args = parser.parse_args()
@@ -1074,6 +1387,23 @@ def main():
         start_from = args.start_from
         log(f"Указан стартовый номер: Experiment {start_from}", "INFO", project_dir)
 
+    # Dry-run: показать prompt без запуска Claude CLI
+    if args.dry_run:
+        config = ProjectConfig(project_dir)
+        if not config.is_configured():
+            config = run_interactive_setup(project_dir)
+        prompt = build_agent_prompt(config, start_from, start_from)
+        prompt_size = len(prompt.encode('utf-8'))
+        log(f"Dry-run: prompt for Experiment {start_from} ({prompt_size:,} bytes, {prompt_size // 1024} KB)", "INFO", project_dir)
+        # Сохраняем в файл для удобного просмотра
+        exp_dir = project_dir / ".autoresearch" / "experiments"
+        exp_dir.mkdir(parents=True, exist_ok=True)
+        prompt_file = exp_dir / f"prompt_{start_from}.md"
+        prompt_file.write_text(prompt, encoding="utf-8")
+        log(f"Prompt saved to: {prompt_file}", "INFO", project_dir)
+        print(prompt)
+        return 0
+
     # Режим только настройки
     if args.configure or args.reconfigure:
         if args.reconfigure:
@@ -1092,7 +1422,8 @@ def main():
             project_dir=project_dir,
             iterations=iterations,
             timeout=timeout,
-            start_from=start_from
+            start_from=start_from,
+            max_time=args.max_time
         )
     except KeyboardInterrupt:
         log("\nПрервано пользователем (Ctrl+C)", "INFO", project_dir)
