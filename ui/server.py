@@ -408,7 +408,7 @@ async def index():
         return FileResponse(index_file)
     return HTMLResponse("<h1>index.html not found in ui/static/</h1>")
 
-# Serve /modules/ directory for plug-in scripts (pet.js, organism.js, etc.)
+# Serve /modules/ directory for plug-in scripts (cat.js, matrix.js, etc.)
 MODULES_DIR = STATIC_DIR / "modules"
 if MODULES_DIR.exists():
     app.mount("/modules", StaticFiles(directory=str(MODULES_DIR)), name="modules")
