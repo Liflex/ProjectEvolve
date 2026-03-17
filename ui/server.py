@@ -19,6 +19,8 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
+from starlette.middleware.base import BaseHTTPMiddleware
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "utils"))
 
@@ -40,6 +42,36 @@ AUTORESEARCH_HOME = Path(__file__).parent.parent.resolve()
 STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="AutoResearch UI", docs_url="/api/docs")
+
+# CSP policy: allow CDN scripts (Tailwind, Alpine, marked, DOMPurify, Google Fonts)
+# and inline scripts/styles (required by Alpine.js directives + Tailwind).
+# connect-src restricted to same-origin to prevent data exfiltration.
+CSP_POLICY = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' "
+        "https://cdn.tailwindcss.com "
+        "https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src 'self' https://fonts.gstatic.com; "
+    "connect-src 'self'; "
+    "frame-ancestors 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'"
+)
+
+
+class CSPMiddleware(BaseHTTPMiddleware):
+    """Add Content-Security-Policy header to all responses."""
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers["Content-Security-Policy"] = CSP_POLICY
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+
+app.add_middleware(CSPMiddleware)
 
 run_state = {
     "running": False,
