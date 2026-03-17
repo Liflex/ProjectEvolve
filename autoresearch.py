@@ -1199,10 +1199,9 @@ def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: O
             result = run_single_experiment(config, i, max_experiment_number, max_time=max_time)
             results.append(result)
 
-            # Сохраняем last_experiment.md и accumulation_context.md после эксперимента
-            # (включая incomplete и interrupted — агент мог сделать изменения)
-            if result.get("status") in ["success", "incomplete", "interrupted"]:
-                output = result.get("output", "")
+            # Extract output from result (handles success, incomplete, interrupted, timeout)
+            # BUG FIX: output was only assigned inside if block, causing NameError on error/timeout
+            output = result.get("output") or result.get("partial_output") or ""
             is_complete = ">>>EXPERIMENT_COMPLETE" in output if output else False
 
             if output and len(output.strip()) > 50:
