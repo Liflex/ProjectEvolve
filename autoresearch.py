@@ -1271,10 +1271,14 @@ def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: O
     # Итоги
     _print_summary(results, iterations, project_dir)
 
-    # Сохраняем итоги
+    # Сохраняем итоги (без raw output — они уже в output_N.md)
     summary_file = project_dir / ".autoresearch" / "experiments" / "summary.json"
+    lean_results = []
+    for r in results:
+        lean = {k: v for k, v in r.items() if k not in ("output", "partial_output")}
+        lean_results.append(lean)
     with open(summary_file, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
+        json.dump(lean_results, f, indent=2, ensure_ascii=False)
 
     return 0
 
