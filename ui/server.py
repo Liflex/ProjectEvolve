@@ -65,79 +65,59 @@ def get_exp_dir() -> Path:
     return get_project_dir() / ".autoresearch" / "experiments"
 
 
-from quality_loop import classify_experiment_type
+from quality_loop import classify_experiment_type, parse_accumulation_context
+
+
+def _extract_section(section_text: str, name: str) -> str:
+    """Extract a ### Name subsection from a single experiment section."""
+    m = re.search(
+        rf"### {re.escape(name)}\s*\n(.*?)(?=\n### |\n---|\Z)", section_text, re.DOTALL
+    )
+    return m.group(1).strip() if m else ""
+
+
+def _enrich_experiment(entry: Dict[str, Any], section: str) -> Dict[str, Any]:
+    """Add UI-specific fields (what_done, files_modified, results, notes)
+    by parsing the raw section text from accumulation_context.md."""
+    files_section = _extract_section(section, "Files Modified")
+    files_modified = []
+    if files_section:
+        for line in files_section.split("\n"):
+            line = line.strip().lstrip("- *").strip().strip("`")
+            if line and line not in ("None", "none", "N/A"):
+                files_modified.append(line)
+
+    return {
+        **entry,
+        "what_done": _extract_section(section, "What Was Done"),
+        "files_modified": files_modified,
+        "results": _extract_section(section, "Results"),
+        "notes": _extract_section(section, "Notes for Next"),
+    }
 
 
 def parse_experiments() -> List[Dict[str, Any]]:
-    exp_dir = get_exp_dir()
-    ctx_file = exp_dir / "accumulation_context.md"
+    """Parse all experiments from accumulation_context.md with UI fields."""
+    ctx_file = get_exp_dir() / "accumulation_context.md"
     if not ctx_file.exists():
         return []
 
+    base_entries = parse_accumulation_context(ctx_file)
+    if not base_entries:
+        return []
+
+    # Re-split to get raw sections for enrichment
     content = ctx_file.read_text(encoding="utf-8")
     sections = re.split(r"(?=^## Experiment \d+)", content, flags=re.MULTILINE)
 
-    experiments = []
+    section_map = {}
     for section in sections:
-        header_match = re.match(r"## Experiment (\d+) — (.+)", section)
-        if not header_match:
-            continue
+        m = re.match(r"## Experiment (\d+)", section)
+        if m:
+            section_map[int(m.group(1))] = section
 
-        num = int(header_match.group(1))
-        title = header_match.group(2).strip()
-
-        date_match = re.search(r"\*\*Date:\*\*\s*(.+)", section)
-        date = date_match.group(1).strip() if date_match else ""
-
-        type_match = re.search(r"\*\*Type:\*\*\s*(.+)", section)
-        exp_type = type_match.group(1).strip() if type_match else classify_experiment_type(title)
-
-        score_match = re.search(
-            r"\*\*Score:\*\*\s*([\d.]+|N/A)\s*\|\s*\*\*Decision:\*\*\s*(\w+)", section
-        )
-        if score_match:
-            score, decision = score_match.group(1), score_match.group(2)
-        else:
-            score_m = re.search(r"\*\*Quality Gate Score:\*\*\s*([\d.]+)", section)
-            result_m = re.search(r"\*\*Result:\*\*\s*(KEEP|DISCARD|MANUAL_REVIEW)", section)
-            score = score_m.group(1) if score_m else "N/A"
-            decision = result_m.group(1) if result_m else "N/A"
-
-        def extract_section(name):
-            m = re.search(
-                rf"### {re.escape(name)}\s*\n(.*?)(?=\n### |\n---|\Z)", section, re.DOTALL
-            )
-            return m.group(1).strip() if m else ""
-
-        what_done = extract_section("What Was Done")
-
-        files_section = extract_section("Files Modified")
-        files_modified = []
-        if files_section:
-            for line in files_section.split("\n"):
-                line = line.strip().lstrip("- *").strip().strip("`")
-                if line and line not in ("None", "none", "N/A"):
-                    files_modified.append(line)
-
-        results = extract_section("Results")
-        notes = extract_section("Notes for Next")
-
-        experiments.append(
-            {
-                "number": num,
-                "title": title,
-                "date": date,
-                "type": exp_type,
-                "score": score,
-                "decision": decision,
-                "what_done": what_done,
-                "files_modified": files_modified,
-                "results": results,
-                "notes": notes,
-            }
-        )
-
-    return experiments
+    return [_enrich_experiment(e, section_map.get(e["number"], ""))
+            for e in base_entries]
 
 
 # =============================================================================

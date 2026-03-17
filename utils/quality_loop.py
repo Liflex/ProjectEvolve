@@ -531,6 +531,68 @@ def classify_experiment_type(title: str) -> str:
     return "Other"
 
 
+def parse_accumulation_context(ctx_file: Path) -> List[Dict[str, Any]]:
+    """Parse experiment entries from accumulation_context.md.
+
+    Shared between autoresearch.py and ui/server.py to prevent drift.
+    Each entry is split by '## Experiment N — Title' headers and
+    standard fields (number, title, date, type, score, decision) are
+    extracted via regex.  Consumers can enrich with additional fields.
+
+    Args:
+        ctx_file: Path to accumulation_context.md
+
+    Returns:
+        List of dicts with keys: number, title, date, type, score, decision
+    """
+    import re
+
+    if not ctx_file.exists():
+        return []
+
+    content = ctx_file.read_text(encoding="utf-8")
+    sections = re.split(r"(?=^## Experiment \d+)", content, flags=re.MULTILINE)
+
+    experiments = []
+    for section in sections:
+        header_match = re.match(r"## Experiment (\d+) — (.+)", section)
+        if not header_match:
+            continue
+
+        num = int(header_match.group(1))
+        title = header_match.group(2).strip()
+
+        date_match = re.search(r"\*\*Date:\*\*\s*(.+)", section)
+        date = date_match.group(1).strip() if date_match else ""
+
+        type_match = re.search(r"\*\*Type:\*\*\s*(.+)", section)
+        exp_type = type_match.group(1).strip() if type_match else classify_experiment_type(title)
+
+        # Format 1: **Score:** X | **Decision:** Y
+        score_match = re.search(
+            r"\*\*Score:\*\*\s*([\d.]+|N/A)\s*\|\s*\*\*Decision:\*\*\s*(\w+)", section
+        )
+        if score_match:
+            score, decision = score_match.group(1), score_match.group(2)
+        else:
+            # Format 2: **Quality Gate Score:** X + **Result:** Y (legacy)
+            score_m = re.search(r"\*\*Quality Gate Score:\*\*\s*([\d.]+)", section)
+            result_m = re.search(r"\*\*Result:\*\*\s*(KEEP|DISCARD|MANUAL_REVIEW)", section)
+            score = score_m.group(1) if score_m else "N/A"
+            decision = result_m.group(1) if result_m else "N/A"
+
+        experiments.append({
+            "number": num,
+            "title": title,
+            "date": date,
+            "type": exp_type,
+            "score": score,
+            "decision": decision,
+        })
+
+    return experiments
+
+
 def main():
     """CLI entry point"""
     import argparse

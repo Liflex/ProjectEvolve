@@ -34,7 +34,7 @@ from typing import Dict, Any, Optional, List
 UTILS_DIR = Path(__file__).parent / "utils"
 sys.path.insert(0, str(UTILS_DIR))
 
-from quality_loop import classify_experiment_type  # noqa: E402
+from quality_loop import classify_experiment_type, parse_accumulation_context  # noqa: E402
 
 # =============================================================================
 # CONFIG
@@ -784,64 +784,25 @@ def _read_experiment_history(exp_dir: Path, max_entries: int = 5) -> str:
     number, type, title, quality score, and decision.
     Used by build_agent_prompt() for diversity awareness.
     """
-    import re
-
     ctx_file = exp_dir / "accumulation_context.md"
-    if not ctx_file.exists():
-        return ""
-
-    content = ctx_file.read_text(encoding="utf-8")
-
-    # Split into experiment sections for independent score extraction
-    sections = re.split(r'(?=^## Experiment \d+)', content, flags=re.MULTILINE)
-
-    entries = []
-    for section in sections:
-        header_match = re.match(r'## Experiment (\d+) — (.+)', section)
-        if not header_match:
-            continue
-        num = header_match.group(1)
-        title = header_match.group(2).strip()
-
-        # Extract explicit Type from entry or classify from title (backward compat)
-        type_match = re.search(r'\*\*Type:\*\*\s*(\S+)', section)
-        if type_match:
-            exp_type = type_match.group(1).strip()
-        else:
-            exp_type = classify_experiment_type(title)
-
-        # Format 1: **Score:** X | **Decision:** Y (well-formed entries)
-        score_match = re.search(
-            r'\*\*Score:\*\*\s*([\d.]+|N/A)\s*\|\s*\*\*Decision:\*\*\s*(\w+)',
-            section
-        )
-        if score_match:
-            score, decision = score_match.group(1), score_match.group(2)
-        else:
-            # Format 2: **Quality Gate Score:** X ... + **Result:** KEEP (legacy format)
-            score_m = re.search(r'\*\*Quality Gate Score:\*\*\s*([\d.]+)', section)
-            result_m = re.search(r'\*\*Result:\*\*\s*(KEEP|DISCARD|MANUAL_REVIEW)', section)
-            score = score_m.group(1) if score_m else "N/A"
-            decision = result_m.group(1) if result_m else "N/A"
-
-        entries.append((num, exp_type, title, score, decision))
-
+    entries = parse_accumulation_context(ctx_file)
     if not entries:
         return ""
 
-    # Take last N
     entries = entries[-max_entries:]
 
     lines = [
         "| # | Type        | Title | Score | Decision |",
         "|---|-------------|-------|-------|----------|"
     ]
-    for num, exp_type, title, score, decision in entries:
+    for e in entries:
+        title = e["title"]
+        exp_type = e["type"]
         if len(title) > 40:
             title = title[:37] + "..."
         if len(exp_type) > 12:
             exp_type = exp_type[:11] + "..."
-        lines.append(f"| {num} | {exp_type:<12} | {title} | {score} | {decision} |")
+        lines.append(f"| {e['number']} | {exp_type:<12} | {title} | {e['score']} | {e['decision']} |")
 
     return "\n".join(lines)
 
