@@ -89,12 +89,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     # Per-route overrides: {path_prefix: (max_requests, window_seconds)}
     # None = use defaults
     ROUTE_LIMITS = {
-        "/api/run": (5, 60),       # 5 starts per minute — expensive operation
-        "/api/run/stop": (10, 60), # 10 stops per minute
+        "/api/run": (5, 60),          # 5 starts per minute — expensive operation
+        "/api/run/stop": (10, 60),    # 10 stops per minute
+        "/api/run/status": (300, 60), # 300/min — polling endpoint, 1/sec is fine
     }
 
     # Defaults for all other /api/* routes
-    DEFAULT_LIMIT = (60, 60)  # 60 requests per minute
+    DEFAULT_LIMIT = (120, 60)  # 120 requests per minute
 
     # Shared state across all instances (singleton via module-level dict)
     _buckets: Dict[str, collections.deque] = {}
@@ -553,9 +554,28 @@ async def stop_run():
     global run_state
     if not run_state["running"] or not run_state["process"]:
         raise HTTPException(status_code=409, detail="Not running")
-    run_state["process"].terminate()
+    proc = run_state["process"]
+    # Force kill — no graceful shutdown
+    proc.kill()
+    try:
+        proc.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        pass
+    # Kill any child processes (claude CLI spawned by autoresearch)
+    try:
+        import psutil
+        parent = psutil.Process(proc.pid)
+        for child in parent.children(recursive=True):
+            try:
+                child.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+    except (ImportError, psutil.NoSuchProcess):
+        pass
     run_state["running"] = False
-    return {"status": "stopped"}
+    run_state["process"] = None
+    run_state["logs"].append("[STOP] Process killed.")
+    return {"status": "killed"}
 
 
 @app.get("/api/logs")
