@@ -8,14 +8,12 @@ Usage:
     python ui/server.py --port 3000            # Custom port
 """
 
-import collections
 import json
 import os
 import re
 import subprocess
 import sys
 import threading
-import time
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -75,103 +73,6 @@ class CSPMiddleware(BaseHTTPMiddleware):
 app.add_middleware(CSPMiddleware)
 
 
-# =============================================================================
-# RATE LIMITING — in-memory sliding-window rate limiter
-# =============================================================================
-
-class RateLimitMiddleware(BaseHTTPMiddleware):
-    """In-memory sliding-window rate limiter for API endpoints.
-
-    Prevents brute-force (e.g. /api/run flooding) and general API abuse.
-    Uses client IP as key; per-endpoint limits for sensitive routes.
-    """
-
-    # Per-route overrides: {path_prefix: (max_requests, window_seconds)}
-    # None = use defaults
-    ROUTE_LIMITS = {
-        "/api/run": (5, 60),          # 5 starts per minute — expensive operation
-        "/api/run/stop": (10, 60),    # 10 stops per minute
-        "/api/run/status": (300, 60), # 300/min — polling endpoint, 1/sec is fine
-    }
-
-    # Defaults for all other /api/* routes
-    DEFAULT_LIMIT = (120, 60)  # 120 requests per minute
-
-    # Shared state across all instances (singleton via module-level dict)
-    _buckets: Dict[str, collections.deque] = {}
-    _lock = threading.Lock()
-
-    @classmethod
-    def _is_allowed(cls, key: str, limit: int, window: float) -> bool:
-        """Check if request is within rate limit using sliding window."""
-        now = time.monotonic()
-        cutoff = now - window
-
-        with cls._lock:
-            bucket = cls._buckets.get(key)
-            if bucket is None:
-                cls._buckets[key] = collections.deque([now])
-                return True
-
-            # Prune expired entries
-            while bucket and bucket[0] < cutoff:
-                bucket.popleft()
-
-            if len(bucket) >= limit:
-                return False
-
-            bucket.append(now)
-            return True
-
-    @classmethod
-    def _prune_all(cls):
-        """Remove empty buckets to prevent memory leak (called periodically)."""
-        now = time.monotonic()
-        with cls._lock:
-            # Remove buckets older than 5 minutes
-            stale_keys = [k for k, v in cls._buckets.items()
-                          if not v or v[-1] < now - 300]
-            for k in stale_keys:
-                del cls._buckets[k]
-
-    async def dispatch(self, request, call_next):
-        # Only rate-limit /api/ routes (skip static files, docs, etc.)
-        path = request.url.path
-        if not path.startswith("/api/"):
-            return await call_next(request)
-
-        # Determine limit for this route
-        limit, window = self.DEFAULT_LIMIT
-        for prefix, (lim, win) in self.ROUTE_LIMITS.items():
-            if path.startswith(prefix):
-                limit, window = lim, win
-                break
-
-        # Use client IP + route as bucket key
-        client_ip = request.client.host if request.client else "unknown"
-        key = f"{client_ip}:{path}"
-
-        # Periodic cleanup (roughly every 100 API requests)
-        if hash(key) % 100 == 0:
-            self._prune_all()
-
-        if not self._is_allowed(key, limit, window):
-            from fastapi.responses import JSONResponse
-            return JSONResponse(
-                status_code=429,
-                content={"detail": "Rate limit exceeded. Try again later."},
-                headers={"Retry-After": str(window)},
-            )
-
-        response = await call_next(request)
-        # Add rate limit info headers
-        remaining = limit - len(self._buckets.get(key, []))
-        response.headers["X-RateLimit-Limit"] = str(limit)
-        response.headers["X-RateLimit-Remaining"] = str(max(0, remaining))
-        return response
-
-
-app.add_middleware(RateLimitMiddleware)
 
 run_state = {
     "running": False,
@@ -182,15 +83,33 @@ run_state = {
     "started_at": None,
     "logs": [],
     "error": None,
+    "_lock": threading.Lock(),  # Protects concurrent log access from reader threads + ASGI
 }
 
 # Regex to detect experiment progress from autoresearch.py log output
 _EXP_PROGRESS_RE = re.compile(r"(?:Эксперимент|Experiment)\s+(\d+)/(\d+)")
 
+MAX_LOG_ENTRIES = 500
+
 
 # =============================================================================
 # HELPERS
 # =============================================================================
+
+def _log_append(text: str):
+    """Thread-safe append to run_state["logs"] with size cap."""
+    with run_state["_lock"]:
+        run_state["logs"].append(text)
+        if len(run_state["logs"]) > MAX_LOG_ENTRIES:
+            run_state["logs"] = run_state["logs"][-MAX_LOG_ENTRIES:]
+
+
+def _log_read(last_n: int = None) -> list:
+    """Thread-safe read of run_state["logs"]. Returns a snapshot."""
+    with run_state["_lock"]:
+        logs = run_state["logs"]
+        return logs[-last_n:] if last_n else list(logs)
+
 
 def get_project_dir() -> Path:
     return Path(os.environ.get("AUTORESEARCH_PROJECT", Path.cwd()))
@@ -480,7 +399,7 @@ async def start_run(data: RunRequest):
     ctx_file = get_exp_dir() / "accumulation_context.md"
     ctx_size = len(ctx_file.read_text(encoding="utf-8")) if ctx_file.exists() else 0
 
-    run_state["logs"].extend([
+    for init_line in [
         f"[INIT] Starting autoresearch PID={process.pid}",
         f"[INIT] Project: {project_dir}",
         f"[INIT] Iterations: {data.iterations} | Timeout: {data.timeout}min | Max time: {data.max_time}s",
@@ -488,7 +407,8 @@ async def start_run(data: RunRequest):
         f"[INIT] Prompt size: {prompt_size:,} bytes ({prompt_size/1024:.1f} KB)",
         f"[INIT] Context size: {ctx_size:,} bytes ({ctx_size/1024:.1f} KB)",
         f"[INIT] Waiting for process output...",
-    ])
+    ]:
+        _log_append(init_line)
 
     def _stream_pipe(pipe, prefix=""):
         """Read lines from a pipe, parse experiment progress, and append to logs."""
@@ -499,9 +419,7 @@ async def start_run(data: RunRequest):
                     continue
                 if prefix:
                     text = prefix + text
-                run_state["logs"].append(text)
-                if len(run_state["logs"]) > 500:
-                    run_state["logs"] = run_state["logs"][-500:]
+                _log_append(text)
 
                 # Parse experiment progress from log lines
                 m = _EXP_PROGRESS_RE.search(text)
@@ -529,7 +447,8 @@ async def start_run(data: RunRequest):
 
         run_state["running"] = False
         if process.returncode != 0:
-            stderr_lines = [l for l in run_state["logs"] if "ERROR" in l or "Traceback" in l or "error" in l.lower()]
+            logs_snapshot = _log_read()
+            stderr_lines = [l for l in logs_snapshot if "ERROR" in l or "Traceback" in l or "error" in l.lower()]
             run_state["error"] = "\n".join(stderr_lines[:5]) if stderr_lines else f"Exit code {process.returncode}"
 
     threading.Thread(target=monitor, daemon=True).start()
@@ -545,7 +464,7 @@ async def get_run_status():
         "project": run_state["project"],
         "started_at": run_state["started_at"],
         "error": run_state["error"],
-        "recent_logs": run_state["logs"][-200:],
+        "recent_logs": _log_read(200),
     }
 
 
@@ -574,7 +493,7 @@ async def stop_run():
         pass
     run_state["running"] = False
     run_state["process"] = None
-    run_state["logs"].append("[STOP] Process killed.")
+    _log_append("[STOP] Process killed.")
     return {"status": "killed"}
 
 
