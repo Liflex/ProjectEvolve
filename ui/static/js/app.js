@@ -84,6 +84,12 @@ function _buildAppData() {
         pinnedMessages: [], // [{tabId, msgIdx, role, preview, ts, content}]
         showPinsPanel: false,
 
+        // Context menu
+        ctxMenu: { show: false, items: [], x: 0, y: 0 },
+
+        // Clock tick (forces status bar re-render every second)
+        _clockTick: 0,
+
         // Live Log
         liveLog: [],
         liveLogFilter: 'all',
@@ -207,6 +213,7 @@ function _buildAppData() {
                 }, 100);
             });
             setInterval(async () => {
+                this._clockTick++; // Force status bar re-render for session duration
                 if (this.page === 'dashboard') await this.loadStats();
                 if (this.page === 'run') await this.pollRunStatus();
                 if (window.CatModule && CatModule.isActive()) {

@@ -120,6 +120,7 @@
                     <div class="flex-1 overflow-y-auto p-4 space-y-3" :id="'chat-messages-' + tab.tab_id"
                          x-html="renderChatHTML(tab)"
                          @click="onChatClick($event)"
+                         @contextmenu="onChatContextMenu(tab, $event)"
                          @scroll="onChatScroll(tab, $event)">
                     </div>
                     <!-- Scroll-to-bottom FAB -->
@@ -299,6 +300,8 @@
                       x-text="activeTab?.ws_state === 'connected' ? 'CONNECTED' : activeTab?.ws_state === 'connecting' ? 'CONNECTING...' : 'DISCONNECTED'"></span>
                 <span class="status-separator"></span>
                 <span class="truncate max-w-[200px]" style="color:var(--ng3)" x-text="activeTab?.project_path"></span>
+                <span class="status-separator"></span>
+                <span style="color:var(--v3)" x-text="(_clockTick, getSessionDuration(activeTab))"></span>
             </div>
             <div class="status-right">
                 <span class="agent-state"
@@ -306,6 +309,12 @@
                       x-text="activeTab?.is_streaming ? (activeTab?.is_thinking ? 'THINKING...' : 'STREAMING...') : 'IDLE'"></span>
                 <span class="status-separator"></span>
                 <span x-text="(activeTab?.messages?.length || 0) + ' MSGS'"></span>
+                <template x-if="getToolCount(activeTab) > 0">
+                    <span>
+                        <span class="status-separator"></span>
+                        <span style="color:var(--pink)" x-text="getToolCount(activeTab) + ' TOOLS'"></span>
+                    </span>
+                </template>
                 <template x-if="activeTab && activeTab.tokens && activeTab.tokens.input > 0">
                     <span>
                         <span class="status-separator"></span>
@@ -321,6 +330,26 @@
                     </span>
                 </template>
             </div>
+        </div>
+
+        <!-- Context Menu (right-click on messages) -->
+        <div x-show="ctxMenu.show" x-cloak
+             class="ctx-menu"
+             :style="'left:' + ctxMenu.x + 'px;top:' + ctxMenu.y + 'px'"
+             @click.stop>
+            <template x-for="(item, idx) in ctxMenu.items" :key="idx">
+                <template x-if="item.sep">
+                    <div class="ctx-menu-sep"></div>
+                </template>
+                <template x-if="!item.sep">
+                    <div class="ctx-menu-item"
+                         :class="item.danger && 'ctx-menu-danger'"
+                         @click="executeContextAction(item)">
+                        <span class="ctx-menu-icon" x-html="item.icon || ''"></span>
+                        <span x-text="item.label"></span>
+                    </div>
+                </template>
+            </template>
         </div>
 
         <!-- Soft limit warning modal -->

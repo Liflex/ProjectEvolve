@@ -237,6 +237,51 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
 .chat-status-bar .agent-state.streaming { color: var(--cyan); }
 .chat-status-bar .agent-state.thinking { color: var(--amber); }
 
+/* === CONTEXT MENU (right-click) === */
+.ctx-menu {
+    position: fixed;
+    z-index: 100;
+    min-width: 180px;
+    background: var(--bg2);
+    border: 1px solid var(--v-dim);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5), 0 0 1px var(--v2);
+    padding: 4px 0;
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+}
+.ctx-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 12px;
+    cursor: pointer;
+    color: var(--ng2);
+    transition: background 0.1s;
+    user-select: none;
+}
+.ctx-menu-item:hover {
+    background: rgba(180,74,255,0.1);
+    color: var(--v);
+}
+.ctx-menu-danger {
+    color: var(--red);
+}
+.ctx-menu-danger:hover {
+    background: rgba(255,51,51,0.1);
+    color: var(--red);
+}
+.ctx-menu-icon {
+    width: 16px;
+    text-align: center;
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+.ctx-menu-sep {
+    height: 1px;
+    background: var(--v-dim);
+    margin: 4px 8px;
+}
+
 /* === CAT CANVAS === */
 .cat-frame { border: 2px solid var(--v-dim); image-rendering: pixelated; overflow: visible; box-shadow: 0 0 12px rgba(180,74,255,0.08); }
 

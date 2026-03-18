@@ -618,7 +618,7 @@ window.AppChat = (function() {
                     const uCollapsed = msg.collapsed && uFold;
                     const uChars = (msg.content || '').length;
                     const uLines = (msg.content || '').split('\n').length;
-                    html += '<div class="msg-wrap chat-msg-fadein chat-msg-row chat-msg-row-user">'
+                    html += '<div class="msg-wrap chat-msg-fadein chat-msg-row chat-msg-row-user" data-msg-idx="' + i + '">'
                         + '<div class="chat-avatar chat-avatar-user">' + avatarUser + '</div>'
                         + '<div class="chat-body">'
                         + '<div class="msg-actions">'
@@ -711,7 +711,7 @@ window.AppChat = (function() {
                             + '</div>';
                     }
                     const isPinned = this.pinnedMessages.some(p => p.tabId === tab.tab_id && p.msgIdx === i);
-                    html += '<div class="msg-wrap chat-msg-fadein chat-msg-row' + (isPinned ? ' msg-pinned' : '') + '">'
+                    html += '<div class="msg-wrap chat-msg-fadein chat-msg-row' + (isPinned ? ' msg-pinned' : '') + '" data-msg-idx="' + i + '">'
                         + '<div class="chat-avatar chat-avatar-asst">' + avatarAsst + '</div>'
                         + '<div class="chat-body">'
                         + '<div class="msg-actions">'
@@ -811,7 +811,7 @@ window.AppChat = (function() {
                         + '<span style="font-size:0.5rem;color:var(--v3);font-family:monospace;margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:30ch" title="' + this.escHtml(primaryTarget) + '">' + this.escHtml(primaryTarget) + '</span>'
                         + diffBadge
                         : '<span style="font-size:0.5625rem;color:var(--ng3);letter-spacing:0.08em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50ch" title="' + this.escHtml(summaryText) + '">' + this.escHtml(summaryText) + '</span>';
-                    html += '<div class="chat-msg-row" style="padding:2px 0"><div class="chat-avatar chat-avatar-tool">' + avatarTool + '</div><div style="flex:1;min-width:0">'
+                    html += '<div class="chat-msg-row" style="padding:2px 0" data-msg-idx="' + (i - toolGroup.length + 1) + '"><div class="chat-avatar chat-avatar-tool">' + avatarTool + '</div><div style="flex:1;min-width:0">'
                         + '<div onclick="var d=this.nextElementSibling,a=this.querySelector(\'[data-arrow]\');if(d.style.display===\'none\'){d.style.display=\'block\';a.textContent=\'\\u25BC\';}else{d.style.display=\'none\';a.textContent=\'\\u25B6\';}" '
                         + 'style="display:flex;align-items:center;gap:6px;padding:4px 6px;cursor:pointer;border:1px solid var(--v-dim);background:var(--tool-header-bg);user-select:none" '
                         + 'onmouseenter="this.style.borderColor=\'var(--v2)\'" onmouseleave="this.style.borderColor=\'var(--v-dim)\'">'
@@ -995,6 +995,13 @@ window.AppChat = (function() {
         // ========== CHAT: SCROLL & CLICK ==========
         onChatClick(event) {
             if (event.target.tagName === 'A') { event.target.target = '_blank'; }
+        },
+        onChatContextMenu(tab, event) {
+            const msgWrap = event.target.closest('[data-msg-idx]');
+            if (!msgWrap) return;
+            const msgIdx = parseInt(msgWrap.getAttribute('data-msg-idx'), 10);
+            if (isNaN(msgIdx) || msgIdx < 0 || msgIdx >= tab.messages.length) return;
+            this.openContextMenu(tab, event, msgIdx);
         },
         onChatScroll(tab, event) {
             const el = event.target;
@@ -1358,6 +1365,83 @@ window.AppChat = (function() {
             const min = Math.floor(sec / 60);
             const rem = (sec % 60).toFixed(0);
             return min + 'm ' + rem + 's';
+        },
+
+        // ========== CHAT: CONTEXT MENU (Right-click) ==========
+        openContextMenu(tab, event, msgIdx) {
+            event.preventDefault();
+            event.stopPropagation();
+            const msg = tab.messages[msgIdx];
+            if (!msg) return;
+            const items = [];
+            if (msg.role === 'user') {
+                items.push({ label: 'COPY', icon: '&#x1f4cb;', action: () => this.copyChatMsg(tab.tab_id, msgIdx) });
+                items.push({ label: 'QUOTE', icon: '&#x275d;', action: () => this.quoteMessage(tab.tab_id, msgIdx) });
+                if (!tab.is_streaming) {
+                    items.push({ label: 'EDIT & RESEND', icon: '&#x270f;', action: () => this.editUserMsg(tab.tab_id, msgIdx) });
+                }
+                items.push({ sep: true });
+                items.push({ label: 'DELETE', icon: '&#x1f5d1;', action: () => this.deleteChatMsg(tab.tab_id, msgIdx), danger: true });
+            } else if (msg.role === 'assistant') {
+                items.push({ label: 'COPY', icon: '&#x1f4cb;', action: () => this.copyChatMsg(tab.tab_id, msgIdx) });
+                items.push({ label: 'QUOTE', icon: '&#x275d;', action: () => this.quoteMessage(tab.tab_id, msgIdx) });
+                // Check if this is the last assistant message
+                const isLastAsst = !msg.is_streaming && !tab.is_streaming && tab.messages.slice(msgIdx + 1).filter(m => m.role === 'assistant').length === 0;
+                if (isLastAsst && !tab.is_streaming) {
+                    items.push({ label: 'REGEN', icon: '&#x21bb;', action: () => this.regenerateResponse(tab.tab_id) });
+                }
+                if (!msg.content?.startsWith('[ERROR]')) {
+                    items.push({ label: this.pinnedMessages.some(p => p.tabId === tab.tab_id && p.msgIdx === msgIdx) ? 'UNPIN' : 'PIN', icon: '&#x1f4cc;', action: () => this.togglePinMessage(tab.tab_id, msgIdx) });
+                }
+                const aFold = !msg.is_streaming && msg.content && msg.content.length > 500;
+                if (aFold) {
+                    items.push({ label: msg.collapsed ? 'UNFOLD' : 'FOLD', icon: '&#x25BC;', action: () => this.toggleMsgCollapse(tab.tab_id, msgIdx) });
+                }
+                items.push({ sep: true });
+                items.push({ label: 'DELETE', icon: '&#x1f5d1;', action: () => this.deleteChatMsg(tab.tab_id, msgIdx), danger: true });
+            } else if (msg.role === 'tool') {
+                const tt = msg.toolType || 'other';
+                const fp = msg.toolPath || '';
+                if (fp) {
+                    items.push({ label: 'COPY PATH', icon: '&#x1f4c1;', action: () => { navigator.clipboard.writeText(fp).then(() => this.showToast('Path copied')); } });
+                }
+                items.push({ label: 'COPY DETAIL', icon: '&#x1f4cb;', action: () => { navigator.clipboard.writeText(msg.toolDetail || msg.content || '').then(() => this.showToast('Copied')); } });
+            }
+            if (items.length === 0) return;
+            // Position: near cursor, but keep within viewport
+            const x = Math.min(event.clientX, window.innerWidth - 220);
+            const y = Math.min(event.clientY, window.innerHeight - items.length * 28 - 10);
+            this.ctxMenu = { show: true, items, x, y };
+            // Close on any click outside
+            this.$nextTick(() => {
+                const close = (e) => {
+                    this.ctxMenu = { show: false, items: [], x: 0, y: 0 };
+                    document.removeEventListener('click', close);
+                    document.removeEventListener('contextmenu', close);
+                };
+                setTimeout(() => {
+                    document.addEventListener('click', close);
+                    document.addEventListener('contextmenu', close);
+                }, 10);
+            });
+        },
+        executeContextAction(item) {
+            if (item && item.action) item.action();
+            this.ctxMenu = { show: false, items: [], x: 0, y: 0 };
+        },
+        closeContextMenu() {
+            this.ctxMenu = { show: false, items: [], x: 0, y: 0 };
+        },
+
+        // ========== CHAT: SESSION METRICS ==========
+        getSessionDuration(tab) {
+            if (!tab || !tab.created_at) return '';
+            const ms = Date.now() - new Date(tab.created_at).getTime();
+            return this.fmtDuration(ms);
+        },
+        getToolCount(tab) {
+            if (!tab || !tab.messages) return 0;
+            return tab.messages.filter(m => m.role === 'tool').length;
         },
     };
 })();
