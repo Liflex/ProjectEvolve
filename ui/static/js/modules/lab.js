@@ -59,10 +59,8 @@ window.AppLab = (function() {
                 // Cat: detect new experiments
                 if (newTotal > prevTotal) {
                     const lastExp = this.stats.last_experiment;
-                    if (lastExp && (lastExp.decision === 'KEEP' || lastExp.decision === 'ACCEPT')) {
-                        if (window.CatModule) { CatModule.setExpression('happy'); CatModule.say('success'); setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000); }
-                    } else if (lastExp && lastExp.decision === 'DISCARD') {
-                        if (window.CatModule) { CatModule.setExpression('angry'); CatModule.say('angry'); setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000); }
+                    if (lastExp && window.CatModule && CatModule.isActive() && CatModule.reactToExperiment) {
+                        CatModule.reactToExperiment(lastExp.decision, parseFloat(lastExp.score) || 0, lastExp.number || newTotal);
                     }
                 }
                 // Organism: update visualizer
@@ -234,16 +232,12 @@ window.AppLab = (function() {
                     } else if (event.type === 'experiment_end') {
                         if (event.tokens) this.runStatus.tokens = event.tokens;
                         this.runStatus.session_id = event.session_id;
-                        if (window.CatModule && CatModule.isActive()) {
-                            const decision = event.decision || '';
-                            if (decision === 'KEEP' || decision === 'ACCEPT') {
-                                CatModule.setExpression('happy'); CatModule.setMood('happy'); CatModule.say('success');
-                                if (CatModule.triggerPawWave) CatModule.triggerPawWave();
-                                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000);
-                            } else if (decision === 'DISCARD') {
-                                CatModule.setExpression('angry'); CatModule.setMood('grumpy'); CatModule.say('angry');
-                                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000);
-                            }
+                        if (window.CatModule && CatModule.isActive() && CatModule.reactToExperiment) {
+                            CatModule.reactToExperiment(
+                                event.decision || event.status || '',
+                                parseFloat(event.score) || 0,
+                                event.number || this.runStatus.current_exp || 0
+                            );
                         }
                     } else if (event.type === 'run_end') {
                         this.runStatus.running = false;

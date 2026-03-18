@@ -114,11 +114,32 @@
         decode([0x00,0x00,0x00, 0xcc,0x13,0x80, 0x38,0x0e,0x00], 17, 3),
     ];
 
-    // Eyes — surprised (reuse neutral frame 0: wide open, no blink)
-    const EYES_SURPRISED = [EYES_NEUTRAL[0]];
+    // Eyes — surprised: wider open, round, no blink (17×4, 1 frame)
+    // .##..........##.  brow
+    // .####......####.  wide open
+    // .####......####.  wide open
+    // ..####....####..  wide bottom
+    const EYES_SURPRISED = [
+        decode([0x60,0x03,0x00, 0x78,0x0F,0x00, 0x78,0x0F,0x00, 0x3C,0x0F,0x00], 17, 4),
+    ];
 
-    // Eyes — angry (reuse sleepy frame 0: narrow/droopy)
-    const EYES_ANGRY = [EYES_SLEEPY[0]];
+    // Eyes — angry: narrow with furrowed V-brows (17×4, 1 frame)
+    // .##.#........###.  V-brows (inner pixels angled)
+    // .###......###.    narrow top
+    // ..##........##..  narrow mid
+    // ..##........##..  narrow bottom
+    const EYES_ANGRY = [
+        decode([0x68,0x0E,0x00, 0x70,0x0E,0x00, 0x30,0x06,0x00, 0x30,0x06,0x00], 17, 4),
+    ];
+
+    // Eyes — thinking: asymmetric (left open+pupil right-shifted, right half-closed) (17×4, 1 frame)
+    // .##..........##.  brows
+    // .###..#.....##..  left open+pupil, right half
+    // .###.......##...  left open, right narrow
+    // ..###......##...  bottom
+    const EYES_THINKING = [
+        decode([0x60,0x03,0x00, 0x64,0x06,0x00, 0x70,0x18,0x00, 0x38,0x18,0x00], 17, 4),
+    ];
 
     // Tail — neutral wagging (15×21, 16 frames)
     const TAIL_OUTLINES = [
@@ -187,7 +208,7 @@
         sleepy:    { frames: EYES_SLEEPY,    x: 9 + OX,  y: 11 + OY, color: null,      blinkSpeed: 8 },
         surprised: { frames: EYES_SURPRISED, x: 9 + OX,  y: 10 + OY, color: '#ffff00', blinkSpeed: 0 },
         angry:     { frames: EYES_ANGRY,     x: 9 + OX,  y: 11 + OY, color: '#ff3355', blinkSpeed: 0 },
-        thinking:  { frames: EYES_NEUTRAL,   x: 9 + OX,  y: 10 + OY, color: '#88aaff', blinkSpeed: 16 },
+        thinking:  { frames: EYES_THINKING,  x: 9 + OX,  y: 10 + OY, color: '#88aaff', blinkSpeed: 0 },
     };
 
     // Paw sprite for wave animation (3×4)
@@ -424,6 +445,11 @@
     let _stretchTicks = 0;                // remaining ticks for stretch animation
     let _stretchPhase = 0;                // 0=prep, 1=stretch, 2=hold, 3=relax
     let _currentPage = 'dashboard';       // current page for contextual tips
+    let _tailSpeed = 2;                   // ticks between tail frame advances (1=fast, 2=normal, 3=slow, 4=erratic)
+    let _tailAccum = 0;                   // accumulator for tail speed
+    let _purrrTicks = 0;                  // remaining ticks for purr body vibration
+    let _expHistory = [];                 // recent experiment results for streak/milestone detection
+    let _lastMilestone = 0;               // last milestone triggered (prevent spam)
 
     // ================================================================
     //  RENDER
@@ -481,6 +507,11 @@
             }
         }
 
+        // Purr vibration: subtle body shake
+        if (_purrrTicks > 0) {
+            bodyOffX += Math.random() < 0.5 ? -1 : 1;
+        }
+
         // Z-order: tail → body → head → paw → eyes
         drawFilled(TAIL_OUTLINES[tailFrame], TAIL_FILLS[tailFrame], TAIL_POS, outlineColor, fillColor, true);
         drawFilled(BODY.outline, BODY.fill,
@@ -516,9 +547,18 @@
     function tick() {
         _tickCount++;
 
-        // Tail: advance every 2 ticks for gentle sway
-        if (_tickCount % 2 === 0) {
-            tailFrame = (tailFrame + 1) % TAIL_OUTLINES.length;
+        // Tail: variable speed based on mood/expression
+        _tailAccum++;
+        const tailInterval = _tailSpeed;
+        if (_tailAccum >= tailInterval) {
+            _tailAccum = 0;
+            if (_tailSpeed === 4) {
+                // Erratic: random skip or double-advance
+                if (Math.random() < 0.3) tailFrame = (tailFrame + 2) % TAIL_OUTLINES.length;
+                else tailFrame = (tailFrame + 1) % TAIL_OUTLINES.length;
+            } else {
+                tailFrame = (tailFrame + 1) % TAIL_OUTLINES.length;
+            }
         }
 
         // Eyes: blink cycle with per-expression speed
@@ -573,6 +613,11 @@
             _stretchTicks = 12;
             _stretchPhase = 0;
             setSpeech('idle'); // yawn
+        }
+
+        // Purr vibration: body micro-shake when happy (triggered externally or by mood)
+        if (_purrrTicks > 0) {
+            _purrrTicks--;
         }
 
         render();
@@ -680,6 +725,15 @@
         setExpression(expr) {
             expression = expr;
             eyeFrame = 0;
+            _tailAccum = 0;
+            // Adjust tail speed based on expression
+            const tailSpeeds = {
+                neutral: 2, happy: 1, sleepy: 4, surprised: 1,
+                angry: 3, thinking: 3,
+            };
+            _tailSpeed = tailSpeeds[expr] || 2;
+            // Purr when happy
+            if (expr === 'happy') _purrrTicks = 20;
             if (animating) render();
         },
 
@@ -721,6 +775,92 @@
             if (_stretchTicks > 0) return;
             _stretchTicks = 12;
             _stretchPhase = 0;
+        },
+
+        /**
+         * React to experiment result — milestone detection, streak analysis, mood updates.
+         * @param {string} decision - 'KEEP'|'DISCARD'|'ACCEPT'|'ERROR'|null
+         * @param {number} score - experiment score (0-1)
+         * @param {number} expNum - experiment number
+         */
+        reactToExperiment(decision, score, expNum) {
+            if (!animating) return;
+            const isKeep = decision === 'KEEP' || decision === 'ACCEPT';
+            const isDiscard = decision === 'DISCARD';
+            const isError = decision === 'ERROR';
+
+            // Track history for streaks
+            _expHistory.push({ decision, score: score || 0, num: expNum || 0 });
+            if (_expHistory.length > 20) _expHistory.shift();
+
+            // Milestone: every 10 experiments
+            if (expNum && expNum % 10 === 0 && expNum !== _lastMilestone) {
+                _lastMilestone = expNum;
+                setExpression('surprised');
+                setSpeechText('Мяу! Эксперимент #' + expNum + '! =^_^=', 5000);
+                triggerPawWave();
+                setTimeout(() => { if (animating) setExpression('happy'); }, 2000);
+                setTimeout(() => { if (animating) setExpression('neutral'); }, 5000);
+                return;
+            }
+
+            // Streak detection: 3+ consecutive KEEP
+            if (isKeep) {
+                let streak = 0;
+                for (let i = _expHistory.length - 1; i >= 0; i--) {
+                    if (_expHistory[i].decision === 'KEEP' || _expHistory[i].decision === 'ACCEPT') streak++;
+                    else break;
+                }
+                if (streak >= 5) {
+                    setExpression('happy');
+                    setSpeechText('Серия из ' + streak + '! Непобедимы! =^_^=', 5000);
+                    _purrrTicks = 30;
+                    setTimeout(() => { if (animating) setExpression('neutral'); }, 5000);
+                    return;
+                }
+                if (streak >= 3) {
+                    setExpression('happy');
+                    setSpeechText(streak + ' KEEP подряд! Мурр! =^._.^=', 4000);
+                    setTimeout(() => { if (animating) setExpression('neutral'); }, 4000);
+                    return;
+                }
+            }
+
+            // Streak detection: 3+ consecutive DISCARD
+            if (isDiscard) {
+                let streak = 0;
+                for (let i = _expHistory.length - 1; i >= 0; i--) {
+                    if (_expHistory[i].decision === 'DISCARD') streak++;
+                    else break;
+                }
+                if (streak >= 3) {
+                    setExpression('angry');
+                    setMood('grumpy');
+                    setSpeechText(streak + ' DISCARD... *шипение* Код нужно менять!', 5000);
+                    _tailSpeed = 4; // erratic
+                    setTimeout(() => { if (animating) { setExpression('neutral'); _tailSpeed = 2; } }, 5000);
+                    return;
+                }
+            }
+
+            // High score celebration (>= 0.9)
+            if (score >= 0.9 && isKeep) {
+                setExpression('happy');
+                setSpeechText('Отличный score: ' + (score * 100).toFixed(0) + '%! =^_^=', 4000);
+                _purrrTicks = 25;
+                triggerPawWave();
+                setTimeout(() => { if (animating) setExpression('neutral'); }, 4000);
+                return;
+            }
+
+            // Error reaction
+            if (isError) {
+                setExpression('surprised');
+                setSpeechText('Мяу?! Ошибка! *уши торчком*', 4000);
+                triggerEarTwitch();
+                setTimeout(() => { if (animating) setExpression('neutral'); }, 4000);
+                return;
+            }
         },
 
         /**
