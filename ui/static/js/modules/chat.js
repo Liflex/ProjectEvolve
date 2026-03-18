@@ -188,6 +188,13 @@ window.AppChat = (function() {
                                 const fp = input.file_path || input.path || '';
                                 toolPath = fp;
                                 toolDetail = fp.split(/[\\/]/).pop() || name;
+                                var _toolEditOld = '', _toolEditNew = '', _toolWriteContent = '';
+                                if (toolType === 'edit') {
+                                    _toolEditOld = input.old_string || '';
+                                    _toolEditNew = input.new_string || '';
+                                } else {
+                                    _toolWriteContent = input.content || '';
+                                }
                             } else if (nameLower.includes('bash') || nameLower.includes('command') || nameLower.includes('shell')) {
                                 toolType = 'bash';
                                 const cmd = (input.command || input.cmd || '');
@@ -199,7 +206,7 @@ window.AppChat = (function() {
                             } else {
                                 toolDetail = name;
                             }
-                            tab.messages.push({ role: 'tool', content: name, toolType, toolDetail, toolPath });
+                            tab.messages.push({ role: 'tool', content: name, toolType, toolDetail, toolPath, toolEditOld: _toolEditOld || '', toolEditNew: _toolEditNew || '', toolWriteContent: _toolWriteContent || '' });
                             _app.chatTick++;
                         } else if (etype === 'result') {
                             const usage = data.usage || {};
@@ -463,6 +470,117 @@ window.AppChat = (function() {
             });
         },
 
+        // ========== CHAT: INLINE DIFF ==========
+        /**
+         * Simple line-level diff: returns array of {type:'eq'|'del'|'ins', text}
+         * Uses LCS-based approach for minimal diff.
+         */
+        simpleLineDiff(oldLines, newLines) {
+            const m = oldLines.length, n = newLines.length;
+            // For large diffs, fall back to simple side-by-side
+            if (m > 200 || n > 200) {
+                const result = [];
+                for (const l of oldLines) result.push({ type: 'del', text: l });
+                for (const l of newLines) result.push({ type: 'ins', text: l });
+                return result;
+            }
+            // Build LCS table
+            const dp = [];
+            for (let i = 0; i <= m; i++) {
+                dp[i] = [];
+                for (let j = 0; j <= n; j++) {
+                    if (i === 0 || j === 0) dp[i][j] = 0;
+                    else if (oldLines[i - 1] === newLines[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+                    else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                }
+            }
+            // Backtrack to produce diff
+            const result = [];
+            let i = m, j = n;
+            while (i > 0 || j > 0) {
+                if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+                    result.push({ type: 'eq', text: oldLines[i - 1] });
+                    i--; j--;
+                } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+                    result.push({ type: 'ins', text: newLines[j - 1] });
+                    j--;
+                } else {
+                    result.push({ type: 'del', text: oldLines[i - 1] });
+                    i--;
+                }
+            }
+            result.reverse();
+            return result;
+        },
+
+        /**
+         * Render inline diff HTML for edit tool messages.
+         * Shows old_string (red) → new_string (green) with line numbers.
+         */
+        renderInlineDiff(oldStr, newStr) {
+            if (!oldStr && !newStr) return '';
+            const oldLines = (oldStr || '').split('\n');
+            const newLines = (newStr || '').split('\n');
+            const diff = this.simpleLineDiff(oldLines, newLines);
+            // Count changes
+            let added = 0, removed = 0;
+            for (const d of diff) {
+                if (d.type === 'ins') added++;
+                if (d.type === 'del') removed++;
+            }
+            // Truncate if too many lines
+            const MAX_LINES = 40;
+            const truncated = diff.length > MAX_LINES;
+            const displayDiff = truncated ? diff.slice(0, MAX_LINES) : diff;
+            let html = '<div class="tool-inline-diff">';
+            // Header
+            html += '<div class="diff-header">';
+            html += '<span class="diff-stats-del">-' + removed + '</span>';
+            html += '<span class="diff-stats-ins">+' + added + '</span>';
+            html += '<span style="color:var(--v3);margin-left:auto;font-size:0.5rem">INLINE_DIFF</span>';
+            html += '</div>';
+            // Lines
+            for (const d of displayDiff) {
+                if (d.type === 'del') {
+                    html += '<div class="diff-del diff-line diff-line-del"><span class="diff-line-sign" style="color:var(--red)">-</span>' + this.escHtml(d.text) + '</div>';
+                } else if (d.type === 'ins') {
+                    html += '<div class="diff-add diff-line diff-line-ins"><span class="diff-line-sign" style="color:var(--ng)">+</span>' + this.escHtml(d.text) + '</div>';
+                } else {
+                    html += '<div class="diff-line diff-line-eq"><span class="diff-line-sign"> </span>' + this.escHtml(d.text) + '</div>';
+                }
+            }
+            if (truncated) {
+                html += '<div class="diff-truncated">... ' + (diff.length - MAX_LINES) + ' more lines</div>';
+            }
+            html += '</div>';
+            return html;
+        },
+
+        /**
+         * Render write tool content preview (first N lines of new file).
+         */
+        renderWritePreview(content) {
+            if (!content) return '';
+            const lines = content.split('\n');
+            const MAX_PREVIEW = 15;
+            const truncated = lines.length > MAX_PREVIEW;
+            const display = lines.slice(0, MAX_PREVIEW);
+            let html = '<div class="tool-write-preview">';
+            html += '<div class="write-header">';
+            html += '<span style="color:var(--ng);letter-spacing:0.1em">NEW FILE</span>';
+            html += '<span style="color:var(--v3);margin-left:auto;font-size:0.5rem">' + lines.length + ' lines</span>';
+            html += '</div>';
+            html += '<div class="write-body">';
+            for (const line of display) {
+                html += '<div style="white-space:pre-wrap;word-break:break-all;line-height:1.5;color:var(--ng2)">' + this.escHtml(line) + '</div>';
+            }
+            if (truncated) {
+                html += '<div class="diff-truncated">... ' + (lines.length - MAX_PREVIEW) + ' more lines</div>';
+            }
+            html += '</div></div>';
+            return html;
+        },
+
         // ========== CHAT: RENDER ==========
         renderChatHTML(tab) {
             const _ = this.chatTick;
@@ -640,6 +758,14 @@ window.AppChat = (function() {
                                 + '<span class="fp-link" style="font-size:0.625rem" title="' + this.escHtml(tp) + ' — click to copy" onclick="event.stopPropagation();navigator.clipboard.writeText(\'' + this.escHtml(tp).replace(/'/g, "\\'") + '\').then(function(){window._app&&window._app.showToast(\'Путь скопирован\')})">' + this.escHtml(fname) + '</span>'
                                 + '<span style="font-size:0.5625rem;color:var(--v3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0" title="' + this.escHtml(tp) + '">' + this.escHtml(tp) + '</span>'
                                 + '</div>';
+                            // Inline diff for EDIT tool
+                            if (tt === 'edit' && (t.toolEditOld || t.toolEditNew)) {
+                                detailHtml += '<div style="margin-left:18px">' + this.renderInlineDiff(t.toolEditOld, t.toolEditNew) + '</div>';
+                            }
+                            // Content preview for WRITE tool
+                            if (tt === 'write' && t.toolWriteContent) {
+                                detailHtml += '<div style="margin-left:18px">' + this.renderWritePreview(t.toolWriteContent) + '</div>';
+                            }
                         } else if (tt === 'bash') {
                             detailHtml += '<div style="display:flex;align-items:flex-start;gap:6px;padding:2px 0 2px 18px">'
                                 + '<span style="font-size:0.625rem;margin-top:1px">' + (icons[tt] || icons.other) + '</span>'
@@ -664,9 +790,26 @@ window.AppChat = (function() {
                     const arrowChar = collapsed ? '&#x25B6;' : '&#x25BC;';
                     const detailDisplay = collapsed ? 'none' : 'block';
                     const typeIcons = [...new Set(toolGroup.map(t => icons[t.toolType || 'other'] || icons.other))].join(' ');
+                    // Diff stats badge for edit tools
+                    let diffBadge = '';
+                    for (const t of toolGroup) {
+                        if (t.toolType === 'edit' && (t.toolEditOld || t.toolEditNew)) {
+                            const oldL = (t.toolEditOld || '').split('\n').length;
+                            const newL = (t.toolEditNew || '').split('\n').length;
+                            const del = Math.max(0, oldL - newL);
+                            const ins = Math.max(0, newL - oldL);
+                            diffBadge = '<span style="font-size:0.5rem;margin-left:4px"><span style="color:var(--red)">-' + oldL + '</span><span style="color:var(--v3)">/</span><span style="color:var(--ng)">+' + newL + '</span></span>';
+                            break;
+                        } else if (t.toolType === 'write' && t.toolWriteContent) {
+                            const wc = (t.toolWriteContent || '').split('\n').length;
+                            diffBadge = '<span style="font-size:0.5rem;margin-left:4px;color:var(--ng)">+' + wc + ' lines</span>';
+                            break;
+                        }
+                    }
                     const headerTarget = primaryTarget
                         ? '<span class="fp-link" style="font-size:0.625rem" title="' + this.escHtml(primaryTarget) + ' — click to copy" onclick="event.stopPropagation();navigator.clipboard.writeText(\'' + this.escHtml(primaryTarget).replace(/'/g, "\\'") + '\').then(function(){window._app&&window._app.showToast(\'Путь скопирован\')})">' + this.escHtml(primaryTarget.split(/[\\/]/).pop()) + '</span>'
                         + '<span style="font-size:0.5rem;color:var(--v3);font-family:monospace;margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:30ch" title="' + this.escHtml(primaryTarget) + '">' + this.escHtml(primaryTarget) + '</span>'
+                        + diffBadge
                         : '<span style="font-size:0.5625rem;color:var(--ng3);letter-spacing:0.08em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50ch" title="' + this.escHtml(summaryText) + '">' + this.escHtml(summaryText) + '</span>';
                     html += '<div class="chat-msg-row" style="padding:2px 0"><div class="chat-avatar chat-avatar-tool">' + avatarTool + '</div><div style="flex:1;min-width:0">'
                         + '<div onclick="var d=this.nextElementSibling,a=this.querySelector(\'[data-arrow]\');if(d.style.display===\'none\'){d.style.display=\'block\';a.textContent=\'\\u25BC\';}else{d.style.display=\'none\';a.textContent=\'\\u25B6\';}" '

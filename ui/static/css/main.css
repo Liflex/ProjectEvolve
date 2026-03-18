@@ -288,6 +288,22 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .diff-hunk { color: var(--cyan); font-weight: bold; background: rgba(0,229,255,0.05); }
 .diff-header { color: var(--v); font-weight: bold; }
 
+/* === INLINE DIFF IN TOOL MESSAGES === */
+.tool-inline-diff { border: 1px solid var(--v-dim); border-radius: 2px; overflow: hidden; margin-top: 4px; font-size: 0.625rem; }
+.tool-inline-diff .diff-header { display: flex; align-items: center; gap: 8px; padding: 3px 8px; background: var(--tool-header-bg); border-bottom: 1px solid var(--v-dim); }
+.tool-inline-diff .diff-stats-del { color: var(--red); letter-spacing: 0.1em; }
+.tool-inline-diff .diff-stats-ins { color: var(--ng); letter-spacing: 0.1em; }
+.tool-inline-diff .diff-line { padding: 0 6px; white-space: pre-wrap; word-break: break-all; line-height: 1.5; }
+.tool-inline-diff .diff-line-eq { color: var(--v3); opacity: 0.5; }
+.tool-inline-diff .diff-line-del { color: var(--ng2); }
+.tool-inline-diff .diff-line-ins { color: var(--ng2); }
+.tool-inline-diff .diff-line-sign { user-select: none; margin-right: 6px; opacity: 0.6; }
+.tool-inline-diff .diff-truncated { padding: 3px 8px; color: var(--v3); font-size: 0.5rem; text-align: center; border-top: 1px solid var(--v-dim); letter-spacing: 0.1em; }
+/* Write preview in tool messages */
+.tool-write-preview { border: 1px solid var(--v-dim); border-radius: 2px; overflow: hidden; margin-top: 4px; font-size: 0.625rem; }
+.tool-write-preview .write-header { display: flex; align-items: center; gap: 8px; padding: 3px 8px; background: var(--tool-header-bg); border-bottom: 1px solid var(--v-dim); }
+.tool-write-preview .write-body { padding: 4px 6px; max-height: 200px; overflow-y: auto; background: var(--code-bg, var(--bg)); }
+
 /* === CHAT IDE BOTTOM PANEL === */
 .chat-bottom-panel {
     background: var(--bg2);
