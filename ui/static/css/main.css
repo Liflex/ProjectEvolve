@@ -56,6 +56,16 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     --thinking-content-bg: rgba(12,11,20,0.4);
     --tool-header-bg: rgba(180,74,255,0.03);
     --tool-detail-bg: rgba(12,11,20,0.5);
+    /* Markdown fallback defaults (overridden per theme) */
+    --md-h1-color: #b44aff; --md-h2-color: #00e5ff; --md-h3-color: #b44aff;
+    --md-h1-shadow: rgba(180,74,255,0.4); --md-h2-border: rgba(0,229,255,0.15);
+    --md-link-color: #00e5ff; --md-link-hover: #39ff14;
+    --md-strong-color: #b44aff; --md-em-color: #ff00aa;
+    --md-blockquote-border: #ff00aa; --md-blockquote-text: #6b3a8f;
+    --md-list-bullet: #b44aff; --md-hr-color: #3c3f41;
+    --md-table-header-bg: rgba(180,74,255,0.05); --md-table-stripe-bg: transparent;
+    --md-code-bg: rgba(180,74,255,0.08); --md-code-color: #b44aff;
+    --md-code-header-accent: #b44aff;
 }
 
 /* === NAV === */
@@ -86,29 +96,43 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
 .animate-breathe { animation: breathe 3s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
 .animate-rotate-slow { animation: rotate-slow 20s linear infinite; }
 
-/* === MARKDOWN (terminal styled) === */
+/* === MARKDOWN (theme-aware rendering) === */
 .md { color: var(--ng2); font-size: inherit; line-height: 1.7; }
-.md h1 { color: var(--v); font-family: 'Press Start 2P', monospace; font-size: 0.8125rem; margin: 1.5rem 0 0.75rem; text-shadow: 0 0 10px rgba(180,74,255,0.4); }
-.md h2 { color: var(--cyan); font-size: 0.9375rem; margin: 1.25rem 0 0.5rem; border-bottom: 1px dashed rgba(0,229,255,0.15); padding-bottom: 0.25rem; }
-.md h3 { color: var(--v); font-size: 0.875rem; margin: 1rem 0 0.375rem; opacity: 0.85; }
+.md h1 { color: var(--md-h1-color, var(--v)); font-family: 'Press Start 2P', monospace; font-size: 0.8125rem; margin: 1.5rem 0 0.75rem; text-shadow: 0 0 10px var(--md-h1-shadow, rgba(180,74,255,0.4)); }
+.md h2 { color: var(--md-h2-color, var(--cyan)); font-size: 0.9375rem; margin: 1.25rem 0 0.5rem; border-bottom: 1px dashed var(--md-h2-border, rgba(0,229,255,0.15)); padding-bottom: 0.25rem; }
+.md h3 { color: var(--md-h3-color, var(--v)); font-size: 0.875rem; margin: 1rem 0 0.375rem; opacity: 0.85; }
+.md h4, .md h5, .md h6 { color: var(--md-h3-color, var(--v)); opacity: 0.75; margin: 0.75rem 0 0.25rem; }
 .md p { margin: 0.4rem 0; }
 .md ul, .md ol { margin: 0.4rem 0; padding-left: 1.5rem; }
+.md ul { list-style: none; }
+.md ul > li { position: relative; margin: 0.15rem 0; padding-left: 0.5em; }
+.md ul > li::before { content: '▸'; position: absolute; left: -1.1em; color: var(--md-list-bullet, var(--v)); font-size: 0.7em; top: 0.15em; }
+.md ol { list-style: none; counter-reset: md-ol; }
+.md ol > li { position: relative; margin: 0.15rem 0; padding-left: 0.5em; counter-increment: md-ol; }
+.md ol > li::before { content: counter(md-ol) '.'; position: absolute; left: -1.8em; color: var(--md-list-bullet, var(--v)); font-size: 0.75em; opacity: 0.8; }
 .md li { margin: 0.15rem 0; }
-.md code { background: rgba(180,74,255,0.08); color: var(--v); padding: 1px 4px; font-size: 0.8125rem; border-radius: 2px; }
+.md li > ul, .md li > ol { margin: 0.1rem 0; }
+.md a { color: var(--md-link-color, var(--cyan)); text-decoration: none; border-bottom: 1px dashed var(--md-link-color, var(--cyan)); opacity: 0.85; transition: all 0.15s; }
+.md a:hover { color: var(--md-link-hover, var(--ng)); opacity: 1; border-bottom-style: solid; }
+.md code { background: var(--md-code-bg, rgba(180,74,255,0.08)); color: var(--md-code-color, var(--v)); padding: 1px 5px; font-size: 0.8125rem; border-radius: 2px; border: 1px solid var(--v-dim); }
+.md strong { color: var(--md-strong-color, var(--v)); }
+.md em { color: var(--md-em-color, var(--pink)); font-style: italic; }
+.md del { color: var(--v3); text-decoration: line-through; opacity: 0.6; }
+.md hr { border: none; height: 1px; background: var(--md-hr-color, var(--v-dim)); margin: 1rem 0; }
 /* IDE-style code block with header bar */
-.md .code-block { position: relative; margin: 0.5rem 0; border: 1px solid var(--v-dim); background: var(--code-bg, var(--bg)); overflow: hidden; }
+.md .code-block { position: relative; margin: 0.5rem 0; border: 1px solid var(--v-dim); background: var(--code-bg, var(--bg)); overflow: hidden; border-radius: 3px; }
 .md .code-block .code-header { display: flex; align-items: center; justify-content: space-between; padding: 4px 10px; background: var(--code-header-bg, rgba(180,74,255,0.06)); border-bottom: 1px solid var(--v-dim); }
 .md .code-block .code-lang { font-size: 0.5625rem; letter-spacing: 0.15em; color: var(--code-lang-color, var(--v3)); text-transform: uppercase; }
 .md .code-block .code-copy { font-size: 0.5625rem; letter-spacing: 0.1em; color: var(--v3); cursor: pointer; padding: 2px 6px; border: 1px solid transparent; transition: all 0.15s; }
 .md .code-block .code-copy:hover { color: var(--v); border-color: var(--v-dim); }
 .md .code-block .code-copy.copied { color: var(--ng); }
 .md .code-block pre { margin: 0; border: none; padding: 0.75rem 0.75rem 0.75rem 0; overflow-x: auto; background: var(--code-bg, transparent); counter-reset: line-num; }
-.md .code-block pre code { background: none; padding: 0; color: var(--ng2); display: block; }
+.md .code-block pre code { background: none; padding: 0; color: var(--ng2); display: block; border: none; }
 .md .code-block .code-line { display: block; padding-left: 3.2em; position: relative; min-height: 1.25em; }
 .md .code-block .code-line::before { counter-increment: line-num; content: counter(line-num); position: absolute; left: 0; width: 2.5em; text-align: right; color: var(--v3); opacity: 0.5; font-size: 0.85em; padding-right: 0.5em; user-select: none; border-right: 1px solid var(--v-dim); }
 /* Fallback for pre without wrapper */
 .md pre { background: var(--bg); border: 1px solid var(--v-dim); padding: 0.75rem; overflow-x: auto; margin: 0.5rem 0; }
-.md pre code { background: none; padding: 0; color: var(--ng2); }
+.md pre code { background: none; padding: 0; color: var(--ng2); border: none; }
 /* Syntax-like coloring for common tokens in code blocks */
 .md .code-block .tok-kw { color: var(--tok-kw); }
 .md .code-block .tok-str { color: var(--tok-str); }
@@ -118,8 +142,17 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
 .md .code-block .code-header { background: var(--code-header-bg); border-bottom: 1px solid var(--v-dim); }
 .md .code-block .code-lang { color: var(--code-lang-color); }
 .md .code-block pre { background: var(--code-bg); }
-.md strong { color: var(--v); }
-.md blockquote { border-left: 3px solid var(--pink); padding-left: 0.75rem; margin: 0.5rem 0; color: var(--v3); }
+.md blockquote { border-left: 3px solid var(--md-blockquote-border, var(--pink)); padding-left: 0.75rem; margin: 0.5rem 0; color: var(--md-blockquote-text, var(--v3)); background: rgba(0,0,0,0.1); padding: 0.5rem 0.75rem; border-radius: 0 3px 3px 0; }
+.md table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.8125rem; border: 1px solid var(--v-dim); border-radius: 3px; overflow: hidden; }
+.md th { border: 1px solid var(--v-dim); padding: 4px 8px; background: var(--md-table-header-bg, rgba(180,74,255,0.05)); color: var(--md-h2-color, var(--v)); text-align: left; font-weight: normal; }
+.md td { border: 1px solid var(--v-dim); padding: 4px 8px; color: var(--ng2); }
+.md tr:nth-child(even) td { background: var(--md-table-stripe-bg, transparent); }
+/* Task lists */
+.md ul:has(> li > input[type="checkbox"]) { list-style: none; padding-left: 0; }
+.md ul:has(> li > input[type="checkbox"]) > li::before { content: none; }
+.md input[type="checkbox"] { margin-right: 0.4em; accent-color: var(--v); }
+/* Images */
+.md img { max-width: 100%; border: 1px solid var(--v-dim); border-radius: 3px; margin: 0.5rem 0; }
 /* Chat role labels */
 .chat-role { font-size: 0.5625rem; letter-spacing: 0.15em; margin-bottom: 3px; font-family: var(--chat-role-font, 'Press Start 2P', monospace); }
 .chat-role-user { color: var(--v); }
@@ -190,10 +223,6 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
 .chat-status-bar .agent-state { color: var(--v); }
 .chat-status-bar .agent-state.streaming { color: var(--cyan); }
 .chat-status-bar .agent-state.thinking { color: var(--amber); }
-.md hr { border-color: var(--v-dim); margin: 1rem 0; }
-.md table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.8125rem; }
-.md th { border: 1px solid var(--v-dim); padding: 4px 8px; background: rgba(180,74,255,0.05); color: var(--v); text-align: left; font-weight: normal; }
-.md td { border: 1px solid var(--v-dim); padding: 4px 8px; color: var(--ng2); }
 
 /* === CAT CANVAS === */
 .cat-frame { border: 2px solid var(--v-dim); image-rendering: pixelated; overflow: visible; box-shadow: 0 0 12px rgba(180,74,255,0.08); }

@@ -68,6 +68,19 @@ window.AppRenderer = (function() {
                 const html = marked.parse(t, { breaks: true });
                 const str = typeof html === 'string' ? html : String(html);
                 const clean = DOMPurify.sanitize(str, { ADD_ATTR: ['class'] });
+                // Language-specific accent colors for code block headers
+                const langAccents = {
+                    python: '#3572A5', py: '#3572A5',
+                    javascript: '#f1e05a', js: '#f1e05a', jsx: '#61dafb', tsx: '#3178c6',
+                    typescript: '#3178c6', ts: '#3178c6',
+                    bash: '#89e051', sh: '#89e051', shell: '#89e051', zsh: '#89e051',
+                    json: '#292929', yaml: '#cb171e', yml: '#cb171e',
+                    html: '#e34c26', css: '#563d7c',
+                    rust: '#dea584', rs: '#dea584',
+                    go: '#00ADD8', java: '#b07219',
+                    sql: '#e38c00', markdown: '#083fa1', md: '#083fa1',
+                    cpp: '#f34b7d', c: '#555555', ruby: '#701516', php: '#4F5D95',
+                };
                 return clean.replace(/<pre><code(?:\s+class="language-(\w+)")?>([\s\S]*?)<\/code><\/pre>/g,
                     (match, lang, code) => {
                         const label = lang ? lang.toUpperCase() : 'CODE';
@@ -76,8 +89,9 @@ window.AppRenderer = (function() {
                         const lines = highlighted.split('\n');
                         if (lines.length > 1 && lines[lines.length - 1].trim() === '') lines.pop();
                         const numbered = lines.map(l => '<span class="code-line">' + (l || ' ') + '</span>').join('\n');
+                        const accentColor = langAccents[(lang || '').toLowerCase()] || 'var(--md-code-header-accent, var(--v3))';
                         return '<div class="code-block"><div class="code-header">'
-                            + '<span class="code-lang">' + label + '</span>'
+                            + '<span class="code-lang" style="color:' + accentColor + '">' + label + '</span>'
                             + '<span class="code-copy" onclick="window._copyCode(this,\'' + id + '\')">[COPY]</span>'
                             + '</div><pre id="' + id + '"><code>' + numbered + '</code></pre></div>';
                     });
