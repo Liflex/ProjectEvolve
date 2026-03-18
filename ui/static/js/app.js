@@ -83,6 +83,12 @@ function _buildAppData() {
         liveLogPaused: false,
         _liveLogMax: 500,
 
+        // Run: file browser state
+        _showBrowsePanel: false,
+        _browsePath: '.',
+        _browseEntries: [],
+        _preflightResult: null,
+
         // Command Palette (Ctrl+Shift+P)
         cmdPalette: { show: false, query: '', selected: 0, _results: [] },
         cmdPaletteCommands: [

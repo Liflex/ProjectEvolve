@@ -78,7 +78,7 @@ def get_next_experiment_number(exp_dir: Path) -> int:
             try:
                 num = int(match)
                 existing.append(num)
-            except:
+            except (ValueError, TypeError):
                 continue
 
     if not existing:
@@ -184,7 +184,7 @@ def get_claude_command() -> str:
                 ps1_path = result.stdout.strip()
                 if ps1_path.endswith(".ps1"):
                     return f'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{ps1_path}"'
-        except:
+        except (subprocess.SubprocessError, OSError):
             pass
 
         # Fallback: Try cmd.exe where command
@@ -199,7 +199,7 @@ def get_claude_command() -> str:
             if result.returncode == 0 and result.stdout.strip():
                 ps1_path = result.stdout.strip().split('\n')[0].strip()
                 return f'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{ps1_path}"'
-        except:
+        except (subprocess.SubprocessError, OSError):
             pass
 
     # Unix-like systems (Linux, macOS) - see INSTALL.md Step 2
@@ -463,10 +463,15 @@ def run_quality_gate(project_dir: Path) -> Dict[str, Any]:
 # PROMPT GENERATION
 # =============================================================================
 
-def build_agent_prompt(config: ProjectConfig, iteration: int, total: int) -> str:
+def build_agent_prompt(config: ProjectConfig, iteration: int, total: int, strategy: str = "default") -> str:
     """Строит промпт для AI-агента."""
-    # Загружаем шаблон
-    template_file = CONFIG_DIR / "default_prompt.md"
+    # Выбираем шаблон по стратегии
+    strategy_files = {
+        "execution": "prompt_execution.md",
+        "quality": "prompt_quality.md",
+    }
+    template_name = strategy_files.get(strategy, "default_prompt.md")
+    template_file = CONFIG_DIR / template_name
     if template_file.exists():
         template = template_file.read_text(encoding="utf-8")
     else:
@@ -535,6 +540,7 @@ def build_agent_prompt(config: ProjectConfig, iteration: int, total: int) -> str
         "project_name": cfg.get("name", "Unknown"),
         "description": cfg.get("description", "Нет описания"),
         "goals": "\n".join(f"- {g}" for g in cfg.get("goals", [])) or "- Не указаны",
+        "completed_goals": "\n".join(f"- {g}" for g in cfg.get("completed_goals", [])) or "",
         "tech_stack": ", ".join(cfg.get("tech_stack", [])) or "Не определён",
         "constraints": "\n".join(f"- {c}" for c in cfg.get("constraints", [])) or "- Нет",
         "focus_areas": "\n".join(f"- {a}" for a in cfg.get("focus_areas", [])) or "- Исследуй любые улучшения",
@@ -584,8 +590,8 @@ def build_agent_prompt(config: ProjectConfig, iteration: int, total: int) -> str
             project_memory += "### Изменённые файлы (git status)\n```\n"
             project_memory += result.stdout.strip()
             project_memory += "\n```\n\n"
-    except:
-        pass
+    except (subprocess.SubprocessError, OSError) as e:
+        log(f"Git status failed: {e}", "DEBUG", project_dir)
 
     if project_memory:
         prompt += project_memory
@@ -762,7 +768,7 @@ def save_changes_log(project_dir: Path, experiment: Dict[str, Any]):
 # EXPERIMENT LOOP
 # =============================================================================
 
-def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> Dict[str, Any]:
+def run_single_experiment(config: ProjectConfig, iteration: int, total: int, strategy: str = "default") -> Dict[str, Any]:
     """Запускает один эксперимент."""
     project_dir = config.project_dir
     exp_dir = project_dir / ".autoresearch" / "experiments"
@@ -771,7 +777,7 @@ def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> 
     log(f"Запуск эксперимента {iteration}/{total}", "INFO", project_dir)
 
     # Строим промпт
-    prompt = build_agent_prompt(config, iteration, total)
+    prompt = build_agent_prompt(config, iteration, total, strategy)
 
     # Сохраняем промпт
     prompt_file = exp_dir / f"prompt_{iteration}.md"
@@ -873,13 +879,17 @@ def run_single_experiment(config: ProjectConfig, iteration: int, total: int) -> 
                     process.kill()
                     process.wait(timeout=5)
                     log(f"Process {process.pid} forcefully terminated", "DEBUG", project_dir)
-                except:
+                except (OSError, ProcessLookupError):
                     pass
 
-def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: Optional[ProjectConfig] = None, start_from: int = 1):
+def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: Optional[ProjectConfig] = None, start_from: int = 1, max_time: Optional[int] = None, strategy: str = "default"):
     """Главный цикл AutoResearch."""
     # Вычисляем конечный номер эксперимента
     max_experiment_number = start_from + iterations - 1
+
+    # Засекаем время старта
+    start_wall = time.time()
+    deadline = start_wall + max_time if max_time else None
 
     log("=" * 70, project_dir=project_dir)
     log("AutoResearch - запуск", project_dir=project_dir)
@@ -889,6 +899,9 @@ def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: O
     log(f"Всего итераций: {iterations}", project_dir=project_dir)
     log(f"Завершить на: Experiment {max_experiment_number}", project_dir=project_dir)
     log(f"Интервал: {timeout} мин", project_dir=project_dir)
+    if max_time:
+        log(f"Максимальное время: {max_time} сек ({max_time // 60} мин)", project_dir=project_dir)
+    log(f"Стратегия: {strategy}", project_dir=project_dir)
     log("", project_dir=project_dir)
 
     # Проверка Claude CLI
@@ -922,12 +935,17 @@ def run_autoresearch(project_dir: Path, iterations: int, timeout: int, config: O
     results = []
 
     for i in range(start_from, max_experiment_number + 1):
+        # Проверяем лимит общего времени
+        if deadline and time.time() >= deadline:
+            log(f"Превышен лимит времени ({max_time} сек). Остановка.", "WARNING", project_dir=project_dir)
+            break
+
         log("", project_dir=project_dir)
         log(f"=" * 70, project_dir=project_dir)
         log(f"Эксперимент {i}/{max_experiment_number}", project_dir=project_dir)
         log("=" * 70, project_dir=project_dir)
 
-        result = run_single_experiment(config, i, max_experiment_number)
+        result = run_single_experiment(config, i, max_experiment_number, strategy)
         results.append(result)
 
         # Сохраняем last_experiment.md и accumulation_context.md после успешного эксперимента
@@ -1042,6 +1060,23 @@ def main():
     )
 
     parser.add_argument(
+        "--max-time",
+        type=int,
+        default=None,
+        dest="max_time",
+        help="Максимальное общее время работы в секундах (по умолчанию: без ограничения)"
+    )
+
+    parser.add_argument(
+        "--strategy",
+        type=str,
+        default="default",
+        dest="strategy",
+        choices=["default", "execution", "quality"],
+        help="Стратегия исследования: default, execution, quality (по умолчанию: default)"
+    )
+
+    parser.add_argument(
         "--configure", "-c",
         action="store_true",
         help="Только настроить проект, не запускать эксперименты"
@@ -1092,7 +1127,9 @@ def main():
             project_dir=project_dir,
             iterations=iterations,
             timeout=timeout,
-            start_from=start_from
+            start_from=start_from,
+            max_time=args.max_time,
+            strategy=args.strategy
         )
     except KeyboardInterrupt:
         log("\nПрервано пользователем (Ctrl+C)", "INFO", project_dir)

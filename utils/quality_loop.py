@@ -16,6 +16,7 @@ Works with:
 import os
 import sys
 import json
+import shlex
 import time
 import subprocess
 import yaml
@@ -154,7 +155,7 @@ class MetricRunner:
                     check=False
                 )
                 return cmd
-            except:
+            except (subprocess.SubprocessError, OSError):
                 continue
 
         return None
@@ -191,9 +192,10 @@ class MetricRunner:
         start_time = time.time()
 
         try:
+            # shlex.split() prevents shell injection vs shell=True
+            cmd_args = shlex.split(command) if isinstance(command, str) else list(command)
             result = subprocess.run(
-                command,
-                shell=True,
+                cmd_args,
                 cwd=self.project_dir,
                 capture_output=True,
                 text=True,
@@ -319,7 +321,7 @@ class QualityLoop:
             threshold = threshold_a if self.state.phase == Phase.A else threshold_b
 
             print(f"\n{'=' * 70}")
-            print(f"Iteration {self.state.iterition}/{max_iterations} | Phase {self.state.phase.value}")
+            print(f"Iteration {self.state.iteration}/{max_iterations} | Phase {self.state.phase.value}")
             print(f"Threshold: {threshold:.2f}")
             print(f"{'=' * 70}\n")
 

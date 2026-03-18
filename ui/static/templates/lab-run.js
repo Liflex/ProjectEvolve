@@ -9,12 +9,32 @@
         </div>
 
         <div>
-            <!-- config + logs -->
             <!-- Config panel (collapses when running) -->
             <div x-show="!runStatus.running" x-transition class="pixel-border bg-[var(--bg2)] p-4 mb-3">
                 <div class="text-[0.5625rem] tracking-widest text-[var(--v3)] mb-3">LAUNCH_PARAMETERS_</div>
                 <div class="grid grid-cols-2 gap-2">
-                    <div><label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">PROJECT_PATH</label><input x-model="runConfig.project" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]" placeholder="."></div>
+                    <!-- PROJECT_PATH with file browser -->
+                    <div class="col-span-2">
+                        <label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">PROJECT_PATH</label>
+                        <div class="mt-0.5 flex gap-1.5">
+                            <input x-model="runConfig.project"
+                                   @change="runPreflight(runConfig.project)"
+                                   class="flex-1 bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"
+                                   placeholder="."
+                                   style="font-family:var(--code-font,monospace)">
+                            <button @click="toggleBrowsePanel()"
+                                    class="px-3 py-1.5 text-[0.5625rem] tracking-wider border border-[var(--v-dim)] text-[var(--v3)] hover:text-[var(--v)] hover:border-[var(--v2)] transition-all whitespace-nowrap"
+                                    :class="_showBrowsePanel && 'text-[var(--v)] border-[var(--v2)] bg-[rgba(180,74,255,0.06)]'"
+                                    title="Browse directories">
+                                &#x1f4c1; BROWSE
+                            </button>
+                            <button @click="runPreflight(runConfig.project)"
+                                    class="px-3 py-1.5 text-[0.5625rem] tracking-wider border border-[var(--v-dim)] text-[var(--v3)] hover:text-[var(--cyan)] hover:border-[rgba(0,229,255,0.3)] transition-all whitespace-nowrap"
+                                    title="Check project readiness">
+                                &#x2713; CHECK
+                            </button>
+                        </div>
+                    </div>
                     <div><label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">ITERATIONS</label><input x-model.number="runConfig.iterations" type="number" min="1" max="500" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
                     <div><label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">INTERVAL_MIN</label><input x-model.number="runConfig.timeout" type="number" min="0" max="60" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
                     <div><label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">MAX_TIME_SEC</label><input x-model.number="runConfig.max_time" type="number" min="60" max="3600" step="60" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
@@ -30,6 +50,64 @@
                         <option value="quality">QUALITY &#x2014; Bug fixes, security & tests</option>
                     </select>
                 </div>
+
+                <!-- File Browser Panel -->
+                <div x-show="_showBrowsePanel" x-transition class="mt-3 border border-[var(--v-dim)] bg-[var(--bg)]">
+                    <!-- Browser header / breadcrumb -->
+                    <div class="flex items-center gap-2 px-3 py-2 border-b border-[var(--v-dim)] bg-[rgba(0,0,0,0.15)]">
+                        <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider">PATH:</span>
+                        <span class="text-[0.625rem] text-[var(--cyan)] flex-1 truncate" style="font-family:var(--code-font,monospace)" x-text="_browsePath"></span>
+                        <button @click="navigateDir(_browsePath + '/..')" class="text-[0.5625rem] text-[var(--v3)] hover:text-[var(--v)] tracking-wider transition-colors" title="Go up">&#x2191; UP</button>
+                        <button @click="browseDir('.')" class="text-[0.5625rem] text-[var(--v3)] hover:text-[var(--v)] tracking-wider transition-colors" title="Go to root">&#x2302; ROOT</button>
+                        <button @click="_showBrowsePanel = false" class="text-[0.5625rem] text-[var(--v3)] hover:text-[var(--red)] tracking-wider transition-colors">[X]</button>
+                    </div>
+                    <!-- Directory entries -->
+                    <div class="max-h-[240px] overflow-y-auto p-1">
+                        <template x-for="(entry, idx) in _browseEntries" :key="idx">
+                            <div @click="entry.is_directory ? navigateDir(entry.path) : null"
+                                 @dblclick="entry.is_directory && selectDir(entry.path)"
+                                 class="flex items-center gap-2 px-3 py-1.5 cursor-pointer transition-colors"
+                                 :class="entry.is_directory ? 'hover:bg-[rgba(180,74,255,0.08)]' : 'hover:bg-[var(--bg3)]'"
+                                 :title="entry.path">
+                                <span class="text-[0.6875rem] shrink-0" x-text="entry.is_directory ? '&#x1f4c1;' : '&#x1f4c4;'"></span>
+                                <span class="text-[0.6875rem] flex-1 truncate"
+                                      :class="entry.is_directory ? 'text-[var(--ng2)]' : 'text-[var(--v3)]'"
+                                      x-text="entry.name"></span>
+                                <span x-show="entry.is_directory" class="text-[0.5rem] text-[var(--v3)] tracking-wider shrink-0">DIR</span>
+                                <span x-show="!entry.is_directory" class="text-[0.5rem] text-[var(--v3)] shrink-0" x-text="formatFileSize(entry.size)"></span>
+                                <button x-show="entry.is_directory"
+                                        @click.stop="selectDir(entry.path)"
+                                        class="text-[0.5rem] text-[var(--v)] tracking-wider px-1.5 py-0.5 border border-[var(--v-dim)] hover:border-[var(--v2)] hover:bg-[rgba(180,74,255,0.1)] transition-all shrink-0"
+                                        title="Select this directory">
+                                    SELECT
+                                </button>
+                            </div>
+                        </template>
+                        <div x-show="_browseEntries.length === 0" class="text-center py-4 text-[0.5625rem] text-[var(--v3)] tracking-wider">EMPTY_DIRECTORY_</div>
+                    </div>
+                </div>
+
+                <!-- Pre-flight Check Results -->
+                <div x-show="_preflightResult" x-transition class="mt-3 border border-[var(--v-dim)]" :class="_preflightResult && _preflightResult.ready ? 'border-[rgba(57,255,20,0.2)] bg-[rgba(57,255,20,0.03)]' : 'border-[rgba(255,170,0,0.2)] bg-[rgba(255,170,0,0.03)]'">
+                    <div class="flex items-center gap-2 px-3 py-2 border-b border-[var(--v-dim)]">
+                        <span x-text="_preflightResult && _preflightResult.ready ? '&#x2705;' : '&#x26A0;'" class="text-sm"></span>
+                        <span class="text-[0.5625rem] tracking-widest" :class="_preflightResult && _preflightResult.ready ? 'text-[var(--ng)]' : 'text-[var(--amber)]'"
+                              x-text="_preflightResult && _preflightResult.ready ? 'READY_TO_LAUNCH' : 'PREFLIGHT_WARNINGS_'"></span>
+                        <span class="text-[0.5rem] text-[var(--v3)] ml-1 truncate" style="font-family:var(--code-font,monospace)" x-text="_preflightResult && _preflightResult.path"></span>
+                        <button @click="_preflightResult = null" class="ml-auto text-[0.5625rem] text-[var(--v3)] hover:text-[var(--red)] tracking-wider">[X]</button>
+                    </div>
+                    <div class="p-2">
+                        <template x-for="(check, ci) in (_preflightResult ? _preflightResult.checks : [])" :key="ci">
+                            <div class="flex items-center gap-2 px-2 py-1 text-[0.5625rem]">
+                                <span x-text="check.ok === true ? '&#x2705;' : check.ok === false ? '&#x274C;' : '&#x26AA;'" class="shrink-0 text-xs"></span>
+                                <span class="tracking-wider" :class="check.ok === true ? 'text-[var(--ng)]' : check.ok === false ? 'text-[var(--red)]' : 'text-[var(--v3)]'" x-text="check.label"></span>
+                                <span class="text-[var(--v3)]" x-text="check.detail"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Launch button -->
                 <div class="mt-3 flex gap-2">
                     <button @click="startRun()" class="border border-[var(--v)] text-[var(--v)] text-xs tracking-wider px-5 py-2 hover:bg-[rgba(180,74,255,0.1)] transition-all">[> INITIATE]</button>
                 </div>

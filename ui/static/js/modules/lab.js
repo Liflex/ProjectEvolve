@@ -1,0 +1,456 @@
+// === AppLab — Lab experiments, dashboard, run control, research WebSocket ===
+// Loaded before app.js, spread into Alpine data object
+window.AppLab = (function() {
+    return {
+        // --- Chart helpers ---
+        scoreTrendSvg() {
+            const t = this.stats.score_trend || [];
+            if (!t.length) return '';
+            return t.map((p, i) => {
+                const x = 40 + i * 28;
+                const y = 85 - (p.score || 0) * 80;
+                const c = p.decision === 'KEEP' ? 'var(--ng)' : p.decision === 'DISCARD' ? 'var(--red)' : 'var(--amber)';
+                const lv = (i % 5 === 0) ? '' : ' visibility="hidden"';
+                return '<circle cx="' + x + '" cy="' + y + '" r="2.5" fill="' + c + '" stroke="var(--bg2)" stroke-width="0.5"/><text x="' + x + '" y="97" fill="var(--v3)" font-size="7" font-family="VT323,monospace" text-anchor="middle"' + lv + '>#' + (p.number || i + 1) + '</text>';
+            }).join('');
+        },
+        movingAvgPoints() {
+            const t = this.stats.score_trend || [];
+            if (t.length < 3) return '';
+            const w = 3; const pts = [];
+            for (let i = 0; i < t.length; i++) {
+                const start = Math.max(0, i - w + 1);
+                const end = Math.min(t.length, i + 1);
+                let sum = 0;
+                for (let j = start; j < end; j++) sum += (t[j].score || 0);
+                const avg = sum / (end - start);
+                pts.push((40 + i * 28) + ',' + (85 - avg * 80));
+            }
+            return pts.join(' ');
+        },
+        scoreTrendHitTest(e) {
+            const svg = e.currentTarget;
+            if (!svg || !svg.viewBox || !svg.viewBox.baseVal) return null;
+            const rect = svg.getBoundingClientRect();
+            const scaleX = svg.viewBox.baseVal.width / rect.width;
+            const mx = (e.clientX - rect.left) * scaleX;
+            const my = (e.clientY - rect.top) * (svg.viewBox.baseVal.height / rect.height);
+            const t = this.stats.score_trend || [];
+            let best = null; let bestDist = 20;
+            for (let i = 0; i < t.length; i++) {
+                const x = 40 + i * 28;
+                const y = 85 - (t[i].score || 0) * 80;
+                const d = Math.sqrt((mx - x) ** 2 + (my - y) ** 2);
+                if (d < bestDist) { bestDist = d; best = { idx: i, ...t[i], px: e.clientX - rect.left, py: e.clientY - rect.top }; }
+            }
+            return best;
+        },
+
+        // --- Data loading ---
+        async loadStats() {
+            try {
+                const prevTotal = this.stats.total_experiments || 0;
+                const data = await this.api('/api/stats');
+                data.last_experiment = data.last_experiment || { number: 0, title: 'No experiments yet', date: '', type: '', score: '0.5', decision: 'N/A', what_done: '', files_modified: [], results: '', notes: '' };
+                data.score_trend = data.score_trend || [];
+                data.type_distribution = data.type_distribution || {};
+                this.stats = data;
+                const newTotal = this.stats.total_experiments || 0;
+                // Cat: detect new experiments
+                if (newTotal > prevTotal) {
+                    const lastExp = this.stats.last_experiment;
+                    if (lastExp && (lastExp.decision === 'KEEP' || lastExp.decision === 'ACCEPT')) {
+                        if (window.CatModule) { CatModule.setExpression('happy'); CatModule.say('success'); setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000); }
+                    } else if (lastExp && lastExp.decision === 'DISCARD') {
+                        if (window.CatModule) { CatModule.setExpression('angry'); CatModule.say('angry'); setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000); }
+                    }
+                }
+                // Organism: update visualizer
+                if (window.OrganismModule) {
+                    const totalExp = this.stats.total_experiments || 0;
+                    const avgScore = this.stats.avg_score || 0;
+                    const typeDist = this.stats.type_distribution || {};
+                    const isRunning = this.runStatus.running;
+                    this.organismSVG = OrganismModule.renderSVG(totalExp, avgScore, typeDist, isRunning);
+                    this.organismStage = OrganismModule.getStage(totalExp).name;
+                }
+            } catch (e) { }
+        },
+        async loadExperiments() {
+            try { const data = await this.api('/api/experiments'); this.experiments = Array.isArray(data) ? data.filter(e => e && typeof e === 'object' && e.number != null).reverse() : []; } catch (e) { this.experiments = []; }
+        },
+
+        // --- Experiment detail ---
+        toggleExperiment(n) {
+            if (this.selectedExp === n) { this.selectedExp = null; this.selectedExpData = null; this.fileDiffData = null; return; }
+            this.loadExperiment(n);
+        },
+        async loadExperiment(n) {
+            this.selectedExp = n; this.expLoading = true; this.expDetailTab = 'output'; this.fileDiffData = null;
+            try {
+                const data = await this.api('/api/experiments/' + n);
+                this.selectedExpData = data;
+            } catch (e) {
+                console.error('[loadExperiment] FAILED:', e);
+                this.showToast('LOAD FAILED', 'error');
+                this.selectedExp = null; this.selectedExpData = null;
+            } finally { this.expLoading = false; }
+        },
+        async loadFileDiff(filepath) {
+            this.fileDiffData = null; this.fileDiffLoading = true;
+            try {
+                const encoded = encodeURIComponent(filepath);
+                const data = await this.api('/api/git/diff/' + encoded);
+                this.fileDiffData = data;
+            } catch (e) {
+                console.error('[loadFileDiff] FAILED:', e);
+                this.showToast('DIFF LOAD FAILED', 'error');
+            } finally { this.fileDiffLoading = false; }
+        },
+        renderDiffHtml(diff, ext) {
+            if (!diff || !diff.trim()) return '';
+            const lines = diff.split('\n');
+            let html = '';
+            for (const line of lines) {
+                if (line.startsWith('+++') || line.startsWith('---')) {
+                    html += '<div style="color:var(--v);font-weight:bold">' + this.escHtml(line) + '</div>';
+                } else if (line.startsWith('@@')) {
+                    html += '<div style="color:var(--cyan);font-weight:bold;background:rgba(0,229,255,0.05)">' + this.escHtml(line) + '</div>';
+                } else if (line.startsWith('+')) {
+                    html += '<div style="background:rgba(57,255,20,0.06);border-left:2px solid rgba(57,255,20,0.3)">' + this.escHtml(line) + '</div>';
+                } else if (line.startsWith('-')) {
+                    html += '<div style="background:rgba(255,51,102,0.06);border-left:2px solid rgba(255,51,102,0.3)">' + this.escHtml(line) + '</div>';
+                } else if (line.startsWith(' ')) {
+                    html += '<div style="color:var(--ng3)">' + this.escHtml(line) + '</div>';
+                } else {
+                    html += '<div style="color:var(--v3)">' + this.escHtml(line) + '</div>';
+                }
+            }
+            return html;
+        },
+
+        // --- Compare ---
+        toggleCompare(n) {
+            const idx = this.compareExps.indexOf(n);
+            if (idx >= 0) { this.compareExps.splice(idx, 1); }
+            else if (this.compareExps.length < 2) { this.compareExps.push(n); }
+        },
+        async runCompare() {
+            if (this.compareExps.length !== 2) return;
+            this.compareLoading = true; this.compareData = {};
+            try {
+                const [d1, d2] = await Promise.all([
+                    this.api('/api/experiments/' + this.compareExps[0]),
+                    this.api('/api/experiments/' + this.compareExps[1]),
+                ]);
+                this.compareData[this.compareExps[0]] = d1;
+                this.compareData[this.compareExps[1]] = d2;
+            } catch (e) {
+                console.error('[runCompare] FAILED:', e);
+                this.showToast('COMPARE FAILED', 'error');
+                this.compareData = {};
+            } finally { this.compareLoading = false; }
+        },
+        compareFields() {
+            const a = this.compareData[this.compareExps[0]];
+            const b = this.compareData[this.compareExps[1]];
+            if (!a || !b) return [];
+            const esc = (s) => s ? this.renderMarkdown(String(s)) : '<span class="text-[var(--v3)]">—</span>';
+            const badge = (type) => `<span class="text-[0.5625rem] px-1 py-px inline-block ${this.typeBadgeCls(type)}">${type || 'N/A'}</span>`;
+            const scoreH = (s) => `<span class="${this.scoreCls(s)}" style="font-family:'Press Start 2P',monospace">${s}</span>`;
+            const decH = (d) => `<span class="${this.decisionCls(d)}">${d}</span>`;
+            return [
+                { key: 'title', label: 'TITLE', diff: a.title !== b.title, renderLeft: esc(a.title), renderRight: esc(b.title) },
+                { key: 'type', label: 'TYPE', diff: a.type !== b.type, renderLeft: badge(a.type), renderRight: badge(b.type) },
+                { key: 'score', label: 'SCORE', diff: a.score !== b.score, renderLeft: scoreH(a.score), renderRight: scoreH(b.score) },
+                { key: 'decision', label: 'DECISION', diff: a.decision !== b.decision, renderLeft: decH(a.decision), renderRight: decH(b.decision) },
+                { key: 'date', label: 'DATE', diff: a.date !== b.date, renderLeft: esc(a.date), renderRight: esc(b.date) },
+            ];
+        },
+        compareSharedFiles() {
+            const a = this.compareData[this.compareExps[0]]?.files_modified || [];
+            const b = this.compareData[this.compareExps[1]]?.files_modified || [];
+            return a.filter(f => b.includes(f));
+        },
+
+        // --- CRUD ---
+        async loadChangesLog() { try { this.changesLog = (await this.api('/api/changes-log')).content; } catch (e) { } },
+        async loadPrompt() { try { this.prompt = (await this.api('/api/prompt')).content; } catch (e) { } },
+        async savePrompt() {
+            this.promptSaving = true;
+            try { await this.api('/api/prompt', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: this.prompt }) }); this.showToast('PROMPT COMPILED', 'success'); }
+            catch (e) { this.showToast('COMPILE FAILED', 'error'); } finally { this.promptSaving = false; }
+        },
+        async loadConfig() { try { this.config = await this.api('/api/config'); } catch (e) { } },
+        async saveConfig() {
+            this.configSaving = true;
+            try { await this.api('/api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.config) }); this.showToast('CONFIG COMMITTED', 'success'); }
+            catch (e) { this.showToast('COMMIT FAILED', 'error'); } finally { this.configSaving = false; }
+        },
+
+        // --- Research WebSocket ---
+        connectResearchWs() {
+            if (this.researchWs && this.researchWs.readyState <= 1) return;
+            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const url = `${proto}//${location.host}/ws/research`;
+            console.log('[lab] connectResearchWs() connecting to:', url);
+            this.researchWs = new WebSocket(url);
+            this.researchWs.onopen = () => console.log('[lab] WS OPEN');
+            this.researchWs.onerror = (e) => console.error('[lab] WS ERROR', e);
+            this.researchWs.onmessage = (e) => {
+                try {
+                    const event = JSON.parse(e.data);
+                    // DEBUG: log every received event
+                    if (!event.type || event.type !== 'tokens_update') {
+                        console.log('[lab] WS event:', event.type, JSON.stringify(event).slice(0, 300));
+                    }
+                    // Live log — use window._app (Alpine proxy) for reactivity
+                    const entry = this._formatLiveLogEntry(event);
+                    if (entry) {
+                        const _a = window._app;
+                        if (_a && !_a.liveLogPaused) {
+                            _a.liveLog = [...(_a.liveLog || []), entry];
+                            if (_a.liveLog.length > (_a._liveLogMax || 500)) {
+                                _a.liveLog = _a.liveLog.slice(_a.liveLog.length - (_a._liveLogMax || 500));
+                            }
+                            _a.scrollLiveLog();
+                        }
+                    }
+                    // Status updates
+                    if (event.type === 'tokens_update' && event.input_tokens !== undefined) {
+                        this.runStatus.tokens = event;
+                    } else if (event.type === 'session_reset') {
+                        this.runStatus.session_id = null;
+                    } else if (event.type === 'experiment_start') {
+                        this.runStatus.current_exp = event.number;
+                        this.runStatus.session_id = event.session_id;
+                        if (event.tokens) this.runStatus.tokens = event.tokens;
+                        if (window.CatModule && CatModule.isActive()) {
+                            CatModule.setExpression('surprised');
+                            if (CatModule.triggerEarTwitch) CatModule.triggerEarTwitch();
+                            CatModule.setSpeechText('Новый эксперимент! Мяу!', 3000);
+                            setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('thinking'); }, 2000);
+                        }
+                    } else if (event.type === 'experiment_end') {
+                        if (event.tokens) this.runStatus.tokens = event.tokens;
+                        this.runStatus.session_id = event.session_id;
+                        if (window.CatModule && CatModule.isActive()) {
+                            const decision = event.decision || '';
+                            if (decision === 'KEEP' || decision === 'ACCEPT') {
+                                CatModule.setExpression('happy'); CatModule.setMood('happy'); CatModule.say('success');
+                                if (CatModule.triggerPawWave) CatModule.triggerPawWave();
+                                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000);
+                            } else if (decision === 'DISCARD') {
+                                CatModule.setExpression('angry'); CatModule.setMood('grumpy'); CatModule.say('angry');
+                                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000);
+                            }
+                        }
+                    } else if (event.type === 'run_end') {
+                        this.runStatus.running = false;
+                        this.pollRunStatus();
+                        if (window.CatModule && CatModule.isActive()) {
+                            CatModule.setExpression('sleepy'); CatModule.setMood('sleepy');
+                            if (CatModule.triggerStretch) CatModule.triggerStretch();
+                            CatModule.setSpeechText('*устало моргает*... Всё_', 5000);
+                            setTimeout(() => {
+                                if (CatModule.isActive()) { CatModule.setExpression('neutral'); CatModule.setMood('neutral'); }
+                            }, 8000);
+                        }
+                    }
+                } catch (err) { }
+            };
+            this.researchWs.onclose = () => {
+                if (this.page === 'run' && this.runStatus.running) {
+                    setTimeout(() => this.connectResearchWs(), 2000);
+                }
+            };
+        },
+        disconnectResearchWs() {
+            if (this.researchWs) { this.researchWs.close(); this.researchWs = null; }
+        },
+
+        // --- Live Log ---
+        _formatLiveLogEntry(event) {
+            const ts = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const etype = event.type || '';
+            if (etype === 'experiment_start') {
+                const n = event.number || 0, t = event.total || 0;
+                const cont = event.session_continued ? ' (cont.)' : '';
+                return { ts, type: 'exp', icon: '▶', color: 'var(--v)', text: `Эксперимент ${n}/${t}${cont}` };
+            } else if (etype === 'experiment_end') {
+                const n = event.number || 0, st = event.status || '?', cost = event.cost ? ` | $${event.cost.toFixed(4)}` : '';
+                return { ts, type: 'exp', icon: '■', color: event.status === 'KEEP' || event.status === 'ACCEPT' ? 'var(--ng)' : event.status === 'DISCARD' ? 'var(--amber)' : 'var(--v3)', text: `Эксперимент ${n}: ${st}${cost}` };
+            } else if (etype === 'run_end') {
+                const ok = event.successful || 0, tot = event.total_run || 0, cost = event.total_cost_usd ? ` | $${event.total_cost_usd.toFixed(4)}` : '';
+                return { ts, type: 'info', icon: '✓', color: 'var(--ng)', text: `Завершено: ${ok}/${tot} успешно${cost}` };
+            } else if (etype === 'session_reset') {
+                return { ts, type: 'info', icon: '↻', color: 'var(--amber)', text: `Session reset: ${event.reason || ''}` };
+            } else if (etype === 'tokens_update') {
+                return null;
+            } else if (etype === 'connected') {
+                return { ts, type: 'info', icon: '●', color: 'var(--ng)', text: 'WebSocket connected' };
+            } else if (etype === 'agent_event') {
+                const msgType = event.message_type || '';
+                const data = event.data || {};
+                if (msgType === 'AssistantMessage') {
+                    for (const block of (data.content || [])) {
+                        if (typeof block !== 'object') continue;
+                        // Plain text block
+                        if (block.text) {
+                            const txt = block.text.length > 300 ? block.text.slice(0, 300) + '...' : block.text;
+                            return { ts, type: 'agent', icon: '◆', color: 'var(--ng2)', text: txt.replace(/\n/g, ' ') };
+                        }
+                        // Thinking block
+                        if (block.thinking) {
+                            const txt = block.thinking.length > 200 ? block.thinking.slice(0, 200) + '...' : block.thinking;
+                            return { ts, type: 'agent', icon: '💭', color: 'var(--amber)', text: 'thinking: ' + txt.replace(/\n/g, ' ') };
+                        }
+                        // Tool-use block embedded in AssistantMessage (server sends tools this way)
+                        if (block.name && block.input) {
+                            const name = block.name;
+                            const input = block.input;
+                            let detail = '';
+                            if (input.command) detail = input.command.length > 80 ? input.command.slice(0, 80) + '...' : input.command;
+                            else if (input.file_path) detail = input.file_path.split(/[\\\/]/).pop() || '';
+                            else if (input.pattern) detail = input.pattern;
+                            else if (input.query) detail = input.query.length > 60 ? input.query.slice(0, 60) + '...' : input.query;
+                            const detailStr = detail ? ` → ${detail}` : '';
+                            return { ts, type: 'tool', icon: '⚙', color: 'var(--pink)', text: `${name}${detailStr}` };
+                        }
+                    }
+                } else if (msgType === 'UserMessage') {
+                    return null;
+                } else if (msgType === 'SystemMessage') {
+                    const sub = data.subtype || data.data?.subtype || '';
+                    return { ts, type: 'info', icon: '◈', color: 'var(--cyan)', text: 'system: ' + (sub || 'init') };
+                } else if (msgType === 'ToolUse') {
+                    const name = data.name || data.tool_name || '?';
+                    const input = data.input || {};
+                    let detail = '';
+                    if (input.command) detail = input.command.length > 80 ? input.command.slice(0, 80) + '...' : input.command;
+                    else if (input.file_path) detail = input.file_path.split('/').pop() || '';
+                    else if (input.pattern) detail = input.pattern;
+                    else if (input.query) detail = input.query.length > 60 ? input.query.slice(0, 60) + '...' : input.query;
+                    const detailStr = detail ? ` → ${detail}` : '';
+                    return { ts, type: 'tool', icon: '⚙', color: 'var(--pink)', text: `${name}${detailStr}` };
+                } else if (msgType === 'ToolResult') {
+                    return null;
+                }
+                return null;
+            } else if (etype === 'log') {
+                return { ts, type: 'info', icon: '·', color: 'var(--v3)', text: event.message || '' };
+            } else if (etype === 'error') {
+                return { ts, type: 'error', icon: '✕', color: 'var(--red)', text: event.message || 'Unknown error' };
+            }
+            return null;
+        },
+        filteredLiveLog() {
+            const log = this.liveLog || [];
+            if (this.liveLogFilter === 'all') return log;
+            return log.filter(e => e.type === this.liveLogFilter);
+        },
+        clearLiveLog() { this.liveLog = []; },
+        toggleLiveLogPause() { this.liveLogPaused = !this.liveLogPaused; },
+        liveLogFilterCounts() {
+            const counts = { all: this.liveLog.length };
+            for (const e of this.liveLog) { counts[e.type] = (counts[e.type] || 0) + 1; }
+            return counts;
+        },
+        scrollLiveLog() {
+            if (!this.liveLogAutoScroll) return;
+            this.$nextTick(() => {
+                const el = document.getElementById('live-log-container');
+                if (el) el.scrollTop = el.scrollHeight;
+            });
+        },
+
+        // --- Run control ---
+        async startRun() {
+            console.log('[lab] startRun() called, config:', JSON.stringify(this.runConfig));
+            try {
+                const res = await this.api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.runConfig) });
+                console.log('[lab] startRun() API response:', JSON.stringify(res).slice(0, 200));
+                this.showToast('EXPERIMENT STARTED', 'success');
+                if (window.CatModule) {
+                    CatModule.setExpression('working');
+                    if (CatModule.triggerEarTwitch) CatModule.triggerEarTwitch();
+                    CatModule.setMood('neutral');
+                    CatModule.setSpeechText('Погнали! *встряхивается*', 3000);
+                }
+                this.connectResearchWs();
+                await this.pollRunStatus();
+            } catch (e) { console.error('[startRun] FAILED:', e); this.showToast('LAUNCH FAILED', 'error'); }
+        },
+        async stopRun() {
+            try {
+                await this.api('/api/run/stop', { method: 'POST' });
+                this.showToast('TERMINATED', 'success');
+                if (window.CatModule) {
+                    CatModule.setExpression('sleepy');
+                    CatModule.setSpeechText('*обиженно* Зачем остановили...', 4000);
+                    setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000);
+                }
+                await this.pollRunStatus();
+            } catch (e) { this.showToast('TERMINATE FAILED', 'error'); }
+        },
+        async pollRunStatus() {
+            try {
+                const prevTokens = this.runStatus.tokens;
+                const status = await this.api('/api/run/status');
+                console.log('[lab] pollRunStatus() running=' + status.running);
+                if (status.tokens) { status.tokens = status.tokens; }
+                else if (prevTokens) { status.tokens = prevTokens; }
+                this.runStatus = status;
+                if (this.runStatus.running) {
+                    this.$nextTick(() => {
+                        const el = this.$refs.logContainer;
+                        if (el) el.scrollTop = el.scrollHeight;
+                    });
+                    this.connectResearchWs();
+                }
+            } catch (e) { }
+        },
+
+        // ========== RUN: FILE BROWSER ==========
+        async browseDir(path) {
+            try {
+                const data = await this.api('/api/fs/list?path=' + encodeURIComponent(path || '.'));
+                this._browsePath = path || '.';
+                this._browseEntries = data.entries || [];
+                return data.entries;
+            } catch (e) {
+                console.error('[browseDir] FAILED:', e);
+                this.showToast('BROWSE FAILED: ' + e.message, 'error');
+                return [];
+            }
+        },
+        async navigateDir(path) {
+            await this.browseDir(path);
+        },
+        selectDir(path) {
+            this.runConfig.project = path;
+            this._showBrowsePanel = false;
+            // Run preflight check automatically
+            this.runPreflight(path);
+        },
+        toggleBrowsePanel() {
+            this._showBrowsePanel = !this._showBrowsePanel;
+            if (this._showBrowsePanel && (!this._browseEntries || this._browseEntries.length === 0)) {
+                this.browseDir(this.runConfig.project || '.');
+            }
+        },
+
+        // ========== RUN: PREFLIGHT CHECK ==========
+        async runPreflight(path) {
+            try {
+                const data = await this.api('/api/fs/preflight?path=' + encodeURIComponent(path || this.runConfig.project || '.'));
+                this._preflightResult = data;
+                return data;
+            } catch (e) {
+                console.error('[preflight] FAILED:', e);
+                this._preflightResult = { ready: false, checks: [], error: e.message };
+                return this._preflightResult;
+            }
+        },
+    };
+})();

@@ -1,0 +1,58 @@
+// === AppUtils — shared utility functions ===
+// Loaded before app.js, spread into Alpine data object
+window.AppUtils = (function() {
+    return {
+        api(url, opts = {}) {
+            return fetch(url, opts).then(async r => {
+                if (!r.ok) {
+                    let detail = '';
+                    try {
+                        const j = await r.json();
+                        detail = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail || j);
+                    } catch (e) {
+                        detail = r.status + ' ' + r.statusText;
+                    }
+                    throw new Error(detail);
+                }
+                return r.json();
+            });
+        },
+
+        showToast(msg, type = 'success') {
+            this.toast = { show: true, message: msg, type };
+            setTimeout(() => { this.toast.show = false; }, 3000);
+        },
+
+        fmtTime(ts) {
+            if (!ts) return '';
+            const d = new Date(ts);
+            return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        },
+
+        formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + 'B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + 'MB';
+        },
+
+        insertTab(e) {
+            const ta = e.target, s = ta.selectionStart;
+            ta.value = ta.value.substring(0, s) + '    ' + ta.value.substring(ta.selectionEnd);
+            ta.selectionStart = ta.selectionEnd = s + 4;
+            this.prompt = ta.value;
+        },
+
+        typeBadgeCls(t) {
+            return { 'Bug Fix': 't-bugfix', 'Security': 't-security', 'Feature': 't-feature', 'Refactoring': 't-refactor', 'Improvement': 't-improvement', 'Docs': 't-docs' }[t] || 't-other';
+        },
+        typeBarCls(t) {
+            return { 'Bug Fix': 'bg-[var(--red)]', 'Security': 'bg-[var(--amber)]', 'Feature': 'bg-[var(--cyan)]', 'Refactoring': 'bg-[var(--pink)]', 'Improvement': 'bg-[var(--ng)]', 'Docs': 'bg-[#cc88ff]' }[t] || 'bg-[#555]';
+        },
+        scoreCls(s) {
+            try { const v = parseFloat(s); return v >= 0.85 ? 'text-[var(--v)] glow-sm' : v >= 0.7 ? 'text-[var(--amber)]' : 'text-[var(--red)]'; } catch (e) { return 'text-[var(--v3)]'; }
+        },
+        decisionCls(d) {
+            return d === 'KEEP' || d === 'ACCEPT' ? 'text-[var(--ng)]' : d === 'DISCARD' ? 'text-[var(--red)]' : 'text-[var(--amber)]';
+        },
+    };
+})();

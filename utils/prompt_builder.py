@@ -44,16 +44,16 @@ SEED_CHALLENGES = [
 # MEMORY READING
 # =============================================================================
 
-def read_last_entries(path: Path, max_entries: int = 5, max_bytes: int = 10240) -> str:
+def read_last_entries(path: Path, max_entries: int = 10, max_bytes: int = 32768) -> str:
     """Читает записи помеченные [CRITICAL] или [IMPORTANT] с лимитом по размеру.
 
     Приоритет: [CRITICAL] > [IMPORTANT]. Записи добавляются до лимита max_bytes.
-    Каждая запись обрезается до 40 строк чтобы предотвратить bloat.
+    Каждая запись обрезается до 120 строк чтобы сохранить контекст.
 
     Args:
         path: Путь к файлу памяти (lessons.md, patterns.md, architecture.md)
-        max_entries: Максимум записей (по умолчанию 5)
-        max_bytes: Лимит общего размера в байтах (по умолчанию 10KB)
+        max_entries: Максимум записей (по умолчанию 10)
+        max_bytes: Лимит общего размера в байтах (по умолчанию 32KB)
 
     Returns:
         str: Содержимое помеченных записей в рамках лимита
@@ -91,7 +91,7 @@ def read_last_entries(path: Path, max_entries: int = 5, max_bytes: int = 10240) 
     result_parts = []
     total_bytes = 0
     count = 0
-    max_lines_per_entry = 40
+    max_lines_per_entry = 120
 
     for entry in marked:
         if count >= max_entries:
@@ -119,6 +119,13 @@ def read_last_entries(path: Path, max_entries: int = 5, max_bytes: int = 10240) 
 # =============================================================================
 # PROMPT GENERATION
 # =============================================================================
+
+def _format_completed_goals(goals: list) -> str:
+    """Форматирует завершённые цели с заголовком, или пустую строку если нет."""
+    if not goals:
+        return ""
+    lines = "\n".join(f"- {g}" for g in goals)
+    return f"### Выполненные цели (НЕ повторять)\n{lines}\n"
 
 def build_agent_prompt(config, iteration: int, total: int) -> str:
     """Строит промпт для AI-агента.
@@ -201,6 +208,7 @@ def build_agent_prompt(config, iteration: int, total: int) -> str:
         "project_name": cfg.get("name", "Unknown"),
         "description": cfg.get("description", "Нет описания"),
         "goals": "\n".join(f"- {g}" for g in cfg.get("goals", [])) or "- Не указаны",
+        "completed_goals": _format_completed_goals(cfg.get("completed_goals", [])),
         "tech_stack": ", ".join(cfg.get("tech_stack", [])) or "Не определён",
         "constraints": "\n".join(f"- {c}" for c in cfg.get("constraints", [])) or "- Нет",
         "focus_areas": "\n".join(f"- {a}" for a in cfg.get("focus_areas", [])) or "- Исследуй любые улучшения",
@@ -215,9 +223,9 @@ def build_agent_prompt(config, iteration: int, total: int) -> str:
     # Читаем память проекта с приоритетами (только [CRITICAL] и [IMPORTANT])
     project_memory = ""
     if memory_dir.exists():
-        lessons = read_last_entries(memory_dir / "lessons.md", max_entries=10, max_bytes=8192)
-        patterns = read_last_entries(memory_dir / "patterns.md", max_entries=7, max_bytes=8192)
-        architecture = read_last_entries(memory_dir / "architecture.md", max_entries=5, max_bytes=5120)
+        lessons = read_last_entries(memory_dir / "lessons.md", max_entries=15, max_bytes=32768)
+        patterns = read_last_entries(memory_dir / "patterns.md", max_entries=12, max_bytes=32768)
+        architecture = read_last_entries(memory_dir / "architecture.md", max_entries=10, max_bytes=20480)
 
         if lessons or patterns or architecture:
             project_memory += "\n\n## Память проекта\n\n"

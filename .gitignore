@@ -20,6 +20,7 @@ wheels/
 .installed.cfg
 *.egg
 .autoresearch.json
+.autoresearch1.json
 # Virtual environments
 venv/
 ENV/

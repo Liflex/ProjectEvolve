@@ -8,6 +8,7 @@ Usage:
     python ui/server.py --port 3000            # Custom port
 """
 
+import asyncio
 import json
 import os
 import re
@@ -116,7 +117,11 @@ def get_project_dir() -> Path:
 
 
 def get_exp_dir() -> Path:
-    return get_project_dir() / ".autoresearch" / "experiments"
+    d = get_project_dir() / ".autoresearch" / "experiments"
+    # Auto-create directory structure if missing
+    if not d.exists():
+        d.mkdir(parents=True, exist_ok=True)
+    return d
 
 
 _RE_EXP_HEADER = re.compile(r"## Experiment (\d+)")
@@ -136,16 +141,16 @@ def parse_accumulation_context(ctx_file: Path, content: str = None) -> List[Dict
         if not m:
             continue
         number = int(m.group(1))
-        # Extract metadata
-        title_m = re.search(r"## Experiment \d+:?\s*(.+)", section)
+        # Extract metadata — handle both plain and markdown bold (**Field:**) formats
+        title_m = re.search(r"## Experiment \d+[—:\-]\s*(.+)", section)
         title = title_m.group(1).strip() if title_m else f"Experiment {number}"
-        date_m = re.search(r"Date:\s*(.+)", section)
+        date_m = re.search(r"\*{0,2}Date:\*{0,2}\s*(.+)", section)
         date = date_m.group(1).strip() if date_m else ""
-        score_m = re.search(r"Score:\s*([\d.]+)", section)
+        score_m = re.search(r"\*{0,2}Score:\*{0,2}\s*([\d.]+)", section)
         score = float(score_m.group(1)) if score_m else 0.5
-        decision_m = re.search(r"Decision:\s*(KEEP|DISCARD|ACCEPT|N/A)", section)
+        decision_m = re.search(r"\*{0,2}Decision:\*{0,2}\s*(KEEP|DISCARD|ACCEPT|N/A)", section)
         decision = decision_m.group(1) if decision_m else "N/A"
-        type_m = re.search(r"Type:\s*(.+)", section)
+        type_m = re.search(r"\*{0,2}Type:\*{0,2}\s*(.+)", section)
         exp_type = type_m.group(1).strip() if type_m else "Unknown"
         experiments.append({
             "number": number, "title": title, "date": date,
@@ -162,9 +167,48 @@ def _extract_section(section_text: str, name: str) -> str:
     return m.group(1).strip() if m else ""
 
 
-def _enrich_experiment(entry: Dict[str, Any], section: str) -> Dict[str, Any]:
+# Defaults for experiment entries — prevents null/undefined in frontend
+_EXP_DEFAULTS = {
+    "number": 0, "title": "Unknown", "date": "", "type": "Unknown",
+    "score": "0.5", "decision": "N/A",
+}
+
+
+def _enrich_experiment(entry: Dict[str, Any], section: str, exp_dir: Path = None) -> Dict[str, Any]:
     """Add UI-specific fields (what_done, files_modified, results, notes)
-    by parsing the raw section text from accumulation_context.md."""
+    by parsing the raw section text from accumulation_context.md.
+    Also extracts Type and Decision from the output file if missing."""
+    if not entry or not isinstance(entry, dict):
+        entry = {}
+    # Fill missing fields with defaults
+    for k, v in _EXP_DEFAULTS.items():
+        if entry.get(k) is None:
+            entry[k] = v
+
+    # If Type/Decision are still defaults, try to extract from output file
+    if exp_dir and (entry.get("type") == "Unknown" or entry.get("decision") == "N/A"):
+        output_file = exp_dir / f"output_{entry.get('number', 0)}.md"
+        if output_file.exists():
+            try:
+                output_content = output_file.read_text(encoding="utf-8")
+                if entry.get("type") == "Unknown":
+                    type_m = re.search(r"\*\*Type:\*\*\s*(.+)", output_content)
+                    if type_m:
+                        entry["type"] = type_m.group(1).strip()
+                if entry.get("decision") == "N/A":
+                    result_m = re.search(r"\*\*Result:\*\*\s*(KEEP|DISCARD)", output_content)
+                    if result_m:
+                        entry["decision"] = result_m.group(1)
+            except (OSError, UnicodeDecodeError):
+                pass
+
+    # Derive score from decision if no explicit score
+    if entry.get("score", "0.5") == "0.5" and entry.get("decision") != "N/A":
+        if entry["decision"] == "KEEP":
+            entry["score"] = "0.85"
+        elif entry["decision"] == "DISCARD":
+            entry["score"] = "0.3"
+
     files_section = _extract_section(section, "Files Modified")
     files_modified = []
     if files_section:
@@ -187,6 +231,146 @@ def _enrich_experiment(entry: Dict[str, Any], section: str) -> Dict[str, Any]:
 _cache = {"data": None, "mtime": 0.0}
 
 
+def _ensure_context_files():
+    """Auto-create missing experiment infrastructure files."""
+    exp_dir = get_exp_dir()
+    for fname in ("accumulation_context.md", "changes_log.md"):
+        fpath = exp_dir / fname
+        if not fpath.exists():
+            fpath.write_text("", encoding="utf-8")
+
+
+# Default content templates for auto-created files
+_DEFAULT_PROMPT = """# AutoResearch Experiment {iteration}/{total}
+
+Вы — автономный AI-исследователь. Ваша цель — находить и реализовывать реально полезные улучшения проекта "{project_name}".
+
+## О проекте
+
+**Название:** {project_name}
+
+**Описание:**
+{description}
+
+## Цели проекта
+
+{goals}
+
+{completed_goals}
+
+## Технический стек
+
+{tech_stack}
+
+---
+
+## Scope Boundaries (CRITICAL)
+
+Фокус на quality of life, безопасность, UX и практическую пользу.
+
+## Формат отчёта
+
+```markdown
+## Experiment Report
+
+**Number:** {iteration}
+**Title:** [краткое название]
+**Files Modified:** [список]
+**Changes Made:** [описание]
+**Results:** [результаты]
+
+>>>EXPERIMENT_COMPLETE<<<
+```
+
+Начинайте эксперимент {iteration}.
+"""
+
+_DEFAULT_PROJECT_CONFIG = {
+    "name": "",
+    "description": "",
+    "goals": [],
+    "completed_goals": [],
+    "constraints": [],
+    "tech_stack": [],
+    "focus_areas": [],
+}
+
+_MEMORY_HEADER = """# {title}
+
+> Auto-created by AutoResearch UI
+> Project: {project}
+
+---
+"""
+
+
+def ensure_project_structure(verbose: bool = False):
+    """Verify and create all required project files at server startup.
+
+    Checks for:
+    - .autoresearch.json (project config)
+    - config/ prompt templates (default, execution, quality)
+    - .autoresearch/experiments/ context files
+    - .claude/memory/ files (lessons, patterns, architecture)
+
+    Creates missing files with sensible defaults so the dashboard and
+    experiment runner never crash on missing infrastructure.
+    """
+    project_dir = get_project_dir()
+    created = []
+
+    # 1. Project config (.autoresearch.json)
+    config_file = project_dir / ".autoresearch.json"
+    if not config_file.exists():
+        config_file.write_text(json.dumps(_DEFAULT_PROJECT_CONFIG, indent=2, ensure_ascii=False), encoding="utf-8")
+        created.append(str(config_file))
+
+    # 2. Prompt templates (config/ directory)
+    config_dir = AUTORESEARCH_HOME / "config"
+    prompt_templates = {
+        "default_prompt.md": _DEFAULT_PROMPT,
+        "prompt_execution.md": _DEFAULT_PROMPT,  # same base template
+        "prompt_quality.md": _DEFAULT_PROMPT,
+    }
+    for fname, default_content in prompt_templates.items():
+        fpath = config_dir / fname
+        if not fpath.exists():
+            fpath.write_text(default_content, encoding="utf-8")
+            created.append(str(fpath))
+
+    # 3. Experiment context files
+    exp_dir = get_exp_dir()  # auto-creates dir
+    for fname in ("accumulation_context.md", "changes_log.md"):
+        fpath = exp_dir / fname
+        if not fpath.exists():
+            fpath.write_text("", encoding="utf-8")
+            created.append(str(fpath))
+
+    # 4. Claude memory files
+    memory_dir = project_dir / ".claude" / "memory"
+    if not memory_dir.exists():
+        memory_dir.mkdir(parents=True, exist_ok=True)
+
+    memory_files = {
+        "lessons.md": "Lessons Learned",
+        "patterns.md": "Patterns & Solutions",
+        "architecture.md": "Architecture Decisions",
+    }
+    for fname, title in memory_files.items():
+        fpath = memory_dir / fname
+        if not fpath.exists():
+            content = _MEMORY_HEADER.format(title=title, project=str(project_dir))
+            fpath.write_text(content, encoding="utf-8")
+            created.append(str(fpath))
+
+    if created and verbose:
+        print(f"  [init] Created {len(created)} missing file(s):")
+        for f in created:
+            print(f"    + {f}")
+
+    return created
+
+
 def _invalidate_cache():
     """Clear parse cache (called after file modifications)."""
     _cache["data"] = None
@@ -205,9 +389,9 @@ def parse_experiments() -> List[Dict[str, Any]]:
     """
     global _cache
 
+    _ensure_context_files()
+
     ctx_file = get_exp_dir() / "accumulation_context.md"
-    if not ctx_file.exists():
-        return []
 
     try:
         current_mtime = ctx_file.stat().st_mtime
@@ -232,7 +416,8 @@ def parse_experiments() -> List[Dict[str, Any]]:
         if m:
             section_map[int(m.group(1))] = section
 
-    result = [_enrich_experiment(e, section_map.get(e["number"], ""))
+    exp_dir = get_exp_dir()
+    result = [_enrich_experiment(e, section_map.get(e["number"], ""), exp_dir)
               for e in base_entries]
 
     _cache["data"] = result
@@ -247,14 +432,16 @@ def parse_experiments() -> List[Dict[str, Any]]:
 @app.get("/api/stats")
 async def get_stats():
     experiments = parse_experiments()
+    # Filter out any entries that ended up null (missing files, parse errors)
+    experiments = [e for e in experiments if e and isinstance(e, dict)]
     total = len(experiments)
-    keep = sum(1 for e in experiments if e["decision"] == "KEEP")
-    discard = sum(1 for e in experiments if e["decision"] == "DISCARD")
+    keep = sum(1 for e in experiments if e.get("decision") == "KEEP")
+    discard = sum(1 for e in experiments if e.get("decision") == "DISCARD")
 
     scores = []
     for e in experiments:
         try:
-            s = float(e["score"])
+            s = float(e.get("score", 0.5))
             if s != 0.5:
                 scores.append(s)
         except (ValueError, TypeError):
@@ -263,16 +450,27 @@ async def get_stats():
 
     type_dist: Dict[str, int] = {}
     for e in experiments:
-        type_dist[e["type"]] = type_dist.get(e["type"], 0) + 1
+        t = e.get("type", "Unknown")
+        if t:
+            type_dist[t] = type_dist.get(t, 0) + 1
 
     score_trend = []
     for e in experiments[-20:]:
         try:
             score_trend.append(
-                {"number": e["number"], "score": float(e["score"]), "decision": e["decision"]}
+                {"number": e["number"], "score": float(e.get("score", 0.5)), "decision": e.get("decision", "N/A")}
             )
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, KeyError):
             pass
+
+    # Never return null for last_experiment — use empty dict so frontend handles gracefully
+    last = experiments[-1] if experiments else None
+    if not last:
+        last = {"number": 0, "title": "No experiments yet", "date": "", "type": "", "score": "0.5", "decision": "N/A", "what_done": "", "files_modified": [], "results": "", "notes": ""}
+    else:
+        for k, v in _EXP_DEFAULTS.items():
+            if last.get(k) is None:
+                last[k] = v
 
     return {
         "total_experiments": total,
@@ -281,7 +479,7 @@ async def get_stats():
         "avg_score": avg_score,
         "type_distribution": type_dist,
         "score_trend": score_trend,
-        "last_experiment": experiments[-1] if experiments else None,
+        "last_experiment": last,
         "run_status": {
             "running": run_state["running"],
             "current_exp": run_state["current_exp"],
@@ -293,7 +491,9 @@ async def get_stats():
 
 @app.get("/api/experiments")
 async def get_experiments():
-    return parse_experiments()
+    experiments = parse_experiments()
+    # Filter out any entries that ended up null/empty (missing files, parse errors)
+    return [e for e in experiments if e and isinstance(e, dict) and e.get("number") is not None]
 
 
 @app.get("/api/experiments/{n}")
@@ -339,6 +539,79 @@ async def get_changes_log():
         return {"content": "# Error reading changes log"}
 
 
+@app.get("/api/git/diff")
+async def get_git_diff():
+    """Return git diff for the working tree (staged + unstaged changes)."""
+    project = get_project_dir()
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--stat", "--patch"],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(project), encoding="utf-8", errors="replace",
+        )
+        staged = subprocess.run(
+            ["git", "diff", "--cached", "--stat", "--patch"],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(project), encoding="utf-8", errors="replace",
+        )
+        # Parse file list from --stat
+        files = []
+        for src in [(result, "unstaged"), (staged, "staged")]:
+            output = src[0].stdout or ""
+            for line in output.splitlines():
+                m = re.match(r"^ (.+?)\s*\|\s*\d+", line)
+                if m:
+                    fname = m.group(1).strip()
+                    if not any(f["path"] == fname for f in files):
+                        files.append({"path": fname, "status": src[1]})
+
+        stat_lines = []
+        for line in ((result.stdout or "") + "\n" + (staged.stdout or "")).splitlines():
+            if re.match(r"^ .+?\s*\|\s*\d+", line):
+                stat_lines.append(line)
+
+        return {
+            "files": files,
+            "stat": "\n".join(stat_lines),
+            "diff": result.stdout or "",
+            "staged_diff": staged.stdout or "",
+        }
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return {"files": [], "stat": "", "diff": "", "staged_diff": ""}
+
+
+@app.get("/api/git/diff/{filepath:path}")
+async def get_git_diff_file(filepath: str):
+    """Return git diff for a specific file."""
+    project = get_project_dir()
+    # Prevent path traversal
+    safe_path = (project / filepath).resolve()
+    if not str(safe_path).startswith(str(project.resolve())):
+        raise HTTPException(status_code=403, detail="Path traversal blocked")
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--", filepath],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(project), encoding="utf-8", errors="replace",
+        )
+        staged = subprocess.run(
+            ["git", "diff", "--cached", "--", filepath],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(project), encoding="utf-8", errors="replace",
+        )
+        # File extension for syntax highlighting hint
+        ext = Path(filepath).suffix.lstrip(".") or ""
+        return {
+            "path": filepath,
+            "ext": ext,
+            "diff": result.stdout or "",
+            "staged_diff": staged.stdout or "",
+            "has_changes": bool((result.stdout or "").strip() or (staged.stdout or "").strip()),
+        }
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        raise HTTPException(status_code=500, detail="git diff failed")
+
+
 @app.get("/api/prompt")
 async def get_prompt():
     prompt_file = AUTORESEARCH_HOME / "config" / "default_prompt.md"
@@ -366,20 +639,26 @@ async def update_prompt(data: PromptUpdate):
 async def get_config():
     config_file = get_project_dir() / ".autoresearch.json"
     if not config_file.exists():
-        return {"name": "", "description": "", "goals": [], "constraints": [],
-                "tech_stack": [], "focus_areas": []}
+        return {"name": "", "description": "", "goals": [], "completed_goals": [],
+                "constraints": [], "tech_stack": [], "focus_areas": []}
     try:
         with open(config_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+        if "completed_goals" not in data:
+            data["completed_goals"] = []
+        return data
     except (json.JSONDecodeError, UnicodeDecodeError):
-        return {"name": "", "description": "", "goals": [], "constraints": [],
-                "tech_stack": [], "focus_areas": [], "_error": "Malformed config file"}
+        return {"name": "", "description": "", "goals": [], "completed_goals": [],
+                "constraints": [], "tech_stack": [], "focus_areas": [], "_error": "Malformed config file"}
 
 
 class ConfigUpdate(BaseModel):
+    model_config = {"extra": "ignore"}
+
     name: str = ""
     description: str = ""
     goals: List[str] = []
+    completed_goals: List[str] = []
     constraints: List[str] = []
     tech_stack: List[str] = []
     focus_areas: List[str] = []
@@ -397,8 +676,9 @@ async def update_config(data: ConfigUpdate):
             pass  # Start fresh if existing config is corrupted
     existing.update({
         "name": data.name, "description": data.description,
-        "goals": data.goals, "constraints": data.constraints,
-        "tech_stack": data.tech_stack, "focus_areas": data.focus_areas,
+        "goals": data.goals, "completed_goals": data.completed_goals,
+        "constraints": data.constraints, "tech_stack": data.tech_stack,
+        "focus_areas": data.focus_areas,
     })
     with open(config_file, "w", encoding="utf-8") as f:
         json.dump(existing, f, indent=2, ensure_ascii=False)
@@ -406,54 +686,146 @@ async def update_config(data: ConfigUpdate):
 
 
 class RunRequest(BaseModel):
-    iterations: int = Field(default=10, ge=1, le=1000)
+    model_config = {"extra": "ignore"}
+
+    iterations: int = Field(default=10, ge=1, le=100000)
     timeout: int = Field(default=5, ge=0, le=1440)
-    max_time: int = Field(default=600, ge=30, le=3600)
+    max_time: int = Field(default=600, ge=30, le=86400)
     project: str = "."
+    strategy: str = Field(default="default", pattern=r"^(default|execution|quality)$")
+    token_threshold: int = Field(default=100_000, ge=20_000, le=200_000)
+
+
+# ---------------------------------------------------------------------------
+# SDK-based Research Runner (replaces subprocess autoresearch.py)
+# ---------------------------------------------------------------------------
+
+try:
+    from agents.research import ResearchRunner
+    _sdk_available = True
+except ImportError:
+    _sdk_available = False
+
+# Active runner instance (replaces run_state["process"])
+_active_runner: Optional["ResearchRunner"] = None
+_run_task: Optional[asyncio.Task] = None
+# WebSocket subscribers for real-time research events
+_research_ws_clients: list = []
+# Keep last tokens snapshot so the bar persists after run ends
+_last_tokens_snapshot: Optional[dict] = None
+
+
+def _get_autoresearch_helpers():
+    """Lazy-import prompt builder and post-experiment helpers from autoresearch.py."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "autoresearch_mod", str(AUTORESEARCH_HOME / "autoresearch.py"),
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+async def _research_event_handler(event: dict) -> None:
+    """Forward ResearchRunner events to logs + WebSocket subscribers."""
+    etype = event.get("type", "")
+
+    # Append human-readable line to polling logs
+    if etype == "experiment_start":
+        n, t = event.get("number", 0), event.get("total", 0)
+        continued = event.get("session_continued", False)
+        tokens_info = event.get("tokens", {})
+        session_note = " (continued session)" if continued else " (fresh session)"
+        _log_append(f"[EXP] Эксперимент {n}/{t}{session_note} | input_tokens: {tokens_info.get('input_tokens', 0):,}")
+        run_state["current_exp"] = n
+    elif etype == "experiment_end":
+        n = event.get("number", 0)
+        status = event.get("status", "?")
+        cost = event.get("cost")
+        cost_str = f" | cost: ${cost:.4f}" if cost else ""
+        usage = event.get("usage") or {}
+        _log_append(f"[EXP] Эксперимент {n} завершён: {status}{cost_str} | tokens: {usage.get('input_tokens', 0):,}in/{usage.get('output_tokens', 0):,}out")
+    elif etype == "session_reset":
+        reason = event.get("reason", "")
+        inp = event.get("input_tokens", 0)
+        _log_append(f"[SESSION] Reset ({reason}): input_tokens={inp:,} exceeded threshold — starting fresh session")
+    elif etype == "tokens_update":
+        pass  # Don't spam logs, available via /api/run/status
+    elif etype == "agent_event":
+        msg_type = event.get("message_type", "")
+        data = event.get("data", {})
+        if msg_type == "AssistantMessage":
+            for block in data.get("content", []):
+                if isinstance(block, dict):
+                    if block.get("text"):
+                        text = block["text"][:200]
+                        _log_append(f"[AGENT] {text}")
+                    elif block.get("name"):
+                        _log_append(f"[TOOL] {block['name']}")
+    elif etype == "log":
+        _log_append(f"[INFO] {event.get('message', '')}")
+    elif etype == "error":
+        _log_append(f"[ERROR] {event.get('message', '')}")
+    elif etype == "run_end":
+        ok = event.get("successful", 0)
+        total = event.get("total_run", 0)
+        cost = event.get("total_cost_usd", 0)
+        _log_append(f"[DONE] Завершено: {ok}/{total} успешно | Total cost: ${cost:.4f}")
+
+    # Broadcast to WebSocket subscribers
+    dead: list[int] = []
+    for i, ws in enumerate(_research_ws_clients):
+        try:
+            await ws.send_json(event)
+        except Exception:
+            dead.append(i)
+    for i in reversed(dead):
+        _research_ws_clients.pop(i)
 
 
 @app.post("/api/run")
 async def start_run(data: RunRequest):
-    global run_state
-    if run_state["running"]:
+    global _active_runner, _run_task
+
+    if not _sdk_available:
+        raise HTTPException(status_code=503, detail="claude-code-sdk not available. Install: pip install claude-code-sdk")
+
+    if _active_runner and _active_runner.is_running:
         raise HTTPException(status_code=409, detail="Already running")
 
     project_dir = Path(data.project).resolve()
-    # Prevent path traversal: project must be a subdirectory of CWD or an
-    # explicitly allowed ancestor.  Reject paths containing ".." components
-    # that escape the working directory.
     if ".." in Path(data.project).parts:
         raise HTTPException(status_code=400, detail="Path traversal detected: '..' not allowed in project path")
     if not project_dir.exists():
         raise HTTPException(status_code=404, detail=f"Project not found: {data.project}")
 
-    autoresearch_script = AUTORESEARCH_HOME / "autoresearch.py"
-    if not autoresearch_script.exists():
-        raise HTTPException(status_code=404, detail="autoresearch.py not found")
+    # Import helpers from autoresearch.py
+    ar = _get_autoresearch_helpers()
 
-    cmd = [
-        sys.executable, str(autoresearch_script),
-        str(project_dir), str(data.iterations), str(data.timeout),
-        "--max-time", str(data.max_time),
-    ]
+    # Load project config
+    config = ar.ProjectConfig(project_dir)
+    if not config.is_configured():
+        raise HTTPException(status_code=400, detail="Project not configured. Run autoresearch.py --configure first.")
 
-    env = os.environ.copy()
-    env.pop("CLAUDECODE", None)
-    env.pop("CLAUDE_SESSION_ID", None)
-    env["PYTHONUNBUFFERED"] = "1"
-    env["PYTHONIOENCODING"] = "utf-8"
+    # Determine start_from
+    exp_dir = project_dir / ".autoresearch" / "experiments"
+    exp_dir.mkdir(parents=True, exist_ok=True)
+    start_from = ar.get_next_experiment_number(exp_dir)
 
-    try:
-        process = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            text=True, encoding="utf-8", errors="replace",
-            cwd=project_dir, env=env, bufsize=1,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to start: {e}")
+    # Create runner
+    runner = ResearchRunner(
+        project_dir=project_dir,
+        strategy=data.strategy,
+        max_turns=100,
+        token_threshold=data.token_threshold,
+        token_soft_threshold=int(data.token_threshold * 0.8),
+    )
+    runner.add_listener(_research_event_handler)
+    _active_runner = runner
 
+    # Reset polling state
     run_state.update({
-        "running": True, "process": process,
+        "running": True, "process": None,
         "current_exp": 0, "total_exps": data.iterations,
         "project": str(project_dir),
         "started_at": datetime.now().isoformat(),
@@ -461,69 +833,95 @@ async def start_run(data: RunRequest):
     })
 
     # Initial info logs
-    prompt_file = AUTORESEARCH_HOME / "config" / "default_prompt.md"
+    prompt_name = {
+        "default": "default_prompt.md",
+        "execution": "prompt_execution.md",
+        "quality": "prompt_quality.md",
+    }.get(data.strategy, "default_prompt.md")
+    prompt_file = AUTORESEARCH_HOME / "config" / prompt_name
     prompt_size = len(prompt_file.read_text(encoding="utf-8")) if prompt_file.exists() else 0
     ctx_file = get_exp_dir() / "accumulation_context.md"
     ctx_size = len(ctx_file.read_text(encoding="utf-8")) if ctx_file.exists() else 0
 
     for init_line in [
-        f"[INIT] Starting autoresearch PID={process.pid}",
+        f"[INIT] Starting ResearchRunner (SDK mode)",
         f"[INIT] Project: {project_dir}",
-        f"[INIT] Iterations: {data.iterations} | Timeout: {data.timeout}min | Max time: {data.max_time}s",
-        f"[INIT] Command: {' '.join(cmd)}",
-        f"[INIT] Prompt size: {prompt_size:,} bytes ({prompt_size/1024:.1f} KB)",
+        f"[INIT] Iterations: {data.iterations} | Timeout: {data.timeout}min | Max time: {data.max_time}s | Strategy: {data.strategy}",
+        f"[INIT] Token threshold: {data.token_threshold:,} (soft: {int(data.token_threshold * 0.8):,})",
+        f"[INIT] Start from: Experiment {start_from}",
+        f"[INIT] Prompt template size: {prompt_size:,} bytes ({prompt_size/1024:.1f} KB)",
         f"[INIT] Context size: {ctx_size:,} bytes ({ctx_size/1024:.1f} KB)",
-        f"[INIT] Waiting for process output...",
     ]:
         _log_append(init_line)
 
-    def _stream_pipe(pipe, prefix=""):
-        """Read lines from a pipe, parse experiment progress, and append to logs."""
-        try:
-            for line in iter(pipe.readline, ''):
-                text = line.rstrip("\n\r")
-                if not text:
-                    continue
-                if prefix:
-                    text = prefix + text
-                _log_append(text)
+    # Build prompt function that also handles post-experiment saving
+    def build_and_save_prompt(iteration: int, total: int) -> str:
+        prompt = ar.build_agent_prompt(config, iteration, total, data.strategy)
+        # Save prompt to file
+        pf = exp_dir / f"prompt_{iteration}.md"
+        pf.write_text(prompt, encoding="utf-8")
+        return prompt
 
-                # Parse experiment progress from log lines
-                m = _EXP_PROGRESS_RE.search(text)
-                if m:
-                    run_state["current_exp"] = int(m.group(1))
-        except Exception:
-            pass
-        finally:
+    def _save_experiment_artifacts(exp_num: int, result: dict) -> None:
+        """Save output file and accumulation context for one experiment."""
+        output = result.get("output", "")
+        if output:
+            out_file = exp_dir / f"output_{exp_num}.md"
+            out_file.write_text(output, encoding="utf-8")
+
+        if result.get("status") in ("success", "incomplete") and output:
             try:
-                pipe.close()
-            except Exception:
-                pass
+                exp_data = ar.parse_experiment_report(output, exp_num)
+                ar.save_last_experiment_summary(project_dir, exp_data)
+                ar.save_accumulation_context(project_dir, exp_data)
+                ar.save_changes_log(project_dir, exp_data)
+                _invalidate_cache()
+            except Exception as e:
+                _log_append(f"[ERROR] Failed to save experiment {exp_num} artifacts: {e}")
 
-    def monitor():
-        global run_state
-        # Stream stdout/stderr in real-time via threads (cross-platform)
-        t_out = threading.Thread(target=_stream_pipe, args=(process.stdout,), daemon=True)
-        t_err = threading.Thread(target=_stream_pipe, args=(process.stderr,), daemon=True)
-        t_out.start()
-        t_err.start()
+    # Track experiment count for incremental saving
+    _last_saved_count = 0
 
-        process.wait()  # Block until process exits
-        t_out.join(timeout=5)
-        t_err.join(timeout=5)
+    async def _save_on_experiment_end(event: dict) -> None:
+        nonlocal _last_saved_count
+        if event.get("type") != "experiment_end":
+            return
+        # Save artifacts for newly completed experiments
+        while _last_saved_count < len(runner.results):
+            idx = _last_saved_count
+            exp_num = start_from + idx
+            _save_experiment_artifacts(exp_num, runner.results[idx])
+            _last_saved_count += 1
 
-        run_state["running"] = False
-        if process.returncode != 0:
-            logs_snapshot = _log_read()
-            stderr_lines = [l for l in logs_snapshot if "ERROR" in l or "Traceback" in l or "error" in l.lower()]
-            run_state["error"] = "\n".join(stderr_lines[:5]) if stderr_lines else f"Exit code {process.returncode}"
+    runner.add_listener(_save_on_experiment_end)
 
-    threading.Thread(target=monitor, daemon=True).start()
-    return {"status": "started", "iterations": data.iterations}
+    async def _run_and_save():
+        """Run the research loop (saving happens via listener)."""
+        try:
+            await runner.run_loop(
+                iterations=data.iterations,
+                start_from=start_from,
+                timeout_min=data.timeout,
+                max_time=data.max_time,
+                build_prompt_fn=build_and_save_prompt,
+            )
+        except Exception as e:
+            run_state["error"] = str(e)
+            _log_append(f"[ERROR] Research loop failed: {e}")
+        finally:
+            run_state["running"] = False
+            _invalidate_cache()
+
+    _run_task = asyncio.create_task(_run_and_save())
+    return {"status": "started", "iterations": data.iterations, "start_from": start_from}
 
 
 @app.get("/api/run/status")
 async def get_run_status():
+    global _last_tokens_snapshot
+    if _active_runner:
+        _last_tokens_snapshot = _active_runner.tokens.to_dict()
+    tokens = _active_runner.tokens.to_dict() if _active_runner else _last_tokens_snapshot
     return {
         "running": run_state["running"],
         "current_exp": run_state["current_exp"],
@@ -532,36 +930,31 @@ async def get_run_status():
         "started_at": run_state["started_at"],
         "error": run_state["error"],
         "recent_logs": _log_read(200),
+        "session_id": _active_runner._session_id if _active_runner else None,
+        "tokens": tokens,
     }
 
 
 @app.post("/api/run/stop")
 async def stop_run():
-    global run_state
-    if not run_state["running"] or not run_state["process"]:
+    global _active_runner, _run_task
+
+    if not _active_runner or not _active_runner.is_running:
         raise HTTPException(status_code=409, detail="Not running")
-    proc = run_state["process"]
-    # Force kill — no graceful shutdown
-    proc.kill()
-    try:
-        proc.wait(timeout=3)
-    except subprocess.TimeoutExpired:
-        pass
-    # Kill any child processes (claude CLI spawned by autoresearch)
-    try:
-        import psutil
-        parent = psutil.Process(proc.pid)
-        for child in parent.children(recursive=True):
-            try:
-                child.kill()
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
-    except (ImportError, psutil.NoSuchProcess):
-        pass
+
+    _active_runner.cancel()
+    _log_append("[STOP] Cancellation requested.")
+
+    # Give the runner a moment to clean up
+    if _run_task and not _run_task.done():
+        try:
+            await asyncio.wait_for(asyncio.shield(_run_task), timeout=5)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            _run_task.cancel()
+
     run_state["running"] = False
-    run_state["process"] = None
-    _log_append("[STOP] Process killed.")
-    return {"status": "killed"}
+    _log_append("[STOP] Runner stopped.")
+    return {"status": "stopped"}
 
 
 @app.get("/api/logs")
@@ -572,7 +965,7 @@ async def get_logs(limit: int = 50):
     try:
         content = log_file.read_text(encoding="utf-8")
         return {"logs": content.strip().split("\n")[-limit:]}
-    except Exception:
+    except (OSError, UnicodeDecodeError):
         return {"logs": []}
 
 
@@ -599,6 +992,11 @@ if CSS_DIR.exists():
     app.mount("/css", StaticFiles(directory=str(CSS_DIR), html=True), name="css")
 if JS_DIR.exists():
     app.mount("/js", StaticFiles(directory=str(JS_DIR), html=True), name="js")
+
+# Serve /templates/ directory for HTML template loaders
+TEMPLATES_DIR = STATIC_DIR / "templates"
+if TEMPLATES_DIR.exists():
+    app.mount("/templates", StaticFiles(directory=str(TEMPLATES_DIR), html=True), name="templates")
 
 
 # =============================================================================
@@ -737,12 +1135,105 @@ async def list_directory(path: str):
     return {"entries": entries}
 
 
+@app.get("/api/fs/preflight")
+async def preflight_check(path: str):
+    """Pre-flight check: verify project has required files for AutoResearch."""
+    if not path:
+        raise HTTPException(status_code=400, detail="path parameter required")
+    abs_path = Path(path).resolve()
+    allowed_bases = {get_project_dir().resolve(), Path.cwd().resolve()}
+    if not any(str(abs_path).startswith(str(base)) for base in allowed_bases):
+        raise HTTPException(status_code=403, detail="Path traversal blocked")
+    if not abs_path.is_dir():
+        raise HTTPException(status_code=404, detail="Directory not found")
+
+    checks = []
+    # Check .autoresearch.json
+    ar_json = abs_path / ".autoresearch.json"
+    if ar_json.exists():
+        try:
+            data = json.loads(ar_json.read_text(encoding="utf-8", errors="replace"))
+            goals_count = len(data.get("goals", []))
+            completed = len(data.get("completed_goals", []))
+            checks.append({"key": "autoresearch_json", "ok": True, "label": ".autoresearch.json",
+                           "detail": f"{goals_count} goals, {completed} completed"})
+        except Exception as e:
+            checks.append({"key": "autoresearch_json", "ok": False, "label": ".autoresearch.json",
+                           "detail": f"Parse error: {str(e)[:80]}"})
+    else:
+        checks.append({"key": "autoresearch_json", "ok": False, "label": ".autoresearch.json",
+                       "detail": "Not found — run will create it"})
+
+    # Check .git directory
+    git_dir = abs_path / ".git"
+    if git_dir.exists():
+        checks.append({"key": "git", "ok": True, "label": ".git", "detail": "Git repository detected"})
+    else:
+        checks.append({"key": "git", "ok": False, "label": ".git", "detail": "Not a git repo — experiments won't commit"})
+
+    # Check CLAUDE.md (optional but recommended)
+    claude_md = abs_path / "CLAUDE.md"
+    if claude_md.exists():
+        checks.append({"key": "claude_md", "ok": True, "label": "CLAUDE.md", "detail": "Found"})
+    else:
+        checks.append({"key": "claude_md", "ok": None, "label": "CLAUDE.md", "detail": "Optional — agent instructions"})
+
+    # Check prompt files
+    prompt_dir = abs_path / ".autoresearch" / "prompts"
+    if prompt_dir.exists():
+        prompt_count = len(list(prompt_dir.glob("*.md")))
+        checks.append({"key": "prompts", "ok": True, "label": "Prompts",
+                       "detail": f"{prompt_count} prompt files"})
+    else:
+        checks.append({"key": "prompts", "ok": None, "label": "Prompts", "detail": "Using defaults"})
+
+    all_ok = all(c["ok"] is not False for c in checks if c["key"] in ("autoresearch_json", "git"))
+    return {"ready": all_ok, "checks": checks, "path": str(abs_path)}
+
+
+# =============================================================================
+# RESEARCH WEBSOCKET — real-time experiment streaming
+# =============================================================================
+
+from fastapi import WebSocket, WebSocketDisconnect
+
+
+@app.websocket("/ws/research")
+async def research_websocket(websocket: WebSocket):
+    """WebSocket for real-time research events (tool use, agent text, tokens)."""
+    await websocket.accept()
+    _research_ws_clients.append(websocket)
+
+    await websocket.send_json({
+        "type": "connected",
+        "running": run_state["running"],
+        "current_exp": run_state["current_exp"],
+        "tokens": _active_runner.tokens.to_dict() if _active_runner else None,
+    })
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+            try:
+                msg = json.loads(data)
+            except json.JSONDecodeError:
+                continue
+
+            if msg.get("type") == "ping":
+                await websocket.send_json({"type": "pong", "timestamp": datetime.now().isoformat()})
+            elif msg.get("type") == "cancel" and _active_runner:
+                _active_runner.cancel()
+
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if websocket in _research_ws_clients:
+            _research_ws_clients.remove(websocket)
+
+
 # =============================================================================
 # CHAT WEBSOCKET — real-time bidirectional streaming
 # =============================================================================
-
-import asyncio
-from fastapi import WebSocket, WebSocketDisconnect
 
 
 @app.websocket("/ws/chat/{session_id}")
@@ -816,6 +1307,8 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
 
 if __name__ == "__main__":
     import argparse
+    import logging
+    import signal
     import uvicorn
 
     parser = argparse.ArgumentParser(description="AutoResearch UI Dashboard")
@@ -830,4 +1323,28 @@ if __name__ == "__main__":
     print(f"  http://{args.host}:{args.port}")
     print(f"  Project: {os.environ['AUTORESEARCH_PROJECT']}\n")
 
-    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    # Verify all required project files exist at startup
+    ensure_project_structure(verbose=True)
+
+    # Suppress Windows ConnectionResetError on client disconnect
+    logging.getLogger("asyncio").setLevel(logging.CRITICAL)
+
+    def _cleanup(signum, frame):
+        """Kill subprocess on Ctrl+C so the process exits cleanly."""
+        proc = run_state.get("process")
+        if proc and proc.poll() is None:
+            try:
+                proc.kill()
+                proc.wait(timeout=3)
+            except (OSError, ProcessLookupError):
+                pass
+        # Force exit — uvicorn may not handle SIGINT properly on Windows
+        import sys
+        sys.exit(0)
+
+    # Windows doesn't support SIGTERM via signal.signal, but SIGINT (Ctrl+C) works
+    signal.signal(signal.SIGINT, _cleanup)
+
+    config = uvicorn.Config(app, host=args.host, port=args.port, log_level="warning", timeout_graceful_shutdown=2)
+    server = uvicorn.Server(config)
+    server.run()

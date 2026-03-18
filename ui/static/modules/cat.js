@@ -190,6 +190,10 @@
         thinking:  { frames: EYES_NEUTRAL,   x: 9 + OX,  y: 10 + OY, color: '#88aaff', blinkSpeed: 16 },
     };
 
+    // Paw sprite for wave animation (3×4)
+    const PAW_OUTLINE = decode([0x07, 0x05, 0x07], 3, 4);
+    const PAW_FILL = decode([0x07, 0x07, 0x07], 3, 4);
+
     const CW = 45, CH = 37;
 
     // ================================================================
@@ -267,6 +271,52 @@
         ],
     };
 
+    // Page-aware contextual tips
+    const PAGE_TIPS = {
+        dashboard: [
+            'Посмотри тренд качества_',
+            'Сколько KEEP за сессию?',
+            'Наведи на график для деталей_',
+            'Качество растёт? =^_^=',
+            'COMPARE — сравни эксперименты!',
+        ],
+        experiments: [
+            'Кликни для деталей эксперимента_',
+            'COMPARE — два рядом!',
+            'FILES — посмотри изменения_',
+            'Фильтруй по типу...',
+            'Найди лучший эксперимент!',
+        ],
+        config: [
+            'Улучши prompt для лучших результатов_',
+            'Обнови цели проекта...',
+            'Фокус-области важны!',
+            'Добавь constraint если нужно_',
+            'Чёткие цели = лучший код!',
+        ],
+        chat: [
+            'Shift+Enter для новой строки_',
+            'Спроси что-нибудь!',
+            'Я слушаю... мурр_',
+            'Agent готов к работе_',
+            'Попробуй задать задачу!',
+        ],
+        settings: [
+            'Попробуй другую тему!',
+            'DARCULA — как в IDE_',
+            'Настрой размер шрифта...',
+            'Compact mode экономит место_',
+            'Matrix rain можно выключить_',
+        ],
+        run: [
+            '*встряхнулся* Погнали!',
+            'Жду результатов...',
+            'Эксперименты идут! Мяу!',
+            '*следит за логами*',
+            'Не забудь проверить score_',
+        ],
+    };
+
     // ================================================================
     //  ANIMATION STATE
     // ================================================================
@@ -283,6 +333,14 @@
     let currentSpeech = '';
     let speechTimer = null;
     let _tickCount = 0;
+    let _headOffX = 0, _headOffY = 0;   // ear twitch offset
+    let _earTwitchTicks = 0;              // remaining ticks for ear twitch
+    let _mood = 'neutral';                // persistent mood: neutral, happy, grumpy, sleepy
+    let _pawWaveTicks = 0;                // remaining ticks for paw wave animation
+    let _pawWavePhase = 0;                // 0=down, 1=up, 2=hold, 3=down
+    let _stretchTicks = 0;                // remaining ticks for stretch animation
+    let _stretchPhase = 0;                // 0=prep, 1=stretch, 2=hold, 3=relax
+    let _currentPage = 'dashboard';       // current page for contextual tips
 
     // ================================================================
     //  RENDER
@@ -326,15 +384,45 @@
         const cfg = EYE_CFG[expression] || EYE_CFG.neutral;
         const eyeColor = cfg.color || '#ffffff';
 
-        // Z-order: body → head → tail → eyes
-        drawFilled(BODY.outline, BODY.fill, BODY_POS, outlineColor, fillColor);
-        drawFilled(HEAD.outline, HEAD.fill, HEAD_POS, outlineColor, fillColor);
-        drawFilled(TAIL_OUTLINES[tailFrame], TAIL_FILLS[tailFrame], TAIL_POS, outlineColor, fillColor, true);
+        // Stretch offsets
+        let bodyOffX = 0, bodyOffY = 0, headExtraY = 0;
+        if (_stretchTicks > 0) {
+            if (_stretchPhase === 1 || _stretchPhase === 2) {
+                // Stretching: body shifts down, head up
+                bodyOffY = 1;
+                headExtraY = -2;
+            } else if (_stretchPhase === 0) {
+                // Preparing: slight compression
+                bodyOffY = -1;
+                headExtraY = 1;
+            }
+        }
 
-        // Eyes on top
+        // Z-order: tail → body → head → paw → eyes
+        drawFilled(TAIL_OUTLINES[tailFrame], TAIL_FILLS[tailFrame], TAIL_POS, outlineColor, fillColor, true);
+        drawFilled(BODY.outline, BODY.fill,
+            { x: BODY_POS.x + bodyOffX, y: BODY_POS.y + bodyOffY },
+            outlineColor, fillColor);
+        // Head with ear twitch + stretch offset
+        drawFilled(HEAD.outline, HEAD.fill,
+            { x: HEAD_POS.x + _headOffX, y: HEAD_POS.y + _headOffY + headExtraY },
+            outlineColor, fillColor);
+
+        // Paw wave animation
+        if (_pawWaveTicks > 0 && (_pawWavePhase === 1 || _pawWavePhase === 2)) {
+            // Paw position: right side of body, near front
+            const pawX = BODY_POS.x + 12 + bodyOffX;
+            const pawBaseY = BODY_POS.y + 14 + bodyOffY;
+            const pawLift = _pawWavePhase === 2 ? 3 : 2;
+            drawFilled(PAW_OUTLINE, PAW_FILL,
+                { x: pawX, y: pawBaseY - pawLift },
+                outlineColor, fillColor);
+        }
+
+        // Eyes on top (follow head offset)
         const frames = cfg.frames;
         if (frames && frames.length > 0 && frames[eyeFrame]) {
-            drawGrid(frames[eyeFrame], cfg.x, cfg.y, eyeColor);
+            drawGrid(frames[eyeFrame], cfg.x + _headOffX, cfg.y + _headOffY + headExtraY, eyeColor);
         }
     }
 
@@ -360,6 +448,50 @@
             }
         }
 
+        // Ear twitch: random micro-animation during idle/neutral
+        if (_earTwitchTicks > 0) {
+            _earTwitchTicks--;
+            if (_earTwitchTicks === 0) { _headOffX = 0; _headOffY = 0; }
+        } else if (expression === 'neutral' && _stretchTicks === 0 && Math.random() < 0.02) {
+            _headOffX = Math.random() < 0.5 ? 1 : -1;
+            _headOffY = -1;
+            _earTwitchTicks = 2 + Math.floor(Math.random() * 2);
+        }
+
+        // Paw wave: random animation during idle
+        if (_pawWaveTicks > 0) {
+            _pawWaveTicks--;
+            // Phase progression: down(0) → up(1) → hold(2) → down(3)
+            if (_pawWaveTicks === 0) { _pawWavePhase = 0; }
+            else if (_pawWaveTicks < 3) { _pawWavePhase = 3; }
+            else if (_pawWaveTicks < 6) { _pawWavePhase = 2; }
+            else { _pawWavePhase = 1; }
+        } else if (expression === 'neutral' && _stretchTicks === 0 && Math.random() < 0.008) {
+            // ~0.8% chance per tick (~every 15s at 120ms interval)
+            _pawWaveTicks = 10;
+            _pawWavePhase = 1;
+            setSpeech('tip');
+        }
+
+        // Stretch/yawn: rare animation during idle
+        if (_stretchTicks > 0) {
+            _stretchTicks--;
+            // Phase progression: prep(0) → stretch(1) → hold(2) → relax(3)
+            if (_stretchTicks === 0) { _stretchPhase = 0; }
+            else if (_stretchTicks < 3) { _stretchPhase = 3; }
+            else if (_stretchTicks < 8) { _stretchPhase = 2; }
+            else { _stretchPhase = 1; }
+            // During stretch, use sleepy eyes
+            if (_stretchPhase >= 1 && _stretchPhase <= 2 && expression === 'neutral') {
+                // Temporarily show sleepy-like half-closed eyes by forcing eyeFrame
+            }
+        } else if (expression === 'neutral' && _pawWaveTicks === 0 && Math.random() < 0.004) {
+            // ~0.4% chance per tick (~every 30s at 120ms interval)
+            _stretchTicks = 12;
+            _stretchPhase = 0;
+            setSpeech('idle'); // yawn
+        }
+
         render();
     }
 
@@ -382,7 +514,27 @@
         if (tipTimer) clearInterval(tipTimer);
         const showTip = () => {
             if (!animating || currentSpeech) return; // don't override active speech
-            setSpeech('tip');
+            // Mood-aware tips
+            const moodTips = {
+                happy: ['*довольный мурр*', 'Всё идёт по плану! =^_^=', 'Хороший день для хаков!'],
+                grumpy: ['Хмф...', '*недовольно смотрит*', 'Можно получше...', 'Не всё KEEP...'],
+                sleepy: ['*зевает*... Мяу...', '*сонно моргает*', 'Скучно... дай задачу...'],
+            };
+            // Page-aware tips take priority, fallback to mood tips, then generic tips
+            const pagePool = PAGE_TIPS[_currentPage];
+            let pool;
+            if (pagePool && Math.random() < 0.7) {
+                // 70% page-specific tips
+                pool = pagePool;
+            } else if (moodTips[_mood]) {
+                // 30% mood-specific or generic
+                pool = moodTips[_mood];
+            } else {
+                pool = SPEECH.tip;
+            }
+            currentSpeech = pickRandom(pool);
+            if (speechTimer) clearTimeout(speechTimer);
+            speechTimer = setTimeout(() => { currentSpeech = ''; }, 6000);
         };
         // first tip after 8s, then every 15-25s
         tipTimer = setTimeout(() => {
@@ -460,6 +612,47 @@
             if (durationMs && text) {
                 speechTimer = setTimeout(() => { currentSpeech = ''; }, durationMs);
             }
+        },
+
+        /** Trigger an ear twitch immediately. */
+        triggerEarTwitch() {
+            _headOffX = Math.random() < 0.5 ? 1 : -1;
+            _headOffY = -1;
+            _earTwitchTicks = 2 + Math.floor(Math.random() * 2);
+        },
+
+        /** Trigger a paw wave animation. */
+        triggerPawWave() {
+            if (_pawWaveTicks > 0) return;
+            _pawWaveTicks = 10;
+            _pawWavePhase = 1;
+        },
+
+        /** Trigger a stretch/yawn animation. */
+        triggerStretch() {
+            if (_stretchTicks > 0) return;
+            _stretchTicks = 12;
+            _stretchPhase = 0;
+        },
+
+        /** Set current page for contextual tips. */
+        setPage(page) {
+            _currentPage = page || 'dashboard';
+        },
+
+        /** Get current page. */
+        getPage() {
+            return _currentPage;
+        },
+
+        /** Set persistent mood (affects idle tip selection). */
+        setMood(mood) {
+            _mood = mood || 'neutral';
+        },
+
+        /** Get current mood. */
+        getMood() {
+            return _mood;
         },
 
         /** Is animation running? */
