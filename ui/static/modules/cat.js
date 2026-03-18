@@ -259,7 +259,7 @@
             'Качество > количество, мяу!',
             'Посмотри последний эксперимент...',
             'Настрой фокус-области в CONFIG_',
-            'Запусти HACK чтобы я заработал!',
+            'Запусти эксперимент чтобы я заработал!',
             'Изучи тренд на DASHBOARD_',
             'Чем выше score, тем лучше_',
             'DISCARD — не конец, а опыт!',
@@ -318,8 +318,7 @@
     }
 
     function render() {
-        if (!ctx) { console.log('[CatModule] render() skipped — no ctx'); return; }
-        if (!canvas) { console.log('[CatModule] render() skipped — no canvas'); return; }
+        if (!ctx || !canvas) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         const outlineColor = '#b44aff';
@@ -408,16 +407,13 @@
          * @param {string} expr - 'neutral'|'happy'|'sleepy'|'surprised'|'angry'|'thinking'
          */
         start(el, expr, pixelSize) {
-            console.log('[CatModule] start() called', { el: !!el, expr, animating, pixelSize });
             if (animating) this.stop();
             canvas = el;
             ctx = canvas.getContext('2d');
-            console.log('[CatModule] canvas:', canvas.width, 'x', canvas.height, 'ctx:', !!ctx);
             ps = pixelSize || 4;
             canvas.width = CW * ps;
             canvas.height = CH * ps;
             canvas.style.imageRendering = 'pixelated';
-            console.log('[CatModule] set canvas to', CW * ps, 'x', CH * ps);
 
             if (expr) expression = expr;
             tailFrame = 0;
@@ -426,11 +422,9 @@
             animating = true;
 
             render();
-            console.log('[CatModule] render() done, starting interval');
             animTimer = setInterval(tick, 120);
             setSpeech('working');
             startTips();
-            console.log('[CatModule] start() complete');
         },
 
         /** Stop animation and release canvas. */
@@ -473,11 +467,7 @@
             return animating;
         },
 
-        /** Get canvas dimensions (pre-size your container). */
-        getSize() {
-            return { w: CW * ps, h: CH * ps };
-        },
     };
 
-    console.log('%c[CatModule] Loaded — catode32 cat sprite engine', 'color: #b44aff');
+    // [CatModule] Loaded — catode32 cat sprite engine
 })();

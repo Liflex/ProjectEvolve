@@ -34,12 +34,11 @@ _RE_SECTION_HEADER = re.compile(r'^(Test Plan|Hypothesis|Target|Complexity|Metri
 _RE_DASH = re.compile(r'\s*[—–]\s+')
 _RE_HYPHEN = re.compile(r'\s+-\s+')
 
-# Patterns for _read_experiment_history()
-_RE_EXP_HEADER = re.compile(r'^## Experiment (\d+) — (.+)', re.MULTILINE)
-_RE_EXP_TYPE = re.compile(r'\*\*Type:\*\*\s*(.+)')
-_RE_SCORE_DECISION = re.compile(r'\*\*Score:\*\*\s*([\d.]+|N/A)\s*\|\s*\*\*Decision:\*\*\s*(\w+)')
-_RE_QUALITY_SCORE = re.compile(r'\*\*Quality Gate Score:\*\*\s*([\d.]+)')
-_RE_RESULT = re.compile(r'\*\*Result:\*\*\s*(KEEP|DISCARD|MANUAL_REVIEW)')
+# Re-export shared patterns from quality_loop (single source of truth)
+from quality_loop import (
+    _RE_EXP_HEADER, _RE_EXP_TYPE, _RE_SCORE_DECISION,
+    _RE_QUALITY_SCORE, _RE_RESULT, _RE_EXP_SPLIT, _parse_score_decision,
+)  # noqa: F401
 
 
 # =============================================================================
@@ -284,14 +283,7 @@ def _read_experiment_history(exp_dir: Path, max_entries: int = 5) -> str:
         type_match = _RE_EXP_TYPE.search(section)
         exp_type = type_match.group(1).strip() if type_match else classify_experiment_type(title)
 
-        score_match = _RE_SCORE_DECISION.search(section)
-        if score_match:
-            score, decision = score_match.group(1), score_match.group(2)
-        else:
-            score_m = _RE_QUALITY_SCORE.search(section)
-            result_m = _RE_RESULT.search(section)
-            score = score_m.group(1) if score_m else "N/A"
-            decision = result_m.group(1) if result_m else "N/A"
+        score, decision = _parse_score_decision(section)
 
         entries.append({
             "number": num, "title": title, "type": exp_type,

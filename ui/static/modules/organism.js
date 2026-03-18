@@ -208,12 +208,6 @@
             return STAGES[0];
         },
 
-        /**
-         * Get core color based on avg quality score
-         */
-        getCoreColor(avgScore) {
-            return _scoreColor(avgScore);
-        },
 
         /**
          * Generate all node positions for SVG rendering
@@ -272,6 +266,5 @@
         },
     };
 
-    // Auto-expose to console for debugging
-    console.log('%c[Organism Module] Loaded — creature: ' + CFG.creature, 'color: #00f0ff');
+    // [Organism Module] Loaded — creature: ' + CFG.creature
 })();

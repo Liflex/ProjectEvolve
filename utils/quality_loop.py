@@ -14,47 +14,16 @@ Works with:
 """
 
 import os
-import re
 import sys
 import json
-import shutil
 import time
-import shlex
 import subprocess
+import yaml
 from pathlib import Path
-
-try:
-    import yaml
-except ImportError:
-    yaml = None
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, asdict
 from enum import Enum
-
-
-# Built-in auto-detect defaults for common tech stacks
-# Used when config doesn't specify auto_detect for a metric
-DEFAULT_AUTO_DETECT = {
-    "python": {
-        "syntax": ["python -m compileall -q ."],
-    },
-    "javascript": {
-        "syntax": [
-            # Walk directory tree, run node --check on each .js/.mjs/.cjs/.jsx file
-            "node -e \"const cp=require('child_process'),fs=require('fs'),path=require('path');"
-            "function walk(d){let files=[];try{for(const e of fs.readdirSync(d,{withFileTypes:true})){"
-            "const full=path.join(d,e.name);if(e.isDirectory()&&e.name!=='node_modules'&&e.name!=='.git')"
-            "files=files.concat(walk(full));else if(/\\.(mjs|cjs|jsx?)$/.test(e.name))files.push(full)}}"
-            "catch(x){}return files}let errs=0;for(const f of walk('.')){try{cp.execFileSync('node',"
-            "['--check',f],{stdio:'pipe'})}catch(e){console.error(f+': '+(e.stderr?e.stderr.toString().trim()"
-            ":e.message));errs++}}if(errs)process.exit(1);\""
-        ],
-    },
-    "typescript": {
-        "syntax": ["npx --yes tsc --noEmit"],
-    },
-}
 
 
 class Phase(Enum):
@@ -93,8 +62,6 @@ class LoopState:
     results: List[MetricResult]
     started_at: str
     stop_reason: Optional[str] = None
-    threshold_a: float = 0.7
-    threshold_b: float = 0.85
 
 
 class QualityConfig:
@@ -106,38 +73,29 @@ class QualityConfig:
         self.config = self._load_config()
 
     def _load_config(self) -> Dict:
-        """Загружает конфигурацию из YAML файла (с fallback на JSON)"""
-        default_config = {
-            "project_name": self.project_dir.name,
-            "metrics": {"tests": {"enabled": True}, "syntax": {"enabled": True}},
-            "thresholds": {
-                "a": {"min_score": 0.7, "required_checks": []},
-                "b": {"min_score": 0.85, "required_checks": []}
-            },
-            "loop": {
-                "max_iterations": 4,
-                "stagnation_limit": 2,
-                "stagnation_delta": 0.02
-            }
-        }
-
+        """Загружает конфигурацию из YAML файла"""
         if not self.config_file.exists():
+            # Создаём дефолтный конфиг
+            default_config = {
+                "project_name": self.project_dir.name,
+                "metrics": {"tests": {"enabled": True}},
+                "thresholds": {
+                    "a": {"min_score": 0.7, "required_checks": ["tests"]},
+                    "b": {"min_score": 0.85, "required_checks": ["tests"]}
+                },
+                "loop": {
+                    "max_iterations": 4,
+                    "stagnation_limit": 2,
+                    "stagnation_delta": 0.02
+                }
+            }
             self.config_file.parent.mkdir(parents=True, exist_ok=True)
-            if yaml:
-                with open(self.config_file, "w", encoding="utf-8") as f:
-                    yaml.dump(default_config, f, default_flow_style=False, allow_unicode=True)
-            else:
-                # Fallback: сохраняем как JSON если yaml недоступен
-                json_file = self.config_file.with_suffix(".json")
-                with open(json_file, "w", encoding="utf-8") as f:
-                    json.dump(default_config, f, indent=2, ensure_ascii=False)
+            with open(self.config_file, "w", encoding="utf-8") as f:
+                yaml.dump(default_config, f, default_flow_style=False, allow_unicode=True)
             return default_config
 
         with open(self.config_file, "r", encoding="utf-8") as f:
-            if yaml and self.config_file.suffix in (".yml", ".yaml"):
-                return yaml.safe_load(f)
-            else:
-                return json.load(f)
+            return yaml.safe_load(f)
 
     def get_phase_threshold(self, phase: Phase) -> float:
         """Возвращает порог для фазы"""
@@ -156,14 +114,11 @@ class MetricRunner:
     def __init__(self, project_dir: Path, config: QualityConfig):
         self.project_dir = project_dir
         self.config = config
-        self.tech_stacks = self._detect_tech_stacks()
+        self.tech_stack = self._detect_tech_stack()
 
-    def _detect_tech_stacks(self) -> List[str]:
-        """Автодетект всех стеков технологий проекта.
-
-        Возвращает список всех обнаруженных стеков (с дедупликацией).
-        Проект со смешанными стеками (JS+Python) получат метрики для каждого.
-        """
+    def _detect_tech_stack(self) -> str:
+        """Автодетект стека технологий"""
+        # Проверяем файлы проекта
         checks = [
             ("package.json", "javascript"),
             ("tsconfig.json", "typescript"),
@@ -176,39 +131,31 @@ class MetricRunner:
             ("build.gradle", "java"),
         ]
 
-        stacks = []
-        seen = set()
         for filename, tech in checks:
-            if (self.project_dir / filename).exists() and tech not in seen:
-                stacks.append(tech)
-                seen.add(tech)
+            if (self.project_dir / filename).exists():
+                return tech
 
-        return stacks if stacks else ["unknown"]
+        return "unknown"
 
     def _find_command(self, metric_type: str) -> Optional[str]:
-        """Находит команду для метрики по типу проекта.
-
-        Проверяет config auto_detect для всех обнаруженных стеков,
-        затем fallback на DEFAULT_AUTO_DETECT.
-        Использует shutil.which() для быстрой проверки без subprocess spawn.
-        """
+        """Находит команду для метрики по типу проекта"""
         auto_detect = self.config.config.get("auto_detect", {})
+        commands = auto_detect.get(self.tech_stack, {}).get(metric_type, [])
 
-        # Check config auto_detect for all detected tech stacks
-        for stack in self.tech_stacks:
-            commands = auto_detect.get(stack, {}).get(metric_type, [])
-            for cmd in commands:
-                base_cmd = shlex.split(cmd)[0]
-                if shutil.which(base_cmd):
-                    return cmd
-
-        # Fallback to built-in defaults for all detected stacks
-        for stack in self.tech_stacks:
-            commands = DEFAULT_AUTO_DETECT.get(stack, {}).get(metric_type, [])
-            for cmd in commands:
-                base_cmd = shlex.split(cmd)[0]
-                if shutil.which(base_cmd):
-                    return cmd
+        # Пробуем каждую команду
+        for cmd in commands:
+            try:
+                # Проверяем что команда существует
+                base_cmd = cmd.split()[0]
+                subprocess.run(
+                    [base_cmd, "--version"],
+                    capture_output=True,
+                    timeout=5,
+                    check=False
+                )
+                return cmd
+            except:
+                continue
 
         return None
 
@@ -233,7 +180,7 @@ class MetricRunner:
                 return MetricResult(
                     name=name,
                     passed=True,
-                    output=f"No {name} command found for {', '.join(self.tech_stacks)}",
+                    output=f"No {name} command found for {self.tech_stack}",
                     duration=0.0,
                     score=0.5  # Neutral score
                 )
@@ -245,8 +192,8 @@ class MetricRunner:
 
         try:
             result = subprocess.run(
-                shlex.split(command),
-                shell=False,
+                command,
+                shell=True,
                 cwd=self.project_dir,
                 capture_output=True,
                 text=True,
@@ -295,15 +242,7 @@ class MetricRunner:
 
     def run_all_metrics(self, phase: Phase) -> Tuple[List[MetricResult], float]:
         """Запускает все метрики и возвращает результаты с общим score"""
-        metrics_config = dict(self.config.config.get("metrics", {}))
-
-        # Auto-add built-in metrics for all detected tech stacks (if not already in config)
-        for stack in self.tech_stacks:
-            stack_defaults = DEFAULT_AUTO_DETECT.get(stack, {})
-            for metric_name in stack_defaults:
-                if metric_name not in metrics_config:
-                    metrics_config[metric_name] = {"enabled": True}
-
+        metrics_config = self.config.config.get("metrics", {})
         required_checks = self.config.get_required_checks(phase)
 
         results = []
@@ -313,11 +252,6 @@ class MetricRunner:
         for metric_name, metric_config in metrics_config.items():
             result = self.run_metric(metric_name, metric_config)
             results.append(result)
-
-            # Skip "not applicable" metrics (score 0.5 = no command found)
-            # They still appear in results for info, but don't affect the score
-            if result.score == 0.5 and result.passed:
-                continue
 
             # required checks имеют вес 2, остальные 1
             weight = 2.0 if metric_name in required_checks else 1.0
@@ -345,8 +279,7 @@ class QualityLoop:
         self,
         max_iterations: int = 4,
         threshold_a: float = 0.7,
-        threshold_b: float = 0.85,
-        quiet: bool = False
+        threshold_b: float = 0.85
     ) -> LoopState:
         """Запускает Quality Loop
 
@@ -354,22 +287,17 @@ class QualityLoop:
             max_iterations: Максимальное количество итераций
             threshold_a: Порог для Phase A
             threshold_b: Порог для Phase B
-            quiet: Подавить console output (для программного использования)
 
         Returns:
             Финальное состояние loop
         """
-        def _print(msg=""):
-            if not quiet:
-                print(msg)
-
-        _print("=" * 70)
-        _print("Quality Loop - Started")
-        _print("=" * 70)
-        _print(f"Project: {self.project_dir.name}")
-        _print(f"Tech Stack: {', '.join(self.runner.tech_stacks)}")
-        _print(f"Max Iterations: {max_iterations}")
-        _print()
+        print("=" * 70)
+        print("Quality Loop - Started")
+        print("=" * 70)
+        print(f"Project: {self.project_dir.name}")
+        print(f"Tech Stack: {self.runner.tech_stack}")
+        print(f"Max Iterations: {max_iterations}")
+        print()
 
         # Инициализация состояния
         self.state = LoopState(
@@ -379,9 +307,7 @@ class QualityLoop:
             baseline_score=0.0,
             last_score=None,
             results=[],
-            started_at=datetime.now().isoformat(),
-            threshold_a=threshold_a,
-            threshold_b=threshold_b
+            started_at=datetime.now().isoformat()
         )
 
         stagnation_count = 0
@@ -392,10 +318,10 @@ class QualityLoop:
             # Определяем порог для текущей фазы
             threshold = threshold_a if self.state.phase == Phase.A else threshold_b
 
-            _print(f"\n{'=' * 70}")
-            _print(f"Iteration {self.state.iteration}/{max_iterations} | Phase {self.state.phase.value}")
-            _print(f"Threshold: {threshold:.2f}")
-            _print(f"{'=' * 70}\n")
+            print(f"\n{'=' * 70}")
+            print(f"Iteration {self.state.iterition}/{max_iterations} | Phase {self.state.phase.value}")
+            print(f"Threshold: {threshold:.2f}")
+            print(f"{'=' * 70}\n")
 
             # Запуск метрик
             results, score = self.runner.run_all_metrics(self.state.phase)
@@ -403,17 +329,17 @@ class QualityLoop:
             self.state.score = score
 
             # Вывод результатов
-            self._print_results(results, score, threshold, quiet)
+            self._print_results(results, score, threshold)
 
             # Проверка условий остановки
-            stop_reason = self._check_stop_conditions(score, threshold, stagnation_count, loop_config, quiet)
+            stop_reason = self._check_stop_conditions(score, threshold, stagnation_count, loop_config)
             if stop_reason:
                 self.state.stop_reason = stop_reason.value
                 break
 
             # Проверка перехода Phase A → B
             if self.state.phase == Phase.A and score >= threshold:
-                _print(f"\n✓ Phase A passed! Advancing to Phase B...")
+                print(f"\n✓ Phase A passed! Advancing to Phase B...")
                 self.state.phase = Phase.B
                 self.state.iteration += 1
                 continue
@@ -431,7 +357,7 @@ class QualityLoop:
             self.state.iteration += 1
 
         # Финальный отчёт
-        self._print_summary(quiet)
+        self._print_summary()
 
         return self.state
 
@@ -440,8 +366,7 @@ class QualityLoop:
         score: float,
         threshold: float,
         stagnation_count: int,
-        loop_config: Dict,
-        quiet: bool = False
+        loop_config: Dict
     ) -> Optional[StopReason]:
         """Проверяет условия остановки loop"""
         # Phase B passed
@@ -451,17 +376,13 @@ class QualityLoop:
         # Stagnation
         stagnation_limit = loop_config.get("stagnation_limit", 2)
         if stagnation_count >= stagnation_limit:
-            if not quiet:
-                print(f"\n⚠ Stagnation detected (no improvement for {stagnation_count} iterations)")
+            print(f"\n⚠ Stagnation detected (no improvement for {stagnation_count} iterations)")
             return StopReason.stagnation
 
         return None
 
-    def _print_results(self, results: List[MetricResult], score: float, threshold: float, quiet: bool = False):
+    def _print_results(self, results: List[MetricResult], score: float, threshold: float):
         """Выводит результаты итерации"""
-        if quiet:
-            return
-
         passed = score >= threshold
         status = "✓ PASS" if passed else "✗ FAIL"
 
@@ -470,7 +391,7 @@ class QualityLoop:
 
         for result in results:
             icon = "✓" if result.passed else "✗"
-            print(f"  {icon} {result.name}: {result.score:.1f} ({result.duration:.1f}s)")
+            print(f"  {icon} {result.name}: {result.score:.0f} ({result.duration:.1f}s)")
 
             # Выводим output если есть ошибка
             if not result.passed and result.output:
@@ -479,11 +400,8 @@ class QualityLoop:
                 for line in lines:
                     print(f"      {line}")
 
-    def _print_summary(self, quiet: bool = False):
+    def _print_summary(self):
         """Выводит финальный отчёт"""
-        if quiet:
-            return
-
         print(f"\n{'=' * 70}")
         print("Quality Loop - Summary")
         print(f"{'=' * 70}")
@@ -500,106 +418,15 @@ class QualityLoop:
 
     def _make_decision(self) -> str:
         """Принимает решение: сохранить или отбросить изменения"""
+        score_improved = self.state.last_score is None or self.state.score > self.state.last_score
         no_failures = all(r.passed for r in self.state.results)
 
-        if self.state.score >= self.state.threshold_b and no_failures:
-            return "✓ KEEP - All checks passed (strict quality)"
-        elif self.state.score >= self.state.threshold_a:
-            return "⚠ ACCEPT - Quality meets baseline"
+        if score_improved and no_failures:
+            return "✓ KEEP - Score improved, all checks passed"
+        elif self.state.score > 0.7:
+            return "⚠ ACCEPT - Good quality, minor issues"
         else:
-            return "✗ DISCARD - Quality below threshold"
-
-
-def classify_experiment_type(title: str) -> str:
-    """Classify experiment type by title keywords.
-
-    Shared between autoresearch.py and ui/server.py to prevent drift.
-    Used as fallback when agent doesn't explicitly report Type.
-    """
-    t = title.lower()
-    if any(kw in t for kw in ("fix", "bug", "crash", "nameerror", "error", "truncat", "hang")):
-        return "Bug Fix"
-    if any(kw in t for kw in ("security", "xss", "injection", "owasp", "path traversal", "protect")):
-        return "Security"
-    if any(kw in t for kw in ("add", "new", "implement", "introduce", "enable")):
-        return "Feature"
-    if any(kw in t for kw in ("refactor", "simplif", "clean", "extract", "consolidat", "compress")):
-        return "Refactoring"
-    if any(kw in t for kw in ("improve", "enhance", "optim", "align")):
-        return "Improvement"
-    if any(kw in t for kw in ("document", "readme", "guide")):
-        return "Docs"
-    return "Other"
-
-
-# Pre-compiled regex patterns for parse_accumulation_context()
-_RE_EXP_SPLIT = re.compile(r"(?=^## Experiment \d+)", re.MULTILINE)
-_RE_EXP_HEADER = re.compile(r"## Experiment (\d+) — (.+)")
-_RE_DATE = re.compile(r"\*\*Date:\*\*\s*(.+)")
-_RE_TYPE = re.compile(r"\*\*Type:\*\*\s*(.+)")
-_RE_SCORE_DECISION = re.compile(r"\*\*Score:\*\*\s*([\d.]+|N/A)\s*\|\s*\*\*Decision:\*\*\s*(\w+)")
-_RE_QUALITY_SCORE = re.compile(r"\*\*Quality Gate Score:\*\*\s*([\d.]+)")
-_RE_RESULT = re.compile(r"\*\*Result:\*\*\s*(KEEP|DISCARD|MANUAL_REVIEW)")
-
-
-def parse_accumulation_context(ctx_file: Path, content: str = None) -> List[Dict[str, Any]]:
-    """Parse experiment entries from accumulation_context.md.
-
-    Shared between autoresearch.py and ui/server.py to prevent drift.
-    Each entry is split by '## Experiment N — Title' headers and
-    standard fields (number, title, date, type, score, decision) are
-    extracted via regex.  Consumers can enrich with additional fields.
-
-    Args:
-        ctx_file: Path to accumulation_context.md
-        content: Pre-read file content (avoids double I/O when caller already read it)
-
-    Returns:
-        List of dicts with keys: number, title, date, type, score, decision
-    """
-    if content is None:
-        if not ctx_file.exists():
-            return []
-        content = ctx_file.read_text(encoding="utf-8")
-
-    sections = _RE_EXP_SPLIT.split(content)
-
-    experiments = []
-    for section in sections:
-        header_match = _RE_EXP_HEADER.match(section)
-        if not header_match:
-            continue
-
-        num = int(header_match.group(1))
-        title = header_match.group(2).strip()
-
-        date_match = _RE_DATE.search(section)
-        date = date_match.group(1).strip() if date_match else ""
-
-        type_match = _RE_TYPE.search(section)
-        exp_type = type_match.group(1).strip() if type_match else classify_experiment_type(title)
-
-        # Format 1: **Score:** X | **Decision:** Y
-        score_match = _RE_SCORE_DECISION.search(section)
-        if score_match:
-            score, decision = score_match.group(1), score_match.group(2)
-        else:
-            # Format 2: **Quality Gate Score:** X + **Result:** Y (legacy)
-            score_m = _RE_QUALITY_SCORE.search(section)
-            result_m = _RE_RESULT.search(section)
-            score = score_m.group(1) if score_m else "N/A"
-            decision = result_m.group(1) if result_m else "N/A"
-
-        experiments.append({
-            "number": num,
-            "title": title,
-            "date": date,
-            "type": exp_type,
-            "score": score,
-            "decision": decision,
-        })
-
-    return experiments
+            return "✗ DISCARD - Quality too low"
 
 
 def main():
@@ -645,20 +472,16 @@ def main():
     state = loop.run(
         max_iterations=args.max_iterations,
         threshold_a=args.threshold_a,
-        threshold_b=args.threshold_b,
-        quiet=args.json  # --json suppresses human-readable output for clean parsing
+        threshold_b=args.threshold_b
     )
 
     if args.json:
-        # Вывод в JSON для парсинга — только JSON, без лишнего текста
-        decision_text = loop._make_decision()
-        decision_key = "KEEP" if "KEEP" in decision_text else ("ACCEPT" if "ACCEPT" in decision_text else "DISCARD")
+        # Вывод в JSON для парсинга
         output = {
             "score": state.score,
             "phase": state.phase.value,
             "iterations": state.iteration - 1,
             "stop_reason": state.stop_reason,
-            "decision": decision_key,
             "results": [
                 {
                     "name": r.name,
@@ -671,7 +494,7 @@ def main():
         }
         print(json.dumps(output, indent=2))
 
-    return 0 if state.score >= state.threshold_a else 1
+    return 0 if state.score >= 0.7 else 1
 
 
 if __name__ == "__main__":

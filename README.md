@@ -288,31 +288,6 @@ F:/IdeaProjects/autoresearch/autoresearch.py . 50 2
 - `--iter` — number of iterations (default: 10)
 - `--timeout` — interval between iterations in minutes (default: 5)
 
-### Step 3️⃣: Web Dashboard (UI)
-
-ProjectEvolve includes a **built-in web dashboard** for monitoring experiments in real-time via the browser.
-
-```bash
-# Start the dashboard (default port 7890)
-python ui/server.py
-
-# Custom project and port
-python ui/server.py --project /path/to/project --port 3000
-```
-
-Open `http://localhost:7890` in your browser.
-
-#### Dashboard Features
-
-- **Live run control** — start/stop autoresearch runs with configurable iterations, timeout, and max time
-- **Real-time log streaming** — watch experiment output as it happens, no terminal needed
-- **Experiment browser** — view all experiments with prompt, output, results, and notes
-- **Progress tracking** — current experiment / total with elapsed time
-- **Visual effects** — Matrix rain background (synthwave theme) and project organism visualizer
-- **Project organism** — SVG-based entity that evolves based on experiment metrics, grows with your project
-- **Cat companion** — contextual tips and comments from a cat assistant
-- **Keyboard navigation** — fully keyboard-accessible (Tab, Enter, Escape)
-
 ---
 
 ## 📂 Project Structure
@@ -328,17 +303,8 @@ autoresearch/
 ├── config/
 │   ├── default_prompt.md    # Agent prompt template
 │   └── quality.yml          # Quality gate configuration
-├── ui/
-│   ├── server.py            # Web dashboard server (FastAPI)
-│   └── static/
-│       ├── index.html       # Dashboard SPA (Alpine.js)
-│       └── modules/
-│           ├── cat.js       # Cat companion with contextual tips
-│           ├── matrix.js    # Matrix rain background effect
-│           └── organism.js  # Project organism visualizer
 ├── utils/
-│   ├── prompt_builder.py    # Prompt generation with context
-│   ├── experiment_io.py     # Experiment parsing and I/O
+│   ├── cli_setup.py         # Interactive setup
 │   └── quality_loop.py      # Quality loop implementation
 └── .gitignore               # Git ignore
 ```
@@ -500,6 +466,8 @@ Contributions welcome! Create issues and pull requests.
 
 ### Ideas for Improvement
 
+- 🌐 Web UI for experiment monitoring
+- 📊 Progress visualization
 - 🔔 Completion notifications
 - 📈 Metrics and analytics
 - 🔄 CI/CD integration

@@ -50,9 +50,9 @@ CSP_POLICY = (
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' "
         "https://cdn.tailwindcss.com "
         "https://cdn.jsdelivr.net; "
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
     "font-src 'self' https://fonts.gstatic.com; "
-    "connect-src 'self'; "
+    "connect-src 'self' ws: wss: https://cdn.jsdelivr.net https://cdn.tailwindcss.com; "
     "frame-ancestors 'none'; "
     "base-uri 'self'; "
     "form-action 'self'"
@@ -119,7 +119,39 @@ def get_exp_dir() -> Path:
     return get_project_dir() / ".autoresearch" / "experiments"
 
 
-from quality_loop import classify_experiment_type, parse_accumulation_context
+_RE_EXP_HEADER = re.compile(r"## Experiment (\d+)")
+_RE_EXP_SPLIT = re.compile(r"(?=^## Experiment \d+)", re.MULTILINE)
+
+
+def parse_accumulation_context(ctx_file: Path, content: str = None) -> List[Dict[str, Any]]:
+    """Parse accumulation_context.md into a list of experiment dicts."""
+    if content is None:
+        try:
+            content = ctx_file.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return []
+    experiments = []
+    for section in _RE_EXP_SPLIT.split(content):
+        m = _RE_EXP_HEADER.match(section)
+        if not m:
+            continue
+        number = int(m.group(1))
+        # Extract metadata
+        title_m = re.search(r"## Experiment \d+:?\s*(.+)", section)
+        title = title_m.group(1).strip() if title_m else f"Experiment {number}"
+        date_m = re.search(r"Date:\s*(.+)", section)
+        date = date_m.group(1).strip() if date_m else ""
+        score_m = re.search(r"Score:\s*([\d.]+)", section)
+        score = float(score_m.group(1)) if score_m else 0.5
+        decision_m = re.search(r"Decision:\s*(KEEP|DISCARD|ACCEPT|N/A)", section)
+        decision = decision_m.group(1) if decision_m else "N/A"
+        type_m = re.search(r"Type:\s*(.+)", section)
+        exp_type = type_m.group(1).strip() if type_m else "Unknown"
+        experiments.append({
+            "number": number, "title": title, "date": date,
+            "score": str(score), "decision": decision, "type": exp_type,
+        })
+    return experiments
 
 
 def _extract_section(section_text: str, name: str) -> str:
@@ -558,7 +590,224 @@ async def index():
 # Serve /modules/ directory for plug-in scripts (cat.js, matrix.js, etc.)
 MODULES_DIR = STATIC_DIR / "modules"
 if MODULES_DIR.exists():
-    app.mount("/modules", StaticFiles(directory=str(MODULES_DIR)), name="modules")
+    app.mount("/modules", StaticFiles(directory=str(MODULES_DIR), html=True), name="modules")
+
+# Serve /css/ and /js/ directories
+CSS_DIR = STATIC_DIR / "css"
+JS_DIR = STATIC_DIR / "js"
+if CSS_DIR.exists():
+    app.mount("/css", StaticFiles(directory=str(CSS_DIR), html=True), name="css")
+if JS_DIR.exists():
+    app.mount("/js", StaticFiles(directory=str(JS_DIR), html=True), name="js")
+
+
+# =============================================================================
+# SESSION MANAGER (for Chat feature)
+# =============================================================================
+
+try:
+    from agents.manager import SessionManager as _SessionManager
+    session_manager = _SessionManager()
+except ImportError as e:
+    import logging
+    logging.getLogger(__name__).warning("agents/ package not available: %s", e)
+    session_manager = None
+
+
+# =============================================================================
+# CHAT SESSION API
+# =============================================================================
+
+class SessionCreateRequest(BaseModel):
+    cwd: str
+    resume: Optional[str] = None
+    system_prompt_append: Optional[str] = None
+
+
+@app.post("/api/sessions")
+async def create_session(data: SessionCreateRequest):
+    """Create a new Claude Code session for a project path."""
+    if session_manager is None:
+        raise HTTPException(status_code=503, detail="Agent SDK not available")
+    if session_manager.is_at_limit():
+        return {
+            "session_id": None,
+            "warning": f"Active session limit ({session_manager._max_sessions}) reached.",
+            "active_count": session_manager.active_count,
+        }
+    project_path = Path(data.cwd).resolve()
+    if not project_path.is_dir():
+        raise HTTPException(status_code=404, detail=f"Project not found: {data.cwd}")
+    session = await session_manager.create_session(
+        cwd=str(project_path),
+        resume_id=data.resume,
+    )
+    return {"session_id": session.session_id, "created_at": session.created_at.isoformat()}
+
+
+@app.get("/api/sessions/history")
+async def list_session_history():
+    """List previous Claude Code sessions for the session picker."""
+    sessions = []
+    claude_projects_dir = Path.home() / ".claude" / "projects"
+    if claude_projects_dir.exists():
+        try:
+            for proj_dir in claude_projects_dir.iterdir():
+                if not proj_dir.is_dir():
+                    continue
+                jsonl_files = list(proj_dir.glob("*.jsonl"))
+                for jf in sorted(jsonl_files, key=lambda p: p.stat().st_mtime, reverse=True)[:50]:
+                    try:
+                        created = datetime.fromtimestamp(jf.stat().st_ctime)
+                        modified = datetime.fromtimestamp(jf.stat().st_mtime)
+                        last_user_msg = ""
+                        msg_count = 0
+                        with open(jf, "r", encoding="utf-8", errors="replace") as f:
+                            for line in f:
+                                try:
+                                    obj = json.loads(line.strip())
+                                    msg_count += 1
+                                    if obj.get("type") == "user" and not last_user_msg:
+                                        content = obj.get("message", {}).get("content", "")
+                                        if isinstance(content, list):
+                                            for c in content:
+                                                if c.get("type") == "text":
+                                                    last_user_msg = c["text"][:100]
+                                                    break
+                                        elif isinstance(content, str):
+                                            last_user_msg = content[:100]
+                                except (json.JSONDecodeError, KeyError):
+                                    pass
+                        sessions.append({
+                            "session_id": jf.stem,
+                            "project_path": str(proj_dir),
+                            "created_at": created.isoformat(),
+                            "last_active": modified.isoformat(),
+                            "message_count": msg_count,
+                            "topic_preview": last_user_msg or "(no user messages)",
+                        })
+                    except (OSError, json.JSONDecodeError):
+                        pass
+        except OSError:
+            pass
+    sessions.sort(key=lambda s: s["last_active"], reverse=True)
+    return {"sessions": sessions[:100]}
+
+
+@app.delete("/api/sessions/{session_id}")
+async def close_session(session_id: str):
+    """Close and clean up a specific session."""
+    if session_manager is None:
+        raise HTTPException(status_code=503, detail="Agent SDK not available")
+    success = await session_manager.cancel_session(session_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"status": "closed", "session_id": session_id}
+
+
+@app.get("/api/fs/list")
+async def list_directory(path: str):
+    """List directory contents for the file browser dialog."""
+    if not path:
+        raise HTTPException(status_code=400, detail="path parameter required")
+    abs_path = Path(path).resolve()
+    allowed_bases = {get_project_dir().resolve(), Path.cwd().resolve()}
+    if not any(str(abs_path).startswith(str(base)) for base in allowed_bases):
+        raise HTTPException(status_code=403, detail="Path traversal blocked")
+    if not abs_path.is_dir():
+        raise HTTPException(status_code=404, detail="Directory not found")
+    entries = []
+    skip_dirs = {".git", "node_modules", "__pycache__", ".venv", "venv", ".idea", ".vscode", ".autoresearch"}
+    try:
+        for entry in sorted(abs_path.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower())):
+            if entry.name.startswith(".") and entry.is_dir():
+                continue
+            if entry.name in skip_dirs:
+                continue
+            stat = entry.stat()
+            entries.append({
+                "name": entry.name,
+                "path": str(entry.resolve()),
+                "is_directory": entry.is_dir(),
+                "size": stat.st_size if not entry.is_dir() else 0,
+                "modified": datetime.fromtimestamp(stat.st_mtime).isoformat() if not entry.is_dir() else None,
+            })
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    return {"entries": entries}
+
+
+# =============================================================================
+# CHAT WEBSOCKET — real-time bidirectional streaming
+# =============================================================================
+
+import asyncio
+from fastapi import WebSocket, WebSocketDisconnect
+
+
+@app.websocket("/ws/chat/{session_id}")
+async def chat_websocket(websocket: WebSocket, session_id: str):
+    """WebSocket endpoint for real-time chat streaming."""
+    await websocket.accept()
+
+    if session_manager is None:
+        await websocket.send_json({"type": "error", "code": 503, "message": "Agent SDK not available", "recoverable": False})
+        await websocket.close()
+        return
+
+    session = session_manager.get_session(session_id)
+    if session is None:
+        await websocket.send_json({"type": "error", "code": 404, "message": "Session not found", "recoverable": False})
+        await websocket.close()
+        return
+
+    await websocket.send_json({
+        "type": "connected",
+        "session_id": session_id,
+        "cwd": session.cwd,
+        "resume_from": session.resume_id,
+    })
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+            try:
+                msg = json.loads(data)
+            except json.JSONDecodeError:
+                await websocket.send_json({"type": "error", "code": 400, "message": "Invalid JSON", "recoverable": True})
+                continue
+
+            msg_type = msg.get("type", "")
+
+            if msg_type == "ping":
+                await websocket.send_json({"type": "pong", "timestamp": datetime.now().isoformat()})
+
+            elif msg_type == "cancel":
+                await session.cancel()
+                await websocket.send_json({"type": "stream_end", "session_id": session_id})
+
+            elif msg_type == "message":
+                content = msg.get("content", "")
+                if not content:
+                    continue
+                try:
+                    async for event in session.send(content):
+                        await websocket.send_json({
+                            "type": "claude_event",
+                            "event_type": event.get("type", "unknown"),
+                            "data": event,
+                        })
+                    await websocket.send_json({"type": "stream_end", "session_id": session_id})
+                except asyncio.CancelledError:
+                    await websocket.send_json({"type": "stream_end", "session_id": session_id})
+                except Exception as e:
+                    await websocket.send_json({"type": "error", "code": 500, "message": str(e), "recoverable": True})
+                    await websocket.send_json({"type": "stream_end", "session_id": session_id})
+
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await session_manager.deactivate(session_id)
 
 
 # =============================================================================

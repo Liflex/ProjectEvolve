@@ -68,7 +68,6 @@ decision:
 
   discard_if:
     score_decreased: true  # Score ухудшился
-    critical_fail: true  # Критическая ошибка
 
 # Автодетект команд по типу проекта
 auto_detect:

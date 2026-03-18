@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AUTORESEARCH // HACK THE PLANET</title>
+    <title>AUTORESEARCH // DASHBOARD</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
@@ -15,6 +15,16 @@
     <script src="/modules/matrix.js"></script>
     <!-- Organism evolution visualizer -->
     <script src="/modules/organism.js"></script>
+    <!-- xterm.js CDN (GPU-accelerated terminal for chat) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@6.0.0/css/xterm.css">
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@6.0.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-webgl@0.19.0/lib/addon-webgl.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.11.0/lib/addon-fit.js"></script>
+    <!-- Chat UI modules -->
+    <link rel="stylesheet" href="/css/xterm.css">
+    <script src="/js/file-browser.js"></script>
+    <script src="/js/terminal.js"></script>
+    <script src="/js/chat.js"></script>
     <style>
         [x-cloak] { display: none !important; }
         * { scrollbar-width: thin; scrollbar-color: #1a1028 #0c0b14; }
@@ -137,6 +147,9 @@
 
         /* === SOFT HIGHLIGHT for selected items === */
         .sel-glow { box-shadow: inset 0 0 20px rgba(180,74,255,0.06); border-color: var(--v2); }
+        @keyframes borderGlow { 0%, 100% { border-color: var(--v-dim); box-shadow: 0 0 15px rgba(180,74,255,0.05); } 50% { border-color: var(--v2); box-shadow: 0 0 30px rgba(180,74,255,0.2), 0 0 60px rgba(180,74,255,0.05); } }
+        .start-session-btn { border: 2px solid var(--v-dim); transition: all 0.4s ease; animation: borderGlow 3s ease-in-out infinite; }
+        .start-session-btn:hover { border-color: var(--v); box-shadow: 0 0 30px rgba(180,74,255,0.3), 0 0 60px rgba(180,74,255,0.1); background: rgba(180,74,255,0.08); transform: scale(1.02); }
     </style>
 </head>
 <body class="text-[var(--ng2)] min-h-screen crt flicker" x-cloak x-data="app()">
@@ -162,7 +175,7 @@
                 <div class="text-[10px] tracking-[0.3em] text-[var(--v3)] mt-1">[ HACK THE PLANET ]</div>
             </div>
 
-            <!-- Cat Companion -->
+            <!-- Cat Companion (always visible) -->
             <div class="py-3 border-b-2 border-[var(--v-dim)] flex flex-col items-center">
                 <div class="cat-frame">
                     <canvas id="cat-canvas" width="180" height="148"></canvas>
@@ -177,8 +190,22 @@
                      x-text="'> ' + catSpeech"></div>
             </div>
 
-            <!-- Project Organism -->
-            <div class="py-2 border-b-2 border-[var(--v-dim)] flex flex-col items-center">
+            <!-- === MAIN NAV: Research Lab / Chat === -->
+            <nav class="flex flex-col border-b-2 border-[var(--v-dim)]">
+                <button @click="navigateSection('lab')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2.5 text-sm tracking-wider text-[var(--ng3)]"
+                        :class="section === 'lab' && 'active'">
+                    <span class="text-xs">[>]</span> RESEARCH LAB
+                    <span class="ml-auto text-[9px] text-[var(--v-dim)] font-mono">Alt+1</span>
+                </button>
+                <button @click="navigateSection('chat')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2.5 text-sm tracking-wider text-[var(--ng3)]"
+                        :class="section === 'chat' && 'active'">
+                    <span class="text-xs">[>]</span> CHAT
+                    <span class="ml-auto text-[9px] text-[var(--v-dim)] font-mono">Alt+2</span>
+                </button>
+            </nav>
+
+            <!-- Project Organism (shown in Research Lab) -->
+            <div x-show="section === 'lab'" class="py-2 border-b-2 border-[var(--v-dim)] flex flex-col items-center">
                 <div class="organism-frame w-32 h-32">
                     <div x-html="organismSVG"></div>
                 </div>
@@ -188,47 +215,48 @@
                 </div>
             </div>
 
-            <!-- Nav -->
-            <nav class="flex-1 py-2">
+            <!-- Lab sub-navigation (shown in Research Lab section) -->
+            <nav x-show="section === 'lab'" class="flex-1 py-2">
                 <button @click="navigate('dashboard')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
                         :class="page === 'dashboard' && 'active'">
                     <span class="text-xs">[>]</span> DASHBOARD
-                    <span class="ml-auto text-[9px] text-[var(--v-dim)] font-mono">Alt+1</span>
                 </button>
                 <button @click="navigate('experiments')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
                         :class="page === 'experiments' && 'active'">
                     <span class="text-xs">[>]</span> EXPERIMENTS
                     <span class="ml-auto text-[10px] text-[var(--v3)]" x-text="String(stats.total_experiments || 0).padStart(3,'0')"></span>
-                    <span class="text-[9px] text-[var(--v-dim)] font-mono">Alt+2</span>
                 </button>
                 <button @click="navigate('changes')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
                         :class="page === 'changes' && 'active'">
                     <span class="text-xs">[>]</span> CHANGELOG
-                    <span class="ml-auto text-[9px] text-[var(--v-dim)] font-mono">Alt+3</span>
                 </button>
                 <div class="my-2 mx-4 border-t border-[var(--v-dim)]"></div>
                 <button @click="navigate('prompt')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
                         :class="page === 'prompt' && 'active'">
                     <span class="text-xs">[>]</span> PROMPT
-                    <span class="ml-auto text-[9px] text-[var(--v-dim)] font-mono">Alt+4</span>
                 </button>
                 <button @click="navigate('config')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
                         :class="page === 'config' && 'active'">
                     <span class="text-xs">[>]</span> CONFIG
-                    <span class="ml-auto text-[9px] text-[var(--v-dim)] font-mono">Alt+5</span>
                 </button>
                 <div class="my-2 mx-4 border-t border-[var(--v-dim)]"></div>
                 <button @click="navigate('run')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
                         :class="page === 'run' && 'active'">
-                    <span class="text-xs">[>]</span> RUN HACK
+                    <span class="text-xs">[>]</span> RUN EXPERIMENT
                     <span class="w-2 h-2" :class="runStatus.running ? 'bg-[var(--v)] pulse' : 'bg-[var(--v3)]'"></span>
-                    <span class="ml-auto text-[9px] text-[var(--v-dim)] font-mono">Alt+6</span>
                 </button>
             </nav>
 
+            <!-- Chat sidebar content (shown in Chat section) -->
+            <div x-show="section === 'chat'" class="flex-1 py-2 flex flex-col items-center justify-center text-center px-4">
+                <div class="text-[9px] tracking-widest text-[var(--v3)] mb-2">ACTIVE_SESSIONS</div>
+                <div class="text-2xl text-[var(--v)] glow-sm" style="font-family:'Press Start 2P',monospace" x-text="String(chatTabs.length).padStart(2,'0')"></div>
+                <div class="text-[9px] text-[var(--v3)] mt-1">/ 5 LIMIT</div>
+            </div>
+
             <!-- Footer -->
             <div class="p-3 border-t-2 border-[var(--v-dim)] flex items-center justify-between">
-                <span class="text-[10px] text-[var(--v3)]">v0.2.0</span>
+                <span class="text-[10px] text-[var(--v3)]">v1.0.0</span>
                 <a href="/api/docs" target="_blank" class="text-[10px] text-[var(--v3)] hover:text-[var(--v)] transition-colors">API_</a>
             </div>
         </aside>
@@ -236,8 +264,11 @@
         <!-- ========== MAIN ========== -->
         <main class="flex-1 overflow-y-auto bg-[var(--bg)]">
 
+            <!-- ==================== RESEARCH LAB SECTION ==================== -->
+            <div x-show="section === 'lab'" class="h-full">
+
             <!-- ==================== DASHBOARD ==================== -->
-            <div x-show="page === 'dashboard'" class="p-6 max-w-7xl mx-auto">
+            <div x-show="page === 'dashboard' && section === 'lab'" class="p-6 max-w-7xl mx-auto">
                 <div class="mb-6">
                     <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">SYSTEM OVERVIEW</h2>
                     <p class="text-xs text-[var(--v3)] mt-1 tracking-wider">PROJECT EVOLUTION METRICS_</p>
@@ -246,7 +277,7 @@
                 <!-- Stats -->
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
                     <div class="pixel-border bg-[var(--bg2)] p-3">
-                        <div class="text-[9px] tracking-widest text-[var(--v3)]">TOTAL_HACKS</div>
+                        <div class="text-[9px] tracking-widest text-[var(--v3)]">TOTAL_EXPS</div>
                         <div class="text-3xl text-[var(--v)] mt-1 glow-sm" style="font-family:'Press Start 2P',monospace" x-text="String(stats.total_experiments || 0).padStart(3,'0')"></div>
                     </div>
                     <div class="pixel-border bg-[var(--bg2)] p-3">
@@ -282,19 +313,18 @@
                                     <line x1="40" y1="5" x2="40" y2="75" stroke="var(--v-dim)" stroke-width="0.5"/>
                                     <line x1="40" y1="75" :x2="stats.score_trend.length * 28 + 40" y2="75" stroke="var(--v-dim)" stroke-width="0.5"/>
                                     <line x1="40" y1="40" :x2="stats.score_trend.length * 28 + 40" y2="40" stroke="var(--v-dim)" stroke-width="0.3" stroke-dasharray="2 4"/>
+                                    <line x1="40" y1="26" :x2="stats.score_trend.length * 28 + 40" y2="26" stroke="var(--amber)" stroke-width="0.4" stroke-dasharray="4 3" opacity="0.6"/>
+                                    <text x="22" y="28.5" fill="var(--amber)" font-size="6" font-family="'VT323',monospace" text-anchor="end" opacity="0.7">0.7</text>
+                                    <line x1="40" y1="15.5" :x2="stats.score_trend.length * 28 + 40" y2="15.5" stroke="var(--cyan)" stroke-width="0.4" stroke-dasharray="4 3" opacity="0.6"/>
+                                    <text x="22" y="18" fill="var(--cyan)" font-size="6" font-family="'VT323',monospace" text-anchor="end" opacity="0.7">0.85</text>
                                     <text x="8" y="9" fill="var(--v3)" font-size="7" font-family="'VT323',monospace">1.0</text>
                                     <text x="8" y="44" fill="var(--v3)" font-size="7" font-family="'VT323',monospace">0.5</text>
                                     <text x="8" y="79" fill="var(--v3)" font-size="7" font-family="'VT323',monospace">0.0</text>
-                                    <polygon :points="'40,75 ' + stats.score_trend.map((p,i) => (40+i*28)+','+(75-p.score*70)).join(' ') + ' ' + (40+(stats.score_trend.length-1)*28)+',75'"
+                                    <polygon :points="'40,75 ' + stats.score_trend.map((p,i) => (40+i*28)+','+(75-(p.score||0)*70)).join(' ') + ' ' + (40+(stats.score_trend.length-1)*28)+',75'"
                                              fill="rgba(180,74,255,0.08)"/>
                                     <polyline fill="none" stroke="var(--v)" stroke-width="1.5" stroke-linejoin="round" opacity="0.7"
-                                              :points="stats.score_trend.map((p,i) => (40+i*28)+','+(75-p.score*70)).join(' ')"/>
-                                    <template x-for="(p,i) in stats.score_trend" :key="'d'+i">
-                                        <circle :cx="40+i*28" :cy="75-p.score*70" r="2" :fill="p.decision==='KEEP'?'var(--v)':p.decision==='DISCARD'?'var(--red)':'var(--amber)'"/>
-                                    </template>
-                                    <template x-for="(p,i) in stats.score_trend" :key="'xl'+i">
-                                        <text x-show="i%5===0" :x="40+i*28" y="87" fill="var(--v3)" font-size="7" font-family="'VT323',monospace" text-anchor="middle" x-text="'#'+p.number"></text>
-                                    </template>
+                                              :points="stats.score_trend.map((p,i) => (40+i*28)+','+(75-(p.score||0)*70)).join(' ')"/>
+                                    <g x-html="scoreTrendSvg()"></g>
                                 </svg>
                             </div>
                         </template>
@@ -339,7 +369,7 @@
             </div>
 
             <!-- ==================== EXPERIMENTS ==================== -->
-            <div x-show="page === 'experiments'" class="p-6 max-w-7xl mx-auto">
+            <div x-show="page === 'experiments' && section === 'lab'" class="p-6 max-w-7xl mx-auto">
                 <div class="flex items-end justify-between mb-5">
                     <div>
                         <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">EXPERIMENT_LOG</h2>
@@ -458,7 +488,7 @@
             </div>
 
             <!-- ==================== CHANGES LOG ==================== -->
-            <div x-show="page === 'changes'" class="p-6 max-w-5xl mx-auto">
+            <div x-show="page === 'changes' && section === 'lab'" class="p-6 max-w-5xl mx-auto">
                 <div class="flex items-end justify-between mb-5">
                     <div>
                         <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">CHANGES_LOG</h2>
@@ -470,7 +500,7 @@
             </div>
 
             <!-- ==================== PROMPT EDITOR ==================== -->
-            <div x-show="page === 'prompt'" class="p-6 max-w-5xl mx-auto">
+            <div x-show="page === 'prompt' && section === 'lab'" class="p-6 max-w-5xl mx-auto">
                 <div class="flex items-end justify-between mb-5">
                     <div>
                         <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">PROMPT_ENGINE</h2>
@@ -495,7 +525,7 @@
             </div>
 
             <!-- ==================== CONFIG ==================== -->
-            <div x-show="page === 'config'" class="p-6 max-w-4xl mx-auto">
+            <div x-show="page === 'config' && section === 'lab'" class="p-6 max-w-4xl mx-auto">
                 <div class="flex items-end justify-between mb-5">
                     <div>
                         <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">CONFIG_MATRIX</h2>
@@ -545,10 +575,10 @@
             </div>
 
             <!-- ==================== RUN CONTROL ==================== -->
-            <div x-show="page === 'run'" class="p-6 max-w-5xl mx-auto">
+            <div x-show="page === 'run' && section === 'lab'" class="p-6 max-w-5xl mx-auto">
                 <div class="mb-5">
                     <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">EVOLUTION_CONTROL</h2>
-                    <p class="text-xs text-[var(--ng3)] mt-1">INITIATE_HACK_SEQUENCE_</p>
+                    <p class="text-xs text-[var(--ng3)] mt-1">START_SEQUENCE_</p>
                 </div>
 
                 <div>
@@ -571,7 +601,7 @@
                         <div x-show="runStatus.running" x-transition class="pixel-border bg-[var(--bg2)] p-4 mb-3">
                             <div class="flex items-center gap-3 mb-1">
                                 <span class="w-2 h-2 bg-[var(--v)] pulse"></span>
-                                <span class="text-xs text-[var(--v)] tracking-widest">HACKING_IN_PROGRESS_</span>
+                                <span class="text-xs text-[var(--v)] tracking-widest">EXPERIMENT_RUNNING_</span>
                                 <span class="text-[10px] text-[var(--cyan)]" x-text="runStatus.current_exp ? 'EXP_' + runStatus.current_exp + '/' + runStatus.total_exps : ''"></span>
                                 <span class="text-[10px] text-[var(--v3)]" x-text="runStatus.started_at"></span>
                                 <span class="text-[10px] text-[var(--yellow)] tabular-nums" x-text="runElapsed"></span>
@@ -609,13 +639,159 @@
                         </div>
                 </div>
             </div>
+            </div><!-- end Research Lab section -->
+
+            <!-- ==================== CHAT SECTION ==================== -->
+            <div x-show="section === 'chat'" class="h-full flex flex-col">
+
+                <!-- Chat Tab Bar -->
+                <div class="flex items-center border-b-2 border-[var(--v-dim)] bg-[var(--bg2)] px-2 shrink-0">
+                    <!-- Tab buttons -->
+                    <div class="flex items-center overflow-x-auto flex-1">
+                        <template x-for="tab in chatTabs" :key="tab.tab_id">
+                            <div class="flex items-center shrink-0 group">
+                                <button @click="activateChatTab(tab.tab_id)"
+                                        class="flex items-center gap-2 px-3 py-2 text-xs tracking-wider transition-colors"
+                                        :class="activeChatTab === tab.tab_id ? 'text-[var(--v)] border-b-2 border-[var(--v)] -mb-[2px]' : 'text-[var(--v3)] hover:text-[var(--ng2)]'">
+                                    <span class="w-1.5 h-1.5" :class="tab.is_active ? 'bg-[var(--ng)]' : 'bg-[var(--v3)]'"></span>
+                                    <span class="truncate max-w-[120px]" x-text="tab.label"></span>
+                                </button>
+                                <button @click="closeChatTab(tab.tab_id)"
+                                        class="text-[var(--v3)] hover:text-[var(--red)] text-xs px-1 mr-1 opacity-0 group-hover:opacity-100 transition-opacity">x</button>
+                            </div>
+                        </template>
+                        <!-- Empty state -->
+                        <div x-show="chatTabs.length === 0" class="text-[10px] text-[var(--v3)] tracking-widest px-3 py-2">
+                            NO_ACTIVE_SESSIONS_
+                        </div>
+                    </div>
+                    <!-- New Tab + Resume buttons -->
+                    <div class="flex items-center gap-1 shrink-0 ml-2">
+                        <button @click="showSessionPicker()" class="px-2 py-1 text-[10px] text-[var(--v3)] hover:text-[var(--cyan)] border border-[var(--v-dim)] hover:border-[var(--cyan)] tracking-wider transition-all" title="Resume previous session">RESUME</button>
+                        <button @click="openFileBrowserForTab()" class="px-2 py-1 text-[10px] text-[var(--v)] border border-[var(--v2)] hover:bg-[rgba(180,74,255,0.1)] tracking-wider transition-all" title="Open new chat tab">+ NEW TAB</button>
+                    </div>
+                </div>
+
+                <!-- Chat Tab Content -->
+                <div class="flex-1 overflow-hidden relative">
+                    <template x-for="tab in chatTabs" :key="tab.tab_id">
+                        <div x-show="activeChatTab === tab.tab_id" class="absolute inset-0 flex flex-col">
+                            <!-- Messages area -->
+                            <div class="flex-1 overflow-y-auto p-4 space-y-3" x-ref="chatMessages">
+                                <!-- Welcome message -->
+                                <div x-show="tab.messages.length === 0" class="flex items-center justify-center h-full">
+                                    <div class="text-center">
+                                        <div class="text-[10px] tracking-widest text-[var(--v3)] mb-2">CLAUDE_CODE_SESSION</div>
+                                        <div class="text-xs text-[var(--v3)]" x-text="'Target: ' + tab.project_path"></div>
+                                        <div class="text-[9px] text-[var(--v3)] mt-1">Type a message to start_</div>
+                                    </div>
+                                </div>
+                                <!-- Messages -->
+                                <template x-for="(msg, mi) in tab.messages" :key="msg.id || mi">
+                                    <!-- User message -->
+                                    <div x-show="msg.role === 'user'" class="flex justify-end">
+                                        <div class="max-w-[70%] px-3 py-2 bg-[rgba(180,74,255,0.1)] border border-[var(--v-dim)] text-sm text-[var(--ng2)]">
+                                            <div x-text="msg.content"></div>
+                                        </div>
+                                    </div>
+                                    <!-- Assistant message -->
+                                    <div x-show="msg.role === 'assistant'" class="flex justify-start">
+                                        <div class="max-w-[80%] px-3 py-2 bg-[var(--bg2)] border border-[var(--v-dim)] text-sm">
+                                            <div class="md" x-html="renderMarkdown(msg.content)"></div>
+                                        </div>
+                                    </div>
+                                    <!-- Tool call indicator -->
+                                    <div x-show="msg.role === 'tool'" class="flex justify-start">
+                                        <div class="px-3 py-1.5 bg-[var(--bg)] border border-[var(--v-dim)] text-[10px] text-[var(--amber)] tracking-wider">
+                                            [TOOL] <span x-text="msg.content"></span>
+                                        </div>
+                                    </div>
+                                </template>
+                                <!-- Streaming indicator -->
+                                <div x-show="tab.is_streaming" class="flex justify-start">
+                                    <div class="px-3 py-1.5 bg-[var(--bg2)] border border-[var(--v-dim)] text-[10px] text-[var(--v)] tracking-widest">
+                                        <span class="blink">STREAMING_</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Input area -->
+                            <div class="border-t-2 border-[var(--v-dim)] bg-[var(--bg2)] p-3 flex gap-2 shrink-0">
+                                <input x-model="tab.input_text" @keydown.enter="sendChatMessage(tab)"
+                                       type="text" placeholder="Type a message_"
+                                       class="flex-1 bg-[var(--bg)] border border-[var(--v-dim)] px-3 py-2 text-sm text-[var(--ng2)] tracking-wider"
+                                       :disabled="tab.is_streaming">
+                                <button @click="sendChatMessage(tab)" :disabled="tab.is_streaming || !tab.input_text?.trim()"
+                                        class="px-4 py-2 border border-[var(--v)] text-[var(--v)] text-xs tracking-wider hover:bg-[rgba(180,74,255,0.1)] disabled:opacity-30 transition-all">
+                                    [> SEND]
+                                </button>
+                                <button @click="cancelChatStream(tab)" x-show="tab.is_streaming"
+                                        class="px-3 py-2 border border-[var(--red)] text-[var(--red)] text-xs tracking-wider hover:bg-[rgba(255,51,51,0.1)] transition-all">
+                                    [X]
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- No tab selected -->
+                    <div x-show="chatTabs.length === 0" class="flex items-center justify-center h-full">
+                        <div class="text-center">
+                            <div class="text-[10px] text-[var(--v3)] tracking-widest mb-6">CHAT_SESSIONS</div>
+                            <button @click="openFileBrowserForTab()" class="start-session-btn px-12 py-5 mb-6 cursor-pointer" style="background: rgba(180,74,255,0.03)">
+                                <div class="text-2xl tracking-widest text-[var(--v)]" style="font-family:'Press Start 2P',monospace">&#x2726; NEW SESSION &#x2726;</div>
+                            </button>
+                            <div class="text-[10px] text-[var(--v3)] tracking-wider">or press [+ NEW TAB] above_</div>
+                            <div class="text-[10px] text-[var(--v3)] mt-3 tracking-wider">&#x2191; resume past session from sidebar</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Soft limit warning modal -->
+                <div x-show="showTabLimitWarning" x-cloak class="fixed inset-0 z-40 flex items-center justify-center bg-black/60" @click.self="showTabLimitWarning = false">
+                    <div class="bg-[var(--bg2)] border-2 border-[var(--amber)] p-6 max-w-md mx-4">
+                        <div class="text-sm text-[var(--amber)] tracking-widest mb-2">RESOURCE_WARNING</div>
+                        <p class="text-xs text-[var(--ng3)] mb-4">Active session limit reached. Multiple sessions consume significant resources. You can proceed, but performance may degrade.</p>
+                        <div class="flex gap-2">
+                            <button @click="showTabLimitWarning = false" class="flex-1 px-3 py-1.5 text-xs text-[var(--v3)] border border-[var(--v-dim)] tracking-wider hover:text-[var(--ng2)]">CANCEL</button>
+                            <button @click="showTabLimitWarning = false; openFileBrowserForTab()" class="flex-1 px-3 py-1.5 text-xs text-[var(--amber)] border border-[var(--amber)] tracking-wider hover:bg-[rgba(255,170,0,0.1)]">PROCEED_ANYWAY</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Session picker modal -->
+                <div x-show="showSessionPickerModal" x-cloak class="fixed inset-0 z-40 flex items-center justify-center bg-black/60" @click.self="showSessionPickerModal = false">
+                    <div class="bg-[var(--bg2)] border-2 border-[var(--v-dim)] p-5 max-w-lg mx-4 w-full max-h-[80vh] flex flex-col">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="text-sm text-[var(--v)] tracking-widest">RESUME_SESSION</div>
+                            <button @click="showSessionPickerModal = false" class="text-[var(--v3)] hover:text-[var(--red)] text-xs">[X]</button>
+                        </div>
+                        <input x-model="sessionPickerSearch" type="text" placeholder="SEARCH_SESSIONS_"
+                               class="w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)] mb-3 tracking-wider">
+                        <div class="flex-1 overflow-y-auto space-y-1">
+                            <template x-for="s in filteredPastSessions" :key="s.session_id">
+                                <button @click="resumeSession(s)"
+                                        class="w-full text-left px-3 py-2 bg-[var(--bg)] border border-[var(--v-dim)] hover:border-[var(--v)] transition-all">
+                                    <div class="text-xs text-[var(--ng2)] truncate" x-text="s.project_path"></div>
+                                    <div class="flex items-center gap-3 mt-0.5">
+                                        <span class="text-[9px] text-[var(--v3)]" x-text="s.last_active?.split('T')[0]"></span>
+                                        <span class="text-[9px] text-[var(--v3)]" x-text="s.message_count + ' msgs'"></span>
+                                        <span class="text-[9px] text-[var(--v-dim)] truncate flex-1" x-text="s.topic_preview"></span>
+                                    </div>
+                                </button>
+                            </template>
+                            <div x-show="pastSessions.length === 0" class="text-center py-6 text-[10px] text-[var(--v3)] tracking-widest">NO_PREVIOUS_SESSIONS_</div>
+                        </div>
+                    </div>
+                </div>
+            </div><!-- end Chat section -->
+
         </main>
     </div>
 
     <script>
         function app() {
             return {
-                page: 'dashboard',
+                section: 'lab',  // top-level: 'lab' or 'chat'
+                page: 'dashboard',  // lab sub-page
                 stats: { score_trend: [], type_distribution: {} },
                 experiments: [],
                 selectedExp: null,
@@ -638,6 +814,15 @@
                 organismStage: 'DORMANT',  // organism evolution stage name
                 runElapsed: '',  // elapsed time since run started
 
+                // Chat state
+                chatTabs: [],
+                activeChatTab: null,
+                chatWs: {},  // websocket connections per tab_id
+                showTabLimitWarning: false,
+                showSessionPickerModal: false,
+                sessionPickerSearch: '',
+                pastSessions: [],
+
                 // Pagination
                 get filteredExperiments() {
                     let list = this.experiments;
@@ -647,6 +832,16 @@
                 },
                 get expTotalPages() { return Math.max(1, Math.ceil(this.filteredExperiments.length / 50)); },
                 get paginatedExperiments() { const s = this.expPage * 50; return this.filteredExperiments.slice(s, s + 50); },
+
+                // Chat: filtered past sessions
+                get filteredPastSessions() {
+                    if (!this.sessionPickerSearch) return this.pastSessions;
+                    const q = this.sessionPickerSearch.toLowerCase();
+                    return this.pastSessions.filter(s =>
+                        s.project_path.toLowerCase().includes(q) ||
+                        s.topic_preview.toLowerCase().includes(q)
+                    );
+                },
 
                 // Pet events tracking
                 _lastExpCount: 0,
@@ -685,12 +880,16 @@
                     }, 1000);
 
                     // Keyboard shortcuts
-                    const PAGES = ['dashboard','experiments','changes','prompt','config','run'];
+                    const LAB_PAGES = ['dashboard','experiments','changes','prompt','config','run'];
                     window.addEventListener('keydown', (e) => {
-                        // Alt+1..6 → navigate to sidebar pages
-                        if (e.altKey && e.key >= '1' && e.key <= '6') {
+                        // Alt+1 → Research Lab, Alt+2 → Chat
+                        if (e.altKey && e.key === '1') { e.preventDefault(); this.navigateSection('lab'); }
+                        if (e.altKey && e.key === '2') { e.preventDefault(); this.navigateSection('chat'); }
+                        // Alt+3..8 → lab sub-pages
+                        if (e.altKey && e.key >= '3' && e.key <= '8') {
                             e.preventDefault();
-                            this.navigate(PAGES[parseInt(e.key) - 1]);
+                            this.navigateSection('lab');
+                            this.$nextTick(() => this.navigate(LAB_PAGES[parseInt(e.key) - 3]));
                         }
                         // Escape → close experiment detail
                         if (e.key === 'Escape' && this.selectedExp !== null) {
@@ -707,6 +906,18 @@
                 },
 
                 api(url, opts={}) { return fetch(url, opts).then(r => { if(!r.ok) throw new Error(); return r.json(); }); },
+                scoreTrendSvg() { const t = this.stats.score_trend || []; if (!t.length) return ''; return t.map((p, i) => { const x = 40 + i * 28; const y = 75 - (p.score || 0) * 70; const c = p.decision === 'KEEP' ? 'var(--v)' : p.decision === 'DISCARD' ? 'var(--red)' : 'var(--amber)'; const lv = (i % 5 === 0) ? '' : ' visibility="hidden"'; return '<circle cx="' + x + '" cy="' + y + '" r="2" fill="' + c + '"/><text x="' + x + '" y="87" fill="var(--v3)" font-size="7" font-family="VT323,monospace" text-anchor="middle"' + lv + '>#' + (p.number || i + 1) + '</text>'; }).join(''); },
+
+                navigateSection(section) {
+                    this.section = section;
+                    if (section === 'lab' && !this.page) this.page = 'dashboard';
+                    if (section === 'chat') this.page = '';
+                    // Cat: contextual speech
+                    if (window.CatModule && CatModule.isActive()) {
+                        if (section === 'lab') CatModule.setSpeechText('Research mode_', 3000);
+                        else CatModule.setSpeechText('Chat mode! *мурлычет*', 3000);
+                    }
+                },
 
                 navigate(page) {
                     this.page = page; this.selectedExp = null; this.selectedExpData = null;
@@ -768,7 +979,6 @@
                 async loadExperiments() { try { this.experiments = (await this.api('/api/experiments')).reverse(); } catch(e) {} },
 
                 toggleExperiment(n) {
-                    console.log('[toggleExperiment]', n, 'current:', this.selectedExp);
                     if (this.selectedExp === n) { this.selectedExp = null; this.selectedExpData = null; return; }
                     this.loadExperiment(n);
                 },
@@ -805,10 +1015,8 @@
                 },
                 async startRun() {
                     try {
-                        console.log('[startRun] config:', JSON.stringify(this.runConfig));
                         const res = await this.api('/api/run', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(this.runConfig) });
-                        console.log('[startRun] response:', res);
-                        this.showToast('HACK INITIATED', 'success');
+                        this.showToast('EXPERIMENT STARTED', 'success');
                         if (window.CatModule) CatModule.setExpression('working');
                         await this.pollRunStatus();
                     }
@@ -834,6 +1042,164 @@
                             });
                         }
                     } catch(e) {}
+                },
+
+                // === Chat methods ===
+                async openFileBrowserForTab() {
+                    if (this.chatTabs.length >= 5) this.showTabLimitWarning = true;
+                    // The file-browser component handles path selection via $dispatch
+                    if (window.fileBrowserOpen) {
+                        window.fileBrowserOpen('.');
+                    }
+                },
+
+                onPathSelected(event) {
+                    const path = event.detail.path;
+                    this.createChatTab(path);
+                },
+
+                async createChatTab(projectPath, resumeId) {
+                    try {
+                        const res = await this.api('/api/sessions', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ cwd: projectPath, resume: resumeId || null }),
+                        });
+                        if (res.warning) this.showToast(res.warning, 'error');
+                        if (!res.session_id) return;
+                        const label = projectPath.split(/[\\/]/).filter(Boolean).pop() || projectPath;
+                        const tab = {
+                            tab_id: 'tab-' + Date.now(),
+                            session_id: res.session_id,
+                            project_path: projectPath,
+                            label: label,
+                            messages: [],
+                            is_active: true,
+                            is_streaming: false,
+                            input_text: '',
+                            created_at: new Date().toISOString(),
+                        };
+                        this.chatTabs.push(tab);
+                        this.activeChatTab = tab.tab_id;
+                        this.connectChatWebSocket(tab);
+                        this.showToast('SESSION STARTED', 'success');
+                    } catch (e) {
+                        this.showToast('SESSION FAILED: ' + e.message, 'error');
+                    }
+                },
+
+                activateChatTab(tabId) {
+                    this.activeChatTab = tabId;
+                    const tab = this.chatTabs.find(t => t.tab_id === tabId);
+                    if (tab) this.page = '';  // clear lab page
+                    // Refit terminal if present
+                    if (window.refitTerminal) refitTerminal(tabId);
+                },
+
+                async closeChatTab(tabId) {
+                    const tab = this.chatTabs.find(t => t.tab_id === tabId);
+                    if (!tab) return;
+                    // Close WebSocket
+                    const ws = this.chatWs[tabId];
+                    if (ws) { try { ws.close(); } catch(e) {} delete this.chatWs[tabId]; }
+                    // Cleanup terminal
+                    if (window.destroyTerminal) destroyTerminal(tabId);
+                    // Close session on server
+                    try { await this.api('/api/sessions/' + tab.session_id, { method: 'DELETE' }); } catch(e) {}
+                    // Remove tab
+                    this.chatTabs = this.chatTabs.filter(t => t.tab_id !== tabId);
+                    if (this.activeChatTab === tabId) {
+                        this.activeChatTab = this.chatTabs.length > 0 ? this.chatTabs[this.chatTabs.length - 1].tab_id : null;
+                    }
+                },
+
+                connectChatWebSocket(tab) {
+                    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    const ws = new WebSocket(`${protocol}//${location.host}/ws/chat/${tab.session_id}`);
+                    this.chatWs[tab.tab_id] = ws;
+
+                    ws.onmessage = (event) => {
+                        try {
+                            const msg = JSON.parse(event.data);
+                            if (msg.type === 'claude_event') {
+                                const data = msg.data || {};
+                                const etype = data.type || msg.event_type;
+                                if (etype === 'text' || etype === 'assistant') {
+                                    const text = typeof data === 'object' ? (data.text || '') : String(data);
+                                    if (text) {
+                                        const lastMsg = tab.messages[tab.messages.length - 1];
+                                        if (lastMsg && lastMsg.role === 'assistant' && lastMsg.is_streaming) {
+                                            lastMsg.content += text;
+                                        } else {
+                                            tab.messages.push({ role: 'assistant', content: text, is_streaming: true });
+                                        }
+                                        tab.is_streaming = true;
+                                        this.$nextTick(() => {
+                                            const el = this.$refs.chatMessages;
+                                            if (el) el.scrollTop = el.scrollHeight;
+                                        });
+                                    }
+                                } else if (etype === 'tool') {
+                                    tab.messages.push({ role: 'tool', content: data.name || 'tool_call' });
+                                }
+                            } else if (msg.type === 'stream_end') {
+                                tab.is_streaming = false;
+                                const lastMsg = tab.messages[tab.messages.length - 1];
+                                if (lastMsg) lastMsg.is_streaming = false;
+                            } else if (msg.type === 'error') {
+                                tab.messages.push({ role: 'assistant', content: '[ERROR] ' + (msg.message || 'Unknown error') });
+                                tab.is_streaming = false;
+                            }
+                        } catch(e) {
+                            console.error('[ws parse]', e);
+                        }
+                    };
+
+                    ws.onclose = () => {
+                        tab.is_streaming = false;
+                    };
+
+                    ws.onerror = () => {
+                        tab.messages.push({ role: 'assistant', content: '[ERROR] WebSocket connection failed' });
+                        tab.is_streaming = false;
+                    };
+                },
+
+                sendChatMessage(tab) {
+                    if (!tab.input_text?.trim() || tab.is_streaming) return;
+                    const content = tab.input_text.trim();
+                    tab.input_text = '';
+                    tab.messages.push({ role: 'user', content: content, id: 'msg-' + Date.now() });
+                    const ws = this.chatWs[tab.tab_id];
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'message', content: content }));
+                    } else {
+                        tab.messages.push({ role: 'assistant', content: '[ERROR] Not connected. Session may have ended.' });
+                    }
+                },
+
+                cancelChatStream(tab) {
+                    const ws = this.chatWs[tab.tab_id];
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'cancel' }));
+                    }
+                    tab.is_streaming = false;
+                },
+
+                async showSessionPicker() {
+                    this.sessionPickerSearch = '';
+                    this.showSessionPickerModal = true;
+                    try {
+                        const data = await this.api('/api/sessions/history');
+                        this.pastSessions = data.sessions || [];
+                    } catch(e) {
+                        this.showToast('FAILED TO LOAD SESSIONS', 'error');
+                    }
+                },
+
+                async resumeSession(session) {
+                    this.showSessionPickerModal = false;
+                    await this.createChatTab(session.project_path, session.session_id);
                 },
 
                 renderMarkdown(t) { if(!t) return ''; try { const html = marked.parse(t, { breaks: true }); const str = typeof html === 'string' ? html : String(html); return DOMPurify.sanitize(str); } catch(e) { console.error('[renderMarkdown]', e); return t.replace(/</g,'&lt;').replace(/\n/g,'<br>'); } },
