@@ -1420,9 +1420,8 @@
                                 + '<div style="max-width:70%;padding:8px 12px;background:rgba(180,74,255,0.1);border:1px solid var(--v-dim);font-size:14px;color:var(--ng2)">'
                                 + this.escHtml(msg.content || '')
                                 + '</div></div>';
+                            i++;
                         } else if (msg.role === 'assistant') {
-                            // During streaming: raw escaped text (O(1) per token).
-                            // On completion: full markdown render (O(n) once).
                             const contentHtml = msg.is_streaming
                                 ? '<pre style="white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit;font-size:inherit">' + this.escHtml(msg.content) + '</pre>'
                                 : '<div class="md">' + this.renderMarkdown(msg.content) + '</div>';
@@ -1431,17 +1430,54 @@
                                 + '<div style="max-width:80%;padding:8px 12px;background:var(--bg2);border:1px solid var(--v-dim);font-size:14px">'
                                 + contentHtml
                                 + '</div></div>';
+                            i++;
                         } else if (msg.role === 'tool') {
-                            const tt = msg.toolType || 'other';
-                            const td = msg.toolDetail || msg.content || '';
-                            const icons = { read:'&#x1f4d6;', edit:'&#x270f;', write:'&#x1f4be;', bash:'&#x2328;', search:'&#x1f50d;', other:'&#x2699;' };
-                            const colors = { read:'var(--cyan)', edit:'var(--yellow)', write:'var(--ng)', bash:'var(--pink)', search:'var(--amber)', other:'var(--v3)' };
-                            const labels = { read:'READ', edit:'EDIT', write:'WRITE', bash:'BASH', search:'SEARCH', other:'TOOL' };
-                            html += '<div style="display:flex;justify-content:flex-start;align-items:center;gap:6px;padding:3px 0">'
-                                + '<span style="font-size:11px">' + (icons[tt] || icons.other) + '</span>'
-                                + '<span style="font-size:9px;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.15em;font-weight:bold;min-width:42px">[' + (labels[tt] || 'TOOL') + ']</span>'
-                                + '<span style="font-size:11px;color:var(--ng3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60ch" title="' + this.escHtml(td) + '">' + this.escHtml(td) + '</span>'
-                                + '</div>';
+                            // Collect consecutive tool messages into a group
+                            const toolGroup = [];
+                            while (i < msgs.length && msgs[i].role === 'tool') {
+                                toolGroup.push(msgs[i]);
+                                i++;
+                            }
+                            if (toolGroup.length === 1) {
+                                const t = toolGroup[0];
+                                const tt = t.toolType || 'other';
+                                const td = t.toolDetail || t.content || '';
+                                html += '<div style="display:flex;justify-content:flex-start;align-items:center;gap:6px;padding:3px 0">'
+                                    + '<span style="font-size:11px">' + (icons[tt] || icons.other) + '</span>'
+                                    + '<span style="font-size:9px;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.15em;font-weight:bold;min-width:42px">[' + (labels[tt] || 'TOOL') + ']</span>'
+                                    + '<span style="font-size:11px;color:var(--ng3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60ch" title="' + this.escHtml(td) + '">' + this.escHtml(td) + '</span>'
+                                    + '</div>';
+                            } else {
+                                const counts = {};
+                                for (const t of toolGroup) {
+                                    const k = labels[t.toolType || 'other'] || 'TOOL';
+                                    counts[k] = (counts[k] || 0) + 1;
+                                }
+                                const summary = Object.entries(counts).map(([k,v]) => k + ' x' + v).join(', ');
+                                let detailHtml = '';
+                                for (const t of toolGroup) {
+                                    const tt = t.toolType || 'other';
+                                    const td = t.toolDetail || t.content || '';
+                                    detailHtml += '<div style="display:flex;align-items:center;gap:6px;padding:2px 0 2px 18px">'
+                                        + '<span style="font-size:10px">' + (icons[tt] || icons.other) + '</span>'
+                                        + '<span style="font-size:8px;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.12em;font-weight:bold;min-width:36px">[' + (labels[tt] || 'TOOL') + ']</span>'
+                                        + '<span style="font-size:10px;color:var(--ng3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55ch" title="' + this.escHtml(td) + '">' + this.escHtml(td) + '</span>'
+                                        + '</div>';
+                                }
+                                html += '<div style="padding:2px 0">'
+                                    + '<div onclick="var d=this.nextElementSibling,a=this.querySelector(\'[data-arrow]\');if(d.style.display===\'none\'){d.style.display=\'block\';a.textContent=\'\\u25BC\';}else{d.style.display=\'none\';a.textContent=\'\\u25B6\';}" '
+                                    + 'style="display:flex;align-items:center;gap:6px;padding:4px 6px;cursor:pointer;border:1px solid var(--v-dim);background:rgba(180,74,255,0.03);user-select:none" '
+                                    + 'onmouseenter="this.style.borderColor=\'var(--v2)\'" onmouseleave="this.style.borderColor=\'var(--v-dim)\'">'
+                                    + '<span data-arrow style="font-size:8px;color:var(--v3);min-width:10px">&#x25B6;</span>'
+                                    + '<span style="font-size:9px;color:var(--v);letter-spacing:0.12em;font-weight:bold">[' + toolGroup.length + ' TOOLS]</span>'
+                                    + '<span style="font-size:9px;color:var(--ng3);letter-spacing:0.08em">' + this.escHtml(summary) + '</span>'
+                                    + '</div>'
+                                    + '<div style="display:none;border:1px solid var(--v-dim);border-top:none;background:rgba(12,11,20,0.5);padding:4px 6px">'
+                                    + detailHtml
+                                    + '</div></div>';
+                            }
+                        } else {
+                            i++;
                         }
                     }
                     if (tab.is_streaming) {
@@ -1532,21 +1568,60 @@
                     }
                 },
 
+                highlightCode(code, lang) {
+                    const l = (lang || '').toLowerCase();
+                    const kwSets = {
+                        python: /\b(def|class|if|elif|else|for|while|return|import|from|as|with|try|except|finally|raise|yield|lambda|pass|break|continue|and|or|not|in|is|None|True|False|self|async|await|nonlocal|global|assert|del)\b/g,
+                        javascript: /\b(function|const|let|var|if|else|for|while|return|import|export|from|class|new|this|try|catch|finally|throw|async|await|yield|typeof|instanceof|null|undefined|true|false|switch|case|default|break|continue|of|in|delete|void|super|extends|static|get|set)\b/g,
+                        bash: /\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|return|exit|echo|export|source|alias|unset|local|readonly|declare|set|shift|trap|eval|exec|cd|pwd|test)\b/g,
+                        generic: /\b(if|else|for|while|return|function|class|import|export|const|let|var|new|try|catch|throw|true|false|null|nil|None|self|this|def|end|do|begin|module|package|struct|enum|interface|type|pub|fn|impl|use|match|async|await)\b/g
+                    };
+                    const kw = kwSets[l] || kwSets[({ py:'python', js:'javascript', ts:'javascript', jsx:'javascript', tsx:'javascript', sh:'bash', shell:'bash', zsh:'bash' })[l]] || kwSets.generic;
+                    const isHash = l === 'python' || l === 'py' || l === 'bash' || l === 'sh' || l === 'shell' || l === 'zsh' || l === 'ruby' || l === 'yaml' || l === 'yml';
+                    const isSlash = !isHash || l === 'javascript' || l === 'js' || l === 'ts' || l === 'tsx' || l === 'jsx' || l === 'java' || l === 'c' || l === 'cpp' || l === 'go' || l === 'rust' || l === 'kotlin' || l === '';
+                    const tokens = [];
+                    // Regex: strings, comments, numbers, then rest
+                    const re = /(&#39;&#39;&#39;[\s\S]*?&#39;&#39;&#39;|&quot;&quot;&quot;[\s\S]*?&quot;&quot;&quot;|&#39;(?:[^&#]|&#\w+;)*?&#39;|&quot;(?:[^&#]|&#\w+;)*?&quot;|`(?:[^`\\]|\\.)*?`)|(#[^\n]*|\/\/[^\n]*|\/\*[\s\S]*?\*\/)|(\b\d+\.?\d*\b)/g;
+                    let last = 0, m;
+                    while ((m = re.exec(code)) !== null) {
+                        if (m.index > last) tokens.push({ type: 'code', text: code.slice(last, m.index) });
+                        if (m[1]) tokens.push({ type: 'str', text: m[0] });
+                        else if (m[2]) {
+                            const c = m[2];
+                            if ((c.startsWith('#') && isHash) || (c.startsWith('//') && isSlash) || c.startsWith('/*'))
+                                tokens.push({ type: 'cmt', text: m[0] });
+                            else tokens.push({ type: 'code', text: m[0] });
+                        }
+                        else if (m[3]) tokens.push({ type: 'num', text: m[0] });
+                        last = re.lastIndex;
+                    }
+                    if (last < code.length) tokens.push({ type: 'code', text: code.slice(last) });
+                    return tokens.map(t => {
+                        if (t.type === 'str') return '<span class="tok-str">' + t.text + '</span>';
+                        if (t.type === 'cmt') return '<span class="tok-cmt">' + t.text + '</span>';
+                        if (t.type === 'num') return '<span class="tok-num">' + t.text + '</span>';
+                        // Apply keywords and function calls to code segments
+                        return t.text.replace(kw, '<span class="tok-kw">$1</span>')
+                            .replace(/(\w+)(\()/g, '<span class="tok-fn">$1</span>$2');
+                    }).join('');
+                },
+
                 renderMarkdown(t) {
                     if(!t) return '';
                     try {
                         const html = marked.parse(t, { breaks: true });
                         const str = typeof html === 'string' ? html : String(html);
                         const clean = DOMPurify.sanitize(str, { ADD_ATTR: ['class'] });
-                        // Wrap <pre><code class="language-X"> blocks in IDE-style container
+                        // Wrap <pre><code class="language-X"> blocks in IDE-style container with syntax highlighting
                         return clean.replace(/<pre><code(?:\s+class="language-(\w+)")?>([\s\S]*?)<\/code><\/pre>/g,
                             (match, lang, code) => {
                                 const label = lang ? lang.toUpperCase() : 'CODE';
                                 const id = 'cb-' + Math.random().toString(36).slice(2, 8);
+                                const highlighted = this.highlightCode(code, lang);
                                 return '<div class="code-block"><div class="code-header">'
                                     + '<span class="code-lang">' + label + '</span>'
                                     + '<span class="code-copy" onclick="window._copyCode(this,\'' + id + '\')">[COPY]</span>'
-                                    + '</div><pre id="' + id + '"><code>' + code + '</code></pre></div>';
+                                    + '</div><pre id="' + id + '"><code>' + highlighted + '</code></pre></div>';
                             });
                     } catch(e) { console.error('[renderMarkdown]', e); return t.replace(/</g,'&lt;').replace(/\n/g,'<br>'); }
                 },
