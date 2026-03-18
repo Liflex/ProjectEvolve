@@ -413,16 +413,25 @@ window.AppChat = (function() {
                             + '<div class="chat-turn-sep-line"></div></div>';
                     }
                     const uTime = this.fmtTime(msg.ts);
+                    const uFold = msg.content && msg.content.length > 500 && !msg.is_streaming;
+                    const uCollapsed = msg.collapsed && uFold;
+                    const uChars = (msg.content || '').length;
+                    const uLines = (msg.content || '').split('\n').length;
                     html += '<div class="msg-wrap chat-msg-fadein chat-msg-row chat-msg-row-user">'
                         + '<div class="chat-avatar chat-avatar-user">' + avatarUser + '</div>'
                         + '<div class="chat-body">'
                         + '<div class="msg-actions">'
                         + '<button class="act-copy" onclick="event.stopPropagation();window._app.copyChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Copy">COPY</button>'
                         + '<button class="act-edit" onclick="event.stopPropagation();window._app.editUserMsg(\'' + tab.tab_id + '\',' + i + ')" title="Edit & resend">EDIT</button>'
+                        + (uFold ? '<button class="act-fold" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + i + ')" title="Fold/Unfold">' + (msg.collapsed ? 'UNFOLD' : 'FOLD') + '</button>' : '')
+                        + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Delete">DEL</button>'
                         + '</div>'
-                        + '<div class="chat-role chat-role-user">USER_' + (uTime ? ' <span style="color:var(--v3);font-weight:normal">' + uTime + '</span>' : '') + '</div>'
+                        + '<div class="chat-role chat-role-user">USER_' + (uTime ? ' <span style="color:var(--v3);font-weight:normal">' + uTime + '</span>' : '') + (uFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + uChars + 'ch · ' + uLines + 'ln</span>' : '') + '</div>'
                         + '<div class="chat-bubble-user" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit;color:var(--ng2)">'
-                        + this.escHtml(msg.content || '')
+                        + (uCollapsed
+                            ? '<div class="chat-collapsed-preview">' + this.escHtml(msg.content.slice(0, 200)) + '</div>'
+                              + '<div class="chat-expand-btn" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + i + ')">&#x25BC; EXPAND (' + uChars + ' chars)</div>'
+                            : this.escHtml(msg.content || ''))
                         + '</div></div></div>';
                     i++;
                 } else if (msg.role === 'assistant') {
@@ -452,17 +461,26 @@ window.AppChat = (function() {
                             + escapedFull
                             + '</div></div>';
                     }
+                    const aFold = !msg.is_streaming && msg.content && msg.content.length > 500;
+                    const aCollapsed = msg.collapsed && aFold;
+                    const aChars = (msg.content || '').length;
+                    const aLines = (msg.content || '').split('\n').length;
                     html += '<div class="msg-wrap chat-msg-fadein chat-msg-row">'
                         + '<div class="chat-avatar chat-avatar-asst">' + avatarAsst + '</div>'
                         + '<div class="chat-body">'
                         + '<div class="msg-actions">'
                         + '<button class="act-copy" onclick="event.stopPropagation();window._app.copyChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Copy">COPY</button>'
                         + (isLastAssistant ? '<button class="act-regen" onclick="event.stopPropagation();window._app.regenerateResponse(\'' + tab.tab_id + '\')" title="Regenerate">REGEN</button>' : '')
+                        + (aFold ? '<button class="act-fold" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + i + ')" title="Fold/Unfold">' + (msg.collapsed ? 'UNFOLD' : 'FOLD') + '</button>' : '')
+                        + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Delete">DEL</button>'
                         + '</div>'
-                        + '<div class="chat-role chat-role-assistant">CLAUDE_' + (aTime ? ' <span style="color:var(--v3);font-weight:normal">' + aTime + '</span>' : '') + '</div>'
+                        + '<div class="chat-role chat-role-assistant">CLAUDE_' + (aTime ? ' <span style="color:var(--v3);font-weight:normal">' + aTime + '</span>' : '') + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + '</div>'
                         + thinkingHtml
                         + '<div class="chat-bubble-asst" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit">'
-                        + contentHtml
+                        + (aCollapsed
+                            ? '<div class="chat-collapsed-preview"><div class="md">' + this.linkFilePaths(this.renderMarkdown(msg.content.slice(0, 300))) + '</div></div>'
+                              + '<div class="chat-expand-btn" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + i + ')">&#x25BC; EXPAND (' + aChars + ' chars)</div>'
+                            : contentHtml)
                         + '</div></div></div>';
                     i++;
                 } else if (msg.role === 'tool') {
@@ -759,6 +777,34 @@ window.AppChat = (function() {
                 ws.send(JSON.stringify({ type: 'message', content: tab.messages[lastUserIdx].content }));
             }
             this.showToast('Regenerating response...');
+        },
+        deleteChatMsg(tabId, msgIdx) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab || !tab.messages[msgIdx]) return;
+            tab.messages.splice(msgIdx, 1);
+            this.chatTick++;
+        },
+        toggleMsgCollapse(tabId, msgIdx) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab || !tab.messages[msgIdx]) return;
+            tab.messages[msgIdx].collapsed = !tab.messages[msgIdx].collapsed;
+            this.chatTick++;
+        },
+        collapseAllMessages() {
+            const tab = this.activeTab;
+            if (!tab) return;
+            for (const msg of tab.messages) {
+                if (msg.content && msg.content.length > 500 && msg.role !== 'tool' && !msg.is_streaming) {
+                    msg.collapsed = true;
+                }
+            }
+            this.chatTick++;
+        },
+        expandAllMessages() {
+            const tab = this.activeTab;
+            if (!tab) return;
+            for (const msg of tab.messages) { msg.collapsed = false; }
+            this.chatTick++;
         },
 
         // ========== CHAT: BOTTOM PANEL ==========

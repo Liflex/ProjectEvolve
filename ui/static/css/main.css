@@ -396,7 +396,33 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .msg-actions button.act-copy:hover { color: var(--cyan); border-color: rgba(0,229,255,0.3); }
 .msg-actions button.act-edit:hover { color: var(--yellow); border-color: rgba(255,224,51,0.3); }
 .msg-actions button.act-regen:hover { color: var(--v); border-color: rgba(180,74,255,0.3); }
+.msg-actions button.act-fold:hover { color: var(--amber); border-color: rgba(255,170,0,0.3); }
 .msg-actions button.act-del:hover { color: var(--red); border-color: rgba(255,51,102,0.3); }
+
+/* === CHAT MESSAGE COLLAPSE === */
+.chat-collapsed-preview {
+    position: relative;
+    max-height: 120px;
+    overflow: hidden;
+}
+.chat-collapsed-preview::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 40px;
+    background: linear-gradient(transparent, var(--chat-asst-bg, var(--bg2)));
+    pointer-events: none;
+}
+.chat-bubble-user .chat-collapsed-preview::after {
+    background: linear-gradient(transparent, var(--chat-user-bg, rgba(180,74,255,0.1)));
+}
+.chat-expand-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 4px 8px; font-size: 0.5625rem; letter-spacing: 0.1em;
+    color: var(--v3); border-top: 1px dashed var(--v-dim);
+    cursor: pointer; transition: all 0.15s; user-select: none;
+}
+.chat-expand-btn:hover { color: var(--v); background: rgba(180,74,255,0.06); }
 
 /* === FILE PATH LINKS in chat === */
 .fp-link {
