@@ -1413,6 +1413,8 @@
                     const colors = { read:'var(--cyan)', edit:'var(--yellow)', write:'var(--ng)', bash:'var(--pink)', search:'var(--amber)', other:'var(--v3)' };
                     const labels = { read:'READ', edit:'EDIT', write:'WRITE', bash:'BASH', search:'SEARCH', other:'TOOL' };
                     const msgs = tab.messages;
+                    // Collect all tool groups with their positions for auto-collapse logic
+                    const toolGroups = [];
                     let i = 0;
                     while (i < msgs.length) {
                         const msg = msgs[i];
@@ -1440,44 +1442,44 @@
                                 toolGroup.push(msgs[i]);
                                 i++;
                             }
-                            if (toolGroup.length === 1) {
-                                const t = toolGroup[0];
+                            // Check if more messages follow (past group) or this is the last group (active)
+                            const isLastGroup = (i >= msgs.length) || (i === msgs.length - 1 && msgs[i]?.role === 'assistant' && msgs[i]?.is_streaming);
+                            const collapsed = !isLastGroup;
+                            // Build summary line
+                            const counts = {};
+                            for (const t of toolGroup) {
+                                const k = labels[t.toolType || 'other'] || 'TOOL';
+                                counts[k] = (counts[k] || 0) + 1;
+                            }
+                            const summaryParts = Object.entries(counts).map(([k,v]) => k + (v > 1 ? ' x' + v : ''));
+                            const summaryText = toolGroup.length === 1
+                                ? (toolGroup[0].toolDetail || toolGroup[0].content || summaryParts[0])
+                                : summaryParts.join(', ');
+                            const countLabel = toolGroup.length === 1 ? '1 TOOL' : toolGroup.length + ' TOOLS';
+                            // Build detail rows
+                            let detailHtml = '';
+                            for (const t of toolGroup) {
                                 const tt = t.toolType || 'other';
                                 const td = t.toolDetail || t.content || '';
-                                html += '<div style="display:flex;justify-content:flex-start;align-items:center;gap:6px;padding:3px 0">'
-                                    + '<span style="font-size:11px">' + (icons[tt] || icons.other) + '</span>'
-                                    + '<span style="font-size:9px;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.15em;font-weight:bold;min-width:42px">[' + (labels[tt] || 'TOOL') + ']</span>'
-                                    + '<span style="font-size:11px;color:var(--ng3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60ch" title="' + this.escHtml(td) + '">' + this.escHtml(td) + '</span>'
+                                detailHtml += '<div style="display:flex;align-items:center;gap:6px;padding:2px 0 2px 18px">'
+                                    + '<span style="font-size:10px">' + (icons[tt] || icons.other) + '</span>'
+                                    + '<span style="font-size:8px;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.12em;font-weight:bold;min-width:36px">[' + (labels[tt] || 'TOOL') + ']</span>'
+                                    + '<span style="font-size:10px;color:var(--ng3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55ch" title="' + this.escHtml(td) + '">' + this.escHtml(td) + '</span>'
                                     + '</div>';
-                            } else {
-                                const counts = {};
-                                for (const t of toolGroup) {
-                                    const k = labels[t.toolType || 'other'] || 'TOOL';
-                                    counts[k] = (counts[k] || 0) + 1;
-                                }
-                                const summary = Object.entries(counts).map(([k,v]) => k + ' x' + v).join(', ');
-                                let detailHtml = '';
-                                for (const t of toolGroup) {
-                                    const tt = t.toolType || 'other';
-                                    const td = t.toolDetail || t.content || '';
-                                    detailHtml += '<div style="display:flex;align-items:center;gap:6px;padding:2px 0 2px 18px">'
-                                        + '<span style="font-size:10px">' + (icons[tt] || icons.other) + '</span>'
-                                        + '<span style="font-size:8px;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.12em;font-weight:bold;min-width:36px">[' + (labels[tt] || 'TOOL') + ']</span>'
-                                        + '<span style="font-size:10px;color:var(--ng3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55ch" title="' + this.escHtml(td) + '">' + this.escHtml(td) + '</span>'
-                                        + '</div>';
-                                }
-                                html += '<div style="padding:2px 0">'
-                                    + '<div onclick="var d=this.nextElementSibling,a=this.querySelector(\'[data-arrow]\');if(d.style.display===\'none\'){d.style.display=\'block\';a.textContent=\'\\u25BC\';}else{d.style.display=\'none\';a.textContent=\'\\u25B6\';}" '
-                                    + 'style="display:flex;align-items:center;gap:6px;padding:4px 6px;cursor:pointer;border:1px solid var(--v-dim);background:rgba(180,74,255,0.03);user-select:none" '
-                                    + 'onmouseenter="this.style.borderColor=\'var(--v2)\'" onmouseleave="this.style.borderColor=\'var(--v-dim)\'">'
-                                    + '<span data-arrow style="font-size:8px;color:var(--v3);min-width:10px">&#x25B6;</span>'
-                                    + '<span style="font-size:9px;color:var(--v);letter-spacing:0.12em;font-weight:bold">[' + toolGroup.length + ' TOOLS]</span>'
-                                    + '<span style="font-size:9px;color:var(--ng3);letter-spacing:0.08em">' + this.escHtml(summary) + '</span>'
-                                    + '</div>'
-                                    + '<div style="display:none;border:1px solid var(--v-dim);border-top:none;background:rgba(12,11,20,0.5);padding:4px 6px">'
-                                    + detailHtml
-                                    + '</div></div>';
                             }
+                            const arrowChar = collapsed ? '&#x25B6;' : '&#x25BC;';
+                            const detailDisplay = collapsed ? 'none' : 'block';
+                            html += '<div style="padding:2px 0">'
+                                + '<div onclick="var d=this.nextElementSibling,a=this.querySelector(\'[data-arrow]\');if(d.style.display===\'none\'){d.style.display=\'block\';a.textContent=\'\\u25BC\';}else{d.style.display=\'none\';a.textContent=\'\\u25B6\';}" '
+                                + 'style="display:flex;align-items:center;gap:6px;padding:4px 6px;cursor:pointer;border:1px solid var(--v-dim);background:rgba(180,74,255,0.03);user-select:none" '
+                                + 'onmouseenter="this.style.borderColor=\'var(--v2)\'" onmouseleave="this.style.borderColor=\'var(--v-dim)\'">'
+                                + '<span data-arrow style="font-size:8px;color:var(--v3);min-width:10px">' + arrowChar + '</span>'
+                                + '<span style="font-size:9px;color:var(--v);letter-spacing:0.12em;font-weight:bold">[' + countLabel + ']</span>'
+                                + '<span style="font-size:9px;color:var(--ng3);letter-spacing:0.08em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50ch" title="' + this.escHtml(summaryText) + '">' + this.escHtml(summaryText) + '</span>'
+                                + '</div>'
+                                + '<div style="display:' + detailDisplay + ';border:1px solid var(--v-dim);border-top:none;background:rgba(12,11,20,0.5);padding:4px 6px">'
+                                + detailHtml
+                                + '</div></div>';
                         } else {
                             i++;
                         }
