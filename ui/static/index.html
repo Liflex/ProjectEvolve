@@ -114,8 +114,10 @@
         .md .code-block .code-copy { font-size: 9px; letter-spacing: 0.1em; color: var(--v3); cursor: pointer; padding: 2px 6px; border: 1px solid transparent; transition: all 0.15s; }
         .md .code-block .code-copy:hover { color: var(--v); border-color: var(--v-dim); }
         .md .code-block .code-copy.copied { color: var(--ng); }
-        .md .code-block pre { margin: 0; border: none; padding: 0.75rem; overflow-x: auto; background: transparent; }
-        .md .code-block pre code { background: none; padding: 0; color: var(--ng2); }
+        .md .code-block pre { margin: 0; border: none; padding: 0.75rem 0.75rem 0.75rem 0; overflow-x: auto; background: transparent; counter-reset: line-num; }
+        .md .code-block pre code { background: none; padding: 0; color: var(--ng2); display: block; }
+        .md .code-block .code-line { display: block; padding-left: 3.2em; position: relative; min-height: 1.25em; }
+        .md .code-block .code-line::before { counter-increment: line-num; content: counter(line-num); position: absolute; left: 0; width: 2.5em; text-align: right; color: var(--v3); opacity: 0.5; font-size: 0.85em; padding-right: 0.5em; user-select: none; border-right: 1px solid var(--v-dim); }
         /* Fallback for pre without wrapper */
         .md pre { background: var(--bg); border: 1px solid var(--v-dim); padding: 0.75rem; overflow-x: auto; margin: 0.5rem 0; }
         .md pre code { background: none; padding: 0; color: var(--ng2); }
@@ -1618,10 +1620,15 @@
                                 const label = lang ? lang.toUpperCase() : 'CODE';
                                 const id = 'cb-' + Math.random().toString(36).slice(2, 8);
                                 const highlighted = this.highlightCode(code, lang);
+                                // Wrap each line in <span class="code-line"> for CSS line numbers
+                                const lines = highlighted.split('\n');
+                                // Remove trailing empty line (common in code blocks)
+                                if (lines.length > 1 && lines[lines.length - 1].trim() === '') lines.pop();
+                                const numbered = lines.map(l => '<span class="code-line">' + (l || ' ') + '</span>').join('\n');
                                 return '<div class="code-block"><div class="code-header">'
                                     + '<span class="code-lang">' + label + '</span>'
                                     + '<span class="code-copy" onclick="window._copyCode(this,\'' + id + '\')">[COPY]</span>'
-                                    + '</div><pre id="' + id + '"><code>' + highlighted + '</code></pre></div>';
+                                    + '</div><pre id="' + id + '"><code>' + numbered + '</code></pre></div>';
                             });
                     } catch(e) { console.error('[renderMarkdown]', e); return t.replace(/</g,'&lt;').replace(/\n/g,'<br>'); }
                 },
