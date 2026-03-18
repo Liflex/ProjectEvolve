@@ -63,6 +63,7 @@ window.AppChat = (function() {
             const tab = this.chatTabs.find(t => t.tab_id === tabId);
             if (tab) this.page = '';
             if (window.refitTerminal) refitTerminal(tabId);
+            this.resizeInputForTab(tab);
         },
 
         async closeChatTab(tabId) {
@@ -242,6 +243,7 @@ window.AppChat = (function() {
             if (!tab.input_text?.trim() || tab.is_streaming) return;
             const content = tab.input_text.trim();
             tab.input_text = '';
+            this.resizeInputForTab(tab);
             tab.scrolledUp = false;
             tab.messages.push({ role: 'user', content: content, id: 'msg-' + Date.now(), ts: Date.now() });
             this.chatTick++;
@@ -264,6 +266,29 @@ window.AppChat = (function() {
                 ws.send(JSON.stringify({ type: 'cancel' }));
             }
             tab.is_streaming = false;
+        },
+
+        // ========== CHAT: TEXTAREA AUTO-RESIZE ==========
+        autoResizeTextarea(e) {
+            const ta = e.target;
+            if (!ta) return;
+            ta.style.height = 'auto';
+            const newH = Math.min(ta.scrollHeight, 200);
+            ta.style.height = newH + 'px';
+            ta.style.overflowY = ta.scrollHeight > 200 ? 'auto' : 'hidden';
+        },
+        resizeInputForTab(tab) {
+            if (!tab) return;
+            this.$nextTick(() => {
+                const container = document.querySelector('#chat-messages-' + tab.tab_id)?.closest('.flex.flex-col');
+                if (!container) return;
+                const ta = container.querySelector('textarea');
+                if (!ta) return;
+                ta.style.height = 'auto';
+                const newH = Math.min(ta.scrollHeight, 200);
+                ta.style.height = newH + 'px';
+                ta.style.overflowY = ta.scrollHeight > 200 ? 'auto' : 'hidden';
+            });
         },
 
         // ========== CHAT: SLASH COMMANDS ==========
@@ -351,6 +376,7 @@ window.AppChat = (function() {
             this.$nextTick(() => {
                 const ta = document.querySelector('#chat-messages-' + tab.tab_id)?.closest('.flex.flex-col')?.querySelector('textarea');
                 if (ta) ta.focus();
+                this.resizeInputForTab(tab);
             });
         },
 
@@ -715,6 +741,7 @@ window.AppChat = (function() {
             this.$nextTick(() => {
                 const textarea = document.querySelector('#chat-messages-' + tabId)?.closest('.flex.flex-col')?.querySelector('textarea');
                 if (textarea) { textarea.focus(); textarea.setSelectionRange(content.length, content.length); }
+                this.resizeInputForTab(tab);
             });
         },
         regenerateResponse(tabId) {

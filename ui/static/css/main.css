@@ -481,6 +481,12 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 }
 
 /* === STREAMING CURSOR (IDE-style blinking block) === */
+
+/* === CHAT INPUT AREA (auto-resize) === */
+.chat-input-area { line-height: 1.5; }
+.chat-input-hint { opacity: 0.4; transition: opacity 0.15s; }
+.chat-input-area:focus ~ .flex .chat-input-hint,
+.chat-input-area:not(:placeholder-shown) ~ .flex .chat-input-hint { opacity: 0.6; }
 .streaming-cursor {
     display: inline-block;
     width: 8px;

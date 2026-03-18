@@ -161,11 +161,16 @@
                             <div class="flex-1 relative">
                                 <textarea x-model="tab.input_text"
                                           @keydown="handleChatKeydown(tab, $event)"
-                                          @input="handleChatInput(tab, $event)"
+                                          @input="handleChatInput(tab, $event); autoResizeTextarea($event)"
                                           placeholder="Message_ (/ for commands, drag files here)"
-                                          rows="2"
-                                          class="w-full bg-[var(--bg)] border border-[var(--v-dim)] px-3 py-2 text-sm text-[var(--ng2)] tracking-wider resize-none editor"
+                                          rows="1"
+                                          class="chat-input-area w-full bg-[var(--bg)] border border-[var(--v-dim)] px-3 py-2 text-sm text-[var(--ng2)] tracking-wider resize-none editor"
+                                          style="min-height:2.25rem;max-height:200px;overflow-y:hidden"
                                           :disabled="tab.is_streaming"></textarea>
+                                <div class="flex items-center justify-between px-1 mt-0.5">
+                                    <span class="chat-input-hint text-[0.5rem] text-[var(--v3)] tracking-wider">ENTER — send | SHIFT+ENTER — newline</span>
+                                    <span class="text-[0.5rem] text-[var(--v3)] tabular-nums" x-show="(tab.input_text || '').length > 0" x-text="(tab.input_text || '').length + ' chars'"></span>
+                                </div>
                                 <!-- Slash command menu -->
                                 <div x-show="slashMenu.show && slashMenu._tabId === tab.tab_id"
                                      x-transition.opacity.duration.100ms
