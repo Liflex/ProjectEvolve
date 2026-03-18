@@ -160,6 +160,19 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
 /* Theme-specific chat bubbles */
 .chat-bubble-user { background: var(--chat-user-bg, rgba(180,74,255,0.1)); border: 1px solid var(--chat-user-border, var(--v-dim)); }
 .chat-bubble-asst { background: var(--chat-asst-bg, var(--bg2)); border: 1px solid var(--chat-asst-border, var(--v-dim)); }
+/* Message metadata badge (response time, tokens, cost) */
+.msg-meta-badge {
+    font-size: 0.5rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    letter-spacing: 0.05em;
+    color: var(--v3);
+    background: rgba(180,74,255,0.04);
+    padding: 1px 6px;
+    border: 1px solid var(--v-dim);
+    border-radius: 2px;
+    font-weight: normal;
+    vertical-align: middle;
+}
 
 /* === CHAT MESSAGE AVATARS (IDE-style) === */
 .chat-msg-row { display: flex; gap: 10px; align-items: flex-start; }

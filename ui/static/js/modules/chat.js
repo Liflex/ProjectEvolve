@@ -194,13 +194,27 @@ window.AppChat = (function() {
                             if (usage.input_tokens) tab.tokens.input = usage.input_tokens;
                             if (usage.output_tokens) tab.tokens.output += usage.output_tokens;
                             if (data.total_cost_usd) tab.tokens.cost += data.total_cost_usd;
+                            // Store per-message token info for display
+                            tab._msgTokens = { input: usage.input_tokens || 0, output: usage.output_tokens || 0, cost: data.total_cost_usd || 0 };
                             _app.chatTick++;
                         }
                     } else if (msg.type === 'stream_end') {
                         tab.is_streaming = false;
                         tab._catThinking = false;
                         const lastMsg = tab.messages[tab.messages.length - 1];
-                        if (lastMsg) lastMsg.is_streaming = false;
+                        if (lastMsg) {
+                            lastMsg.is_streaming = false;
+                            // Attach timing info to the last assistant message
+                            if (tab._msgStartTime) {
+                                lastMsg.duration = Date.now() - tab._msgStartTime;
+                                tab._msgStartTime = null;
+                            }
+                            // Attach per-message token info
+                            if (tab._msgTokens) {
+                                lastMsg.msgTokens = tab._msgTokens;
+                                tab._msgTokens = null;
+                            }
+                        }
                         if (window.CatModule && CatModule.isActive()) {
                             // Cat: analyze agent response for contextual comment
                             if (CatModule.analyzeAgentResponse && lastMsg && lastMsg.content) {
@@ -251,6 +265,8 @@ window.AppChat = (function() {
             this.resizeInputForTab(tab);
             tab.scrolledUp = false;
             tab.messages.push({ role: 'user', content: content, id: 'msg-' + Date.now(), ts: Date.now() });
+            tab._msgStartTime = Date.now();
+            tab._msgTokens = null;
             this.chatTick++;
             // Cat: analyze user message for contextual skill tips
             if (window.CatModule && CatModule.isActive() && CatModule.analyzeChatContext) {
@@ -501,6 +517,19 @@ window.AppChat = (function() {
                     const aCollapsed = msg.collapsed && aFold;
                     const aChars = (msg.content || '').length;
                     const aLines = (msg.content || '').split('\n').length;
+                    // Timing & token metadata
+                    let aMetaHtml = '';
+                    if (!msg.is_streaming) {
+                        const metaParts = [];
+                        if (msg.duration) metaParts.push(this.fmtDuration(msg.duration));
+                        if (msg.msgTokens) {
+                            if (msg.msgTokens.output) metaParts.push((msg.msgTokens.output / 1000).toFixed(1) + 'K out');
+                            if (msg.msgTokens.cost > 0) metaParts.push('$' + msg.msgTokens.cost.toFixed(4));
+                        }
+                        if (metaParts.length) {
+                            aMetaHtml = ' <span class="msg-meta-badge">' + metaParts.join(' · ') + '</span>';
+                        }
+                    }
                     html += '<div class="msg-wrap chat-msg-fadein chat-msg-row">'
                         + '<div class="chat-avatar chat-avatar-asst">' + avatarAsst + '</div>'
                         + '<div class="chat-body">'
@@ -510,7 +539,7 @@ window.AppChat = (function() {
                         + (aFold ? '<button class="act-fold" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + i + ')" title="Fold/Unfold">' + (msg.collapsed ? 'UNFOLD' : 'FOLD') + '</button>' : '')
                         + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Delete">DEL</button>'
                         + '</div>'
-                        + '<div class="chat-role chat-role-assistant">CLAUDE_' + (aTime ? ' <span style="color:var(--v3);font-weight:normal">' + aTime + '</span>' : '') + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + '</div>'
+                        + '<div class="chat-role chat-role-assistant">CLAUDE_' + (aTime ? ' <span style="color:var(--v3);font-weight:normal">' + aTime + '</span>' : '') + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + '</div>'
                         + thinkingHtml
                         + '<div class="chat-bubble-asst" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit">'
                         + (aCollapsed
@@ -909,7 +938,12 @@ window.AppChat = (function() {
             md += '_Exported: ' + new Date().toISOString() + '_\n\n---\n\n';
             for (const msg of tab.messages) {
                 if (msg.role === 'user') { md += '## User\n\n' + (msg.content || '') + '\n\n'; }
-                else if (msg.role === 'assistant') { md += '## Claude\n\n' + (msg.content || '') + '\n\n'; }
+                else if (msg.role === 'assistant') {
+                    let meta = '';
+                    if (msg.duration) meta += ' ⏱ ' + this.fmtDuration(msg.duration);
+                    if (msg.msgTokens?.cost > 0) meta += ' 💰 $' + msg.msgTokens.cost.toFixed(4);
+                    md += '## Claude' + meta + '\n\n' + (msg.content || '') + '\n\n';
+                }
                 else if (msg.role === 'tool') {
                     const label = { read: 'Read', edit: 'Edit', write: 'Write', bash: 'Bash', search: 'Search', other: 'Tool' }[msg.toolType || 'other'] || 'Tool';
                     md += '> **[' + label + ']** ' + (msg.toolDetail || msg.content || '') + '\n>\n';
@@ -955,6 +989,17 @@ window.AppChat = (function() {
         async resumeSession(session) {
             this.showSessionPickerModal = false;
             await this.createChatTab(session.project_path, session.session_id);
+        },
+
+        // ========== CHAT: DURATION FORMATTER ==========
+        fmtDuration(ms) {
+            if (!ms || ms < 0) return '';
+            if (ms < 1000) return ms + 'ms';
+            const sec = ms / 1000;
+            if (sec < 60) return sec.toFixed(1) + 's';
+            const min = Math.floor(sec / 60);
+            const rem = (sec % 60).toFixed(0);
+            return min + 'm ' + rem + 's';
         },
     };
 })();
