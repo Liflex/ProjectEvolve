@@ -374,9 +374,18 @@ window.AppChat = (function() {
             const avatarTool = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>';
             const msgs = tab.messages;
             let i = 0;
+            let turnCount = 0;
             while (i < msgs.length) {
                 const msg = msgs[i];
                 if (msg.role === 'user') {
+                    turnCount++;
+                    // Turn separator before each user message (except the first turn)
+                    if (turnCount > 1) {
+                        const relTime = this.relativeTime(msg.ts);
+                        html += '<div class="chat-turn-sep"><div class="chat-turn-sep-line"></div>'
+                            + '<span class="chat-turn-sep-label">' + relTime + '</span>'
+                            + '<div class="chat-turn-sep-line"></div></div>';
+                    }
                     const uTime = this.fmtTime(msg.ts);
                     html += '<div class="msg-wrap chat-msg-fadein chat-msg-row chat-msg-row-user">'
                         + '<div class="chat-avatar chat-avatar-user">' + avatarUser + '</div>'

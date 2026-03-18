@@ -29,6 +29,17 @@ window.AppUtils = (function() {
             return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
         },
 
+        relativeTime(ts) {
+            if (!ts) return '';
+            const diff = Math.floor((Date.now() - ts) / 1000);
+            if (diff < 10) return 'только что';
+            if (diff < 60) return diff + ' сек назад';
+            if (diff < 3600) { const m = Math.floor(diff / 60); return m + ' мин назад'; }
+            if (diff < 86400) { const h = Math.floor(diff / 3600); return h + ' ч назад'; }
+            const d = new Date(ts);
+            return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getFullYear()).slice(2);
+        },
+
         formatFileSize(bytes) {
             if (bytes < 1024) return bytes + 'B';
             if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB';

@@ -528,6 +528,31 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* === CHAT TURN SEPARATOR === */
+.chat-turn-sep {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0 8px;
+    user-select: none;
+}
+.chat-turn-sep-line {
+    flex: 1;
+    height: 1px;
+    background: var(--v-dim);
+    opacity: 0.5;
+}
+.chat-turn-sep-label {
+    font-size: 0.5625rem;
+    letter-spacing: 0.1em;
+    color: var(--v3);
+    opacity: 0.7;
+    white-space: nowrap;
+    padding: 1px 8px;
+    border: 1px solid var(--v-dim);
+    background: var(--bg);
+}
+
 /* === COMMAND PALETTE === */
 .cmd-palette {
     background: var(--bg2);
