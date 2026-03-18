@@ -618,6 +618,7 @@
                                 <div><label class="text-[9px] text-[var(--v3)] tracking-wider">ITERATIONS</label><input x-model.number="runConfig.iterations" type="number" min="1" max="500" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
                                 <div><label class="text-[9px] text-[var(--v3)] tracking-wider">INTERVAL_MIN</label><input x-model.number="runConfig.timeout" type="number" min="0" max="60" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
                                 <div><label class="text-[9px] text-[var(--v3)] tracking-wider">MAX_TIME_SEC</label><input x-model.number="runConfig.max_time" type="number" min="60" max="3600" step="60" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
+                                <div><label class="text-[9px] text-[var(--v3)] tracking-wider">TOKEN_THRESHOLD</label><input x-model.number="runConfig.token_threshold" type="number" min="20000" max="200000" step="10000" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
                             </div>
                             <!-- Strategy selector -->
                             <div class="mt-3">
@@ -648,6 +649,24 @@
                             <div x-show="runStatus.total_exps > 0" class="mt-2 h-1.5 bg-[var(--bg)] pixel-border overflow-hidden">
                                 <div class="h-full bg-[var(--v)] transition-all duration-500" :style="'width:' + Math.max(0, Math.min(100, (runStatus.current_exp / runStatus.total_exps) * 100)) + '%'"></div>
                             </div>
+                            <!-- Token budget bar -->
+                            <div x-show="runStatus.tokens" class="mt-2">
+                                <div class="flex items-center gap-3 text-[9px] tracking-wider">
+                                    <span class="text-[var(--v3)]">TOKENS_</span>
+                                    <span class="text-[var(--cyan)] tabular-nums" x-text="runStatus.tokens ? (runStatus.tokens.input_tokens/1000).toFixed(1)+'K / '+(runStatus.tokens.threshold/1000).toFixed(0)+'K' : ''"></span>
+                                    <span class="text-[var(--v3)]">|</span>
+                                    <span class="text-[var(--ng2)] tabular-nums" x-text="runStatus.tokens ? 'avg: '+(runStatus.tokens.avg_experiment_tokens/1000).toFixed(1)+'K/exp' : ''"></span>
+                                    <span class="text-[var(--v3)]">|</span>
+                                    <span class="text-[var(--yellow)] tabular-nums" x-text="runStatus.tokens ? '$'+runStatus.tokens.total_cost_usd.toFixed(4) : ''"></span>
+                                    <span x-show="runStatus.tokens && runStatus.tokens.should_reset" class="text-[var(--amber)] blink">RESET_PENDING</span>
+                                    <span x-show="runStatus.session_id" class="ml-auto text-[var(--v3)]" x-text="'SID:' + (runStatus.session_id || '').substring(0,8)"></span>
+                                </div>
+                                <div class="mt-1 h-1 bg-[var(--bg)] pixel-border overflow-hidden">
+                                    <div class="h-full transition-all duration-500"
+                                         :class="runStatus.tokens && runStatus.tokens.input_tokens > runStatus.tokens.soft_threshold ? 'bg-[var(--amber)]' : 'bg-[var(--cyan)]'"
+                                         :style="'width:' + Math.min(100, ((runStatus.tokens?.input_tokens||0) / (runStatus.tokens?.threshold||100000)) * 100) + '%'"></div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Logs -->
@@ -664,7 +683,7 @@
                                  x-ref="logContainer"
                                  class="bg-[var(--bg)] pixel-border p-3 max-h-96 overflow-y-auto text-[11px] leading-relaxed font-mono">
                                 <template x-for="(line,i) in runStatus.recent_logs" :key="'rl'+i">
-                                    <div :class="line.includes('ERROR') ? 'text-[var(--red)]' : line.includes('[INIT]') ? 'text-[var(--cyan)]' : line.includes('SUCCESS') || line.includes('KEEP') ? 'text-[var(--ng)]' : line.includes('WARNING') || line.includes('DISCARD') ? 'text-[var(--amber)]' : (line.match(/(?:Эксперимент|Experiment)\s+\d+\/\d+/) || line.includes('[COMPLETE]')) ? 'text-[var(--v)]' : 'text-[var(--v3)]'"
+                                    <div :class="line.includes('[ERROR]') || line.includes('ERROR') ? 'text-[var(--red)]' : line.includes('[INIT]') ? 'text-[var(--cyan)]' : line.includes('[DONE]') || line.includes('SUCCESS') || line.includes('KEEP') ? 'text-[var(--ng)]' : line.includes('[SESSION]') ? 'text-[var(--amber)]' : line.includes('[TOOL]') ? 'text-[var(--pink)]' : line.includes('[AGENT]') ? 'text-[var(--ng2)]' : line.includes('WARNING') || line.includes('DISCARD') ? 'text-[var(--amber)]' : line.includes('[EXP]') || (line.match(/(?:Эксперимент|Experiment)\s+\d+\/\d+/) || line.includes('[COMPLETE]')) ? 'text-[var(--v)]' : line.includes('[STOP]') ? 'text-[var(--red)]' : 'text-[var(--v3)]'"
                                          x-text="line"></div>
                                 </template>
                             </div>
@@ -915,8 +934,9 @@
                 changesLog: '',
                 promptSaving: false,
                 configSaving: false,
-                runConfig: { iterations:10, timeout:5, max_time:600, project:'.', strategy:'default' },
-                runStatus: { running:false, current_exp:0, total_exps:0, started_at:null, recent_logs:[], error:null },
+                runConfig: { iterations:10, timeout:5, max_time:600, project:'.', strategy:'default', token_threshold:100000 },
+                runStatus: { running:false, current_exp:0, total_exps:0, started_at:null, recent_logs:[], error:null, tokens:null, session_id:null },
+                researchWs: null,
                 toast: { show:false, message:'', type:'success' },
                 catSpeech: '',  // reactive trigger for cat speech bubble
                 organismSVG: '',  // organism visualizer SVG
@@ -1060,7 +1080,8 @@
                     if (page==='prompt') this.loadPrompt();
                     if (page==='config') this.loadConfig();
                     if (page==='dashboard') this.loadStats();
-                    if (page==='run') this.pollRunStatus();
+                    if (page==='run') { this.pollRunStatus(); if (this.runStatus.running) this.connectResearchWs(); }
+                    if (page!=='run') this.disconnectResearchWs();
                     // Cat: contextual speech based on page
                     if (window.CatModule && CatModule.isActive()) {
                         const tips = {
@@ -1150,11 +1171,47 @@
                     try { await this.api('/api/config', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(this.config) }); this.showToast('CONFIG COMMITTED', 'success'); }
                     catch(e) { this.showToast('COMMIT FAILED', 'error'); } finally { this.configSaving = false; }
                 },
+                connectResearchWs() {
+                    if (this.researchWs && this.researchWs.readyState <= 1) return;
+                    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    this.researchWs = new WebSocket(`${proto}//${location.host}/ws/research`);
+                    this.researchWs.onmessage = (e) => {
+                        try {
+                            const event = JSON.parse(e.data);
+                            if (event.type === 'tokens_update' && event.input_tokens !== undefined) {
+                                this.runStatus.tokens = event;
+                            } else if (event.type === 'session_reset') {
+                                this.runStatus.session_id = null;
+                            } else if (event.type === 'experiment_start') {
+                                this.runStatus.current_exp = event.number;
+                                this.runStatus.session_id = event.session_id;
+                                if (event.tokens) this.runStatus.tokens = event.tokens;
+                            } else if (event.type === 'experiment_end') {
+                                if (event.tokens) this.runStatus.tokens = event.tokens;
+                                this.runStatus.session_id = event.session_id;
+                            } else if (event.type === 'run_end') {
+                                this.runStatus.running = false;
+                                this.pollRunStatus();
+                                if (window.CatModule) CatModule.setExpression('neutral');
+                            }
+                        } catch(err) { /* ignore parse errors */ }
+                    };
+                    this.researchWs.onclose = () => {
+                        // Reconnect if still on run page and running
+                        if (this.page === 'run' && this.runStatus.running) {
+                            setTimeout(() => this.connectResearchWs(), 2000);
+                        }
+                    };
+                },
+                disconnectResearchWs() {
+                    if (this.researchWs) { this.researchWs.close(); this.researchWs = null; }
+                },
                 async startRun() {
                     try {
                         const res = await this.api('/api/run', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(this.runConfig) });
                         this.showToast('EXPERIMENT STARTED', 'success');
                         if (window.CatModule) CatModule.setExpression('working');
+                        this.connectResearchWs();
                         await this.pollRunStatus();
                     }
                     catch(e) { console.error('[startRun] FAILED:', e); this.showToast('LAUNCH FAILED', 'error'); }
@@ -1177,6 +1234,8 @@
                                 const el = this.$refs.logContainer;
                                 if (el) el.scrollTop = el.scrollHeight;
                             });
+                            // Ensure WS is connected while running
+                            this.connectResearchWs();
                         }
                     } catch(e) {}
                 },
@@ -1284,7 +1343,7 @@
                                         if (lastMsg && lastMsg.role === 'assistant' && lastMsg.is_streaming) {
                                             lastMsg.content += text;
                                         } else {
-                                            tab.messages.push({ role: 'assistant', content: text, is_streaming: true });
+                                            tab.messages.push({ role: 'assistant', content: text, is_streaming: true, ts: Date.now() });
                                         }
                                         tab.is_streaming = true;
                                         _app.chatTick++;
@@ -1306,7 +1365,7 @@
                                         if (lastMsg && lastMsg.role === 'assistant' && lastMsg.is_streaming) {
                                             lastMsg.content += text;
                                         } else {
-                                            tab.messages.push({ role: 'assistant', content: text, is_streaming: true });
+                                            tab.messages.push({ role: 'assistant', content: text, is_streaming: true, ts: Date.now() });
                                         }
                                         tab.is_streaming = true;
                                         _app.chatTick++;
@@ -1345,7 +1404,7 @@
                                 if (lastMsg) lastMsg.is_streaming = false;
                                 _app.chatTick++;
                             } else if (msg.type === 'error') {
-                                tab.messages.push({ role: 'assistant', content: '[ERROR] ' + (msg.message || 'Unknown error') });
+                                tab.messages.push({ role: 'assistant', content: '[ERROR] ' + (msg.message || 'Unknown error'), ts: Date.now() });
                                 tab.is_streaming = false;
                                 _app.chatTick++;
                             }
@@ -1363,7 +1422,7 @@
 
                     ws.onerror = (e) => {
                         console.error('[ws] error:', tab.session_id, e);
-                        tab.messages.push({ role: 'assistant', content: '[ERROR] WebSocket connection failed' });
+                        tab.messages.push({ role: 'assistant', content: '[ERROR] WebSocket connection failed', ts: Date.now() });
                         tab.is_streaming = false;
                     };
                 },
@@ -1373,7 +1432,7 @@
                     const content = tab.input_text.trim();
                     tab.input_text = '';
                     tab.scrolledUp = false;
-                    tab.messages.push({ role: 'user', content: content, id: 'msg-' + Date.now() });
+                    tab.messages.push({ role: 'user', content: content, id: 'msg-' + Date.now(), ts: Date.now() });
                     this.chatTick++;
                     // Always scroll to bottom after user sends a message
                     setTimeout(() => {
@@ -1384,7 +1443,7 @@
                     if (ws && ws.readyState === WebSocket.OPEN) {
                         ws.send(JSON.stringify({ type: 'message', content: content }));
                     } else {
-                        tab.messages.push({ role: 'assistant', content: '[ERROR] Not connected. Session may have ended.' });
+                        tab.messages.push({ role: 'assistant', content: '[ERROR] Not connected. Session may have ended.', ts: Date.now() });
                         this.chatTick++;
                     }
                 },
@@ -1395,6 +1454,12 @@
                         ws.send(JSON.stringify({ type: 'cancel' }));
                     }
                     tab.is_streaming = false;
+                },
+
+                fmtTime(ts) {
+                    if (!ts) return '';
+                    const d = new Date(ts);
+                    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
                 },
 
                 renderChatHTML(tab) {
@@ -1419,8 +1484,9 @@
                     while (i < msgs.length) {
                         const msg = msgs[i];
                         if (msg.role === 'user') {
+                            const uTime = this.fmtTime(msg.ts);
                             html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:0">'
-                                + '<div class="chat-role chat-role-user">USER_</div>'
+                                + '<div class="chat-role chat-role-user">USER_' + (uTime ? ' <span style="color:var(--v3);font-weight:normal">' + uTime + '</span>' : '') + '</div>'
                                 + '<div style="max-width:70%;padding:8px 12px;background:rgba(180,74,255,0.1);border:1px solid var(--v-dim);font-size:14px;color:var(--ng2)">'
                                 + this.escHtml(msg.content || '')
                                 + '</div></div>';
@@ -1429,8 +1495,9 @@
                             const contentHtml = msg.is_streaming
                                 ? '<pre style="white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit;font-size:inherit">' + this.escHtml(msg.content) + '</pre>'
                                 : '<div class="md">' + this.renderMarkdown(msg.content) + '</div>';
+                            const aTime = this.fmtTime(msg.ts);
                             html += '<div style="display:flex;flex-direction:column;align-items:flex-start;gap:0">'
-                                + '<div class="chat-role chat-role-assistant">CLAUDE_</div>'
+                                + '<div class="chat-role chat-role-assistant">CLAUDE_' + (aTime ? ' <span style="color:var(--v3);font-weight:normal">' + aTime + '</span>' : '') + '</div>'
                                 + '<div style="max-width:80%;padding:8px 12px;background:var(--bg2);border:1px solid var(--v-dim);font-size:14px">'
                                 + contentHtml
                                 + '</div></div>';
