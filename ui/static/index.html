@@ -22,15 +22,13 @@
     <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.11.0/lib/addon-fit.js"></script>
     <!-- Chat UI modules -->
     <link rel="stylesheet" href="/css/xterm.css">
-    <script src="/js/file-browser.js"></script>
     <script src="/js/terminal.js"></script>
-    <script src="/js/chat.js"></script>
     <style>
         [x-cloak] { display: none !important; }
-        * { scrollbar-width: thin; scrollbar-color: #1a1028 #0c0b14; }
+        * { scrollbar-width: thin; scrollbar-color: var(--v-dim) var(--bg); }
         ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0c0b14; }
-        ::-webkit-scrollbar-thumb { background: #1a1028; border-radius: 0; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--v-dim); border-radius: 0; }
 
         body { background: #0c0b14; font-family: 'VT323', monospace; }
 
@@ -44,7 +42,7 @@
         }
         .crt::after {
             content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9998;
-            background: radial-gradient(ellipse at center, transparent 55%, rgba(12,8,18,0.5) 100%);
+            background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.5) 100%);
         }
         @keyframes flicker { 0%, 100% { opacity: 1; } 92% { opacity: 1; } 93% { opacity: 0.85; } 94% { opacity: 1; } 96% { opacity: 0.92; } 97% { opacity: 1; } }
         .flicker { animation: flicker 10s infinite; }
@@ -108,11 +106,31 @@
         .md p { margin: 0.4rem 0; }
         .md ul, .md ol { margin: 0.4rem 0; padding-left: 1.5rem; }
         .md li { margin: 0.15rem 0; }
-        .md code { background: rgba(180,74,255,0.08); color: var(--v); padding: 1px 4px; font-size: 13px; }
-        .md pre { background: #08070f; border: 1px solid var(--v-dim); padding: 0.75rem; overflow-x: auto; margin: 0.5rem 0; }
+        .md code { background: rgba(180,74,255,0.08); color: var(--v); padding: 1px 4px; font-size: 13px; border-radius: 2px; }
+        /* IDE-style code block with header bar */
+        .md .code-block { position: relative; margin: 0.5rem 0; border: 1px solid var(--v-dim); background: var(--bg); overflow: hidden; }
+        .md .code-block .code-header { display: flex; align-items: center; justify-content: space-between; padding: 4px 10px; background: rgba(180,74,255,0.06); border-bottom: 1px solid var(--v-dim); }
+        .md .code-block .code-lang { font-size: 9px; letter-spacing: 0.15em; color: var(--v3); text-transform: uppercase; }
+        .md .code-block .code-copy { font-size: 9px; letter-spacing: 0.1em; color: var(--v3); cursor: pointer; padding: 2px 6px; border: 1px solid transparent; transition: all 0.15s; }
+        .md .code-block .code-copy:hover { color: var(--v); border-color: var(--v-dim); }
+        .md .code-block .code-copy.copied { color: var(--ng); }
+        .md .code-block pre { margin: 0; border: none; padding: 0.75rem; overflow-x: auto; background: transparent; }
+        .md .code-block pre code { background: none; padding: 0; color: var(--ng2); }
+        /* Fallback for pre without wrapper */
+        .md pre { background: var(--bg); border: 1px solid var(--v-dim); padding: 0.75rem; overflow-x: auto; margin: 0.5rem 0; }
         .md pre code { background: none; padding: 0; color: var(--ng2); }
+        /* Syntax-like coloring for common tokens in code blocks */
+        .md .code-block .tok-kw { color: var(--v); }
+        .md .code-block .tok-str { color: var(--ng); }
+        .md .code-block .tok-cmt { color: var(--v3); font-style: italic; }
+        .md .code-block .tok-fn { color: var(--cyan); }
+        .md .code-block .tok-num { color: var(--pink); }
         .md strong { color: var(--v); }
-        .md blockquote { border-left: 3px solid var(--pink); padding-left: 0.75rem; margin: 0.5rem 0; color: #4a3a5a; }
+        .md blockquote { border-left: 3px solid var(--pink); padding-left: 0.75rem; margin: 0.5rem 0; color: var(--v3); }
+        /* Chat role labels */
+        .chat-role { font-size: 9px; letter-spacing: 0.15em; margin-bottom: 3px; }
+        .chat-role-user { color: var(--v); }
+        .chat-role-assistant { color: var(--cyan); }
         .md hr { border-color: var(--v-dim); margin: 1rem 0; }
         .md table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 13px; }
         .md th { border: 1px solid var(--v-dim); padding: 4px 8px; background: rgba(180,74,255,0.05); color: var(--v); text-align: left; font-weight: normal; }
@@ -175,8 +193,8 @@
                 <div class="text-[10px] tracking-[0.3em] text-[var(--v3)] mt-1">[ HACK THE PLANET ]</div>
             </div>
 
-            <!-- Cat Companion (always visible) -->
-            <div class="py-3 border-b-2 border-[var(--v-dim)] flex flex-col items-center">
+            <!-- Cat Companion -->
+            <div x-show="settings.catCompanion" class="py-3 border-b-2 border-[var(--v-dim)] flex flex-col items-center">
                 <div class="cat-frame">
                     <canvas id="cat-canvas" width="180" height="148"></canvas>
                 </div>
@@ -186,7 +204,8 @@
                 </div>
                 <!-- Cat speech bubble -->
                 <div x-show="catSpeech" x-cloak
-                     class="mt-1 px-2 py-0.5 border border-[var(--v-dim)] bg-[var(--bg2)] text-[9px] text-[var(--cyan)] tracking-wider max-w-[200px] text-center truncate"
+                     class="mt-1 px-2 py-0.5 border border-[var(--v)] text-[9px] text-[var(--cyan)] tracking-wider max-w-[200px] text-center truncate"
+                     style="background:rgba(12,11,20,0.95); box-shadow: 0 0 10px rgba(180,74,255,0.15);"
                      x-text="'> ' + catSpeech"></div>
             </div>
 
@@ -244,6 +263,12 @@
                         :class="page === 'run' && 'active'">
                     <span class="text-xs">[>]</span> RUN EXPERIMENT
                     <span class="w-2 h-2" :class="runStatus.running ? 'bg-[var(--v)] pulse' : 'bg-[var(--v3)]'"></span>
+                </button>
+                <div class="my-2 mx-4 border-t border-[var(--v-dim)]"></div>
+                <button @click="navigate('settings')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
+                        :class="page === 'settings' && 'active'">
+                    <span class="text-xs">[>]</span> SETTINGS
+                    <span class="ml-auto text-[9px] text-[var(--v-dim)] font-mono">Alt+9</span>
                 </button>
             </nav>
 
@@ -309,21 +334,21 @@
                         </template>
                         <template x-if="stats.score_trend && stats.score_trend.length > 0">
                             <div class="overflow-x-auto">
-                                <svg :viewBox="'0 0 ' + Math.max(stats.score_trend.length * 28 + 50, 200) + ' 90'" class="w-full h-24">
+                                <svg :viewBox="'0 0 ' + Math.max((stats.score_trend?.length || 0) * 28 + 50, 200) + ' 90'" class="w-full h-24">
                                     <line x1="40" y1="5" x2="40" y2="75" stroke="var(--v-dim)" stroke-width="0.5"/>
-                                    <line x1="40" y1="75" :x2="stats.score_trend.length * 28 + 40" y2="75" stroke="var(--v-dim)" stroke-width="0.5"/>
-                                    <line x1="40" y1="40" :x2="stats.score_trend.length * 28 + 40" y2="40" stroke="var(--v-dim)" stroke-width="0.3" stroke-dasharray="2 4"/>
-                                    <line x1="40" y1="26" :x2="stats.score_trend.length * 28 + 40" y2="26" stroke="var(--amber)" stroke-width="0.4" stroke-dasharray="4 3" opacity="0.6"/>
+                                    <line x1="40" y1="75" :x2="(stats.score_trend?.length || 0) * 28 + 40" y2="75" stroke="var(--v-dim)" stroke-width="0.5"/>
+                                    <line x1="40" y1="40" :x2="(stats.score_trend?.length || 0) * 28 + 40" y2="40" stroke="var(--v-dim)" stroke-width="0.3" stroke-dasharray="2 4"/>
+                                    <line x1="40" y1="26" :x2="(stats.score_trend?.length || 0) * 28 + 40" y2="26" stroke="var(--amber)" stroke-width="0.4" stroke-dasharray="4 3" opacity="0.6"/>
                                     <text x="22" y="28.5" fill="var(--amber)" font-size="6" font-family="'VT323',monospace" text-anchor="end" opacity="0.7">0.7</text>
-                                    <line x1="40" y1="15.5" :x2="stats.score_trend.length * 28 + 40" y2="15.5" stroke="var(--cyan)" stroke-width="0.4" stroke-dasharray="4 3" opacity="0.6"/>
+                                    <line x1="40" y1="15.5" :x2="(stats.score_trend?.length || 0) * 28 + 40" y2="15.5" stroke="var(--cyan)" stroke-width="0.4" stroke-dasharray="4 3" opacity="0.6"/>
                                     <text x="22" y="18" fill="var(--cyan)" font-size="6" font-family="'VT323',monospace" text-anchor="end" opacity="0.7">0.85</text>
                                     <text x="8" y="9" fill="var(--v3)" font-size="7" font-family="'VT323',monospace">1.0</text>
                                     <text x="8" y="44" fill="var(--v3)" font-size="7" font-family="'VT323',monospace">0.5</text>
                                     <text x="8" y="79" fill="var(--v3)" font-size="7" font-family="'VT323',monospace">0.0</text>
-                                    <polygon :points="'40,75 ' + stats.score_trend.map((p,i) => (40+i*28)+','+(75-(p.score||0)*70)).join(' ') + ' ' + (40+(stats.score_trend.length-1)*28)+',75'"
+                                    <polygon :points="'40,75 ' + (stats.score_trend || []).map((p,i) => (40+i*28)+','+(75-(p.score||0)*70)).join(' ') + ' ' + (40+((stats.score_trend||[]).length-1)*28)+',75'"
                                              fill="rgba(180,74,255,0.08)"/>
                                     <polyline fill="none" stroke="var(--v)" stroke-width="1.5" stroke-linejoin="round" opacity="0.7"
-                                              :points="stats.score_trend.map((p,i) => (40+i*28)+','+(75-(p.score||0)*70)).join(' ')"/>
+                                              :points="(stats.score_trend || []).map((p,i) => (40+i*28)+','+(75-(p.score||0)*70)).join(' ')"/>
                                     <g x-html="scoreTrendSvg()"></g>
                                 </svg>
                             </div>
@@ -347,23 +372,23 @@
                 </div>
 
                 <!-- Last Experiment -->
-                <div x-show="stats.last_experiment" class="mt-3 pixel-border bg-[var(--bg2)] p-4">
+                <div x-show="stats.last_experiment && stats.last_experiment.number" class="mt-3 pixel-border bg-[var(--bg2)] p-4">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-[9px] tracking-widest text-[var(--v3)]">LATEST_MUTATION_</span>
-                        <button @click="navigate('experiments'); $nextTick(() => loadExperiment(stats.last_experiment.number))" class="text-[10px] text-[var(--cyan)] hover:text-white tracking-wider">INSPECT_</button>
+                        <button @click="navigate('experiments'); $nextTick(() => loadExperiment(stats.last_experiment?.number))" class="text-[10px] text-[var(--cyan)] hover:text-white tracking-wider">INSPECT_</button>
                     </div>
                     <div class="flex items-start gap-3">
-                        <span class="text-[var(--v3)] text-xs mt-0.5" style="font-family:'Press Start 2P',monospace" x-text="'#'+String(stats.last_experiment.number).padStart(2,'0')"></span>
+                        <span class="text-[var(--v3)] text-xs mt-0.5" style="font-family:'Press Start 2P',monospace" x-text="'#'+String(stats.last_experiment?.number || 0).padStart(2,'0')"></span>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2 flex-wrap">
-                                <span class="text-sm text-[var(--ng2)]" x-text="stats.last_experiment.title"></span>
-                                <span class="text-[9px] px-1 py-px" :class="typeBadgeCls(stats.last_experiment.type)" x-text="stats.last_experiment.type"></span>
-                                <span class="text-[9px]" :class="decisionCls(stats.last_experiment.decision)" x-text="stats.last_experiment.decision"></span>
+                                <span class="text-sm text-[var(--ng2)]" x-text="stats.last_experiment?.title"></span>
+                                <span class="text-[9px] px-1 py-px" :class="typeBadgeCls(stats.last_experiment?.type)" x-text="stats.last_experiment?.type"></span>
+                                <span class="text-[9px]" :class="decisionCls(stats.last_experiment?.decision)" x-text="stats.last_experiment?.decision"></span>
                             </div>
-                            <div class="text-[10px] text-[var(--v3)] mt-0.5" x-text="stats.last_experiment.date"></div>
-                            <div class="text-xs text-[var(--ng3)] mt-1 line-clamp-2" x-text="stats.last_experiment.what_done"></div>
+                            <div class="text-[10px] text-[var(--v3)] mt-0.5" x-text="stats.last_experiment?.date"></div>
+                            <div class="text-xs text-[var(--ng3)] mt-1 line-clamp-2" x-text="stats.last_experiment?.what_done"></div>
                         </div>
-                        <div class="text-xl text-[var(--v)] glow-sm shrink-0" style="font-family:'Press Start 2P',monospace" x-text="stats.last_experiment.score"></div>
+                        <div class="text-xl text-[var(--v)] glow-sm shrink-0" style="font-family:'Press Start 2P',monospace" x-text="stats.last_experiment?.score"></div>
                     </div>
                 </div>
             </div>
@@ -592,6 +617,16 @@
                                 <div><label class="text-[9px] text-[var(--v3)] tracking-wider">INTERVAL_MIN</label><input x-model.number="runConfig.timeout" type="number" min="0" max="60" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
                                 <div><label class="text-[9px] text-[var(--v3)] tracking-wider">MAX_TIME_SEC</label><input x-model.number="runConfig.max_time" type="number" min="60" max="3600" step="60" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
                             </div>
+                            <!-- Strategy selector -->
+                            <div class="mt-3">
+                                <label class="text-[9px] text-[var(--v3)] tracking-wider">STRATEGY_</label>
+                                <select x-model="runConfig.strategy"
+                                    class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]">
+                                    <option value="default">BALANCED — Full-featured research cycle</option>
+                                    <option value="execution">EXECUTION — Goals & features, minimal overhead</option>
+                                    <option value="quality">QUALITY — Bug fixes, security & tests</option>
+                                </select>
+                            </div>
                             <div class="mt-3 flex gap-2">
                                 <button @click="startRun()" class="border border-[var(--v)] text-[var(--v)] text-xs tracking-wider px-5 py-2 hover:bg-[rgba(180,74,255,0.1)] transition-all">[> INITIATE]</button>
                             </div>
@@ -639,6 +674,70 @@
                         </div>
                 </div>
             </div>
+            <!-- ==================== SETTINGS ==================== -->
+            <div x-show="page === 'settings' && section === 'lab'" class="p-6 max-w-4xl mx-auto">
+                <div class="mb-5">
+                    <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">SETTINGS</h2>
+                    <p class="text-xs text-[var(--ng3)] mt-1">UI_PREFERENCES_</p>
+                </div>
+                <div class="space-y-3">
+                    <!-- Theme selector -->
+                    <div class="pixel-border bg-[var(--bg2)] p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <div class="text-sm text-[var(--ng2)] tracking-wider">COLOR_THEME</div>
+                                <div class="text-[10px] text-[var(--v3)] mt-0.5">Visual theme for the entire interface</div>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <template x-for="[key, label] in [['synthwave','SYNTHWAVE'],['dracula','DRACULA']]" :key="key">
+                                <button @click="settings.theme = key; localStorage.setItem('ar-settings', JSON.stringify(settings)); applyTheme(key);"
+                                        class="flex-1 py-2.5 px-3 text-xs tracking-wider transition-all"
+                                        :class="settings.theme === key ? 'bg-[var(--v)] text-[var(--bg)] border border-[var(--v)]' : 'bg-[var(--bg)] border border-[var(--v-dim)] text-[var(--ng3)] hover:border-[var(--v2)] hover:text-[var(--ng2)]'">
+                                    <span x-text="label"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                    <div class="pixel-border bg-[var(--bg2)] p-4 flex items-center justify-between">
+                        <div>
+                            <div class="text-sm text-[var(--ng2)] tracking-wider">MATRIX_RAIN</div>
+                            <div class="text-[10px] text-[var(--v3)] mt-0.5">Animated code rain background</div>
+                        </div>
+                        <button @click="toggleSetting('matrixRain')"
+                                class="w-12 h-6 rounded-sm transition-all duration-200 relative cursor-pointer"
+                                :class="settings.matrixRain ? 'bg-[var(--v)]' : 'bg-[var(--v-dim)]'">
+                            <div class="w-5 h-5 rounded-sm absolute top-0.5 transition-all duration-200"
+                                 :class="settings.matrixRain ? 'left-[26px] bg-[var(--bg2)]' : 'left-0.5 bg-[var(--v3)]'"></div>
+                        </button>
+                    </div>
+                    <div class="pixel-border bg-[var(--bg2)] p-4 flex items-center justify-between">
+                        <div>
+                            <div class="text-sm text-[var(--ng2)] tracking-wider">CRT_EFFECT</div>
+                            <div class="text-[10px] text-[var(--v3)] mt-0.5">Scanlines, vignette + flicker</div>
+                        </div>
+                        <button @click="toggleSetting('crtEffect')"
+                                class="w-12 h-6 rounded-sm transition-all duration-200 relative cursor-pointer"
+                                :class="settings.crtEffect ? 'bg-[var(--v)]' : 'bg-[var(--v-dim)]'">
+                            <div class="w-5 h-5 rounded-sm absolute top-0.5 transition-all duration-200"
+                                 :class="settings.crtEffect ? 'left-[26px] bg-[var(--bg2)]' : 'left-0.5 bg-[var(--v3)]'"></div>
+                        </button>
+                    </div>
+                    <div class="pixel-border bg-[var(--bg2)] p-4 flex items-center justify-between">
+                        <div>
+                            <div class="text-sm text-[var(--ng2)] tracking-wider">CAT_COMPANION</div>
+                            <div class="text-[10px] text-[var(--v3)] mt-0.5">Sidebar cat sprite with speech</div>
+                        </div>
+                        <button @click="toggleSetting('catCompanion')"
+                                class="w-12 h-6 rounded-sm transition-all duration-200 relative cursor-pointer"
+                                :class="settings.catCompanion ? 'bg-[var(--v)]' : 'bg-[var(--v-dim)]'">
+                            <div class="w-5 h-5 rounded-sm absolute top-0.5 transition-all duration-200"
+                                 :class="settings.catCompanion ? 'left-[26px] bg-[var(--bg2)]' : 'left-0.5 bg-[var(--v3)]'"></div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             </div><!-- end Research Lab section -->
 
             <!-- ==================== CHAT SECTION ==================== -->
@@ -676,56 +775,31 @@
                 <div class="flex-1 overflow-hidden relative">
                     <template x-for="tab in chatTabs" :key="tab.tab_id">
                         <div x-show="activeChatTab === tab.tab_id" class="absolute inset-0 flex flex-col">
-                            <!-- Messages area -->
-                            <div class="flex-1 overflow-y-auto p-4 space-y-3" x-ref="chatMessages">
-                                <!-- Welcome message -->
-                                <div x-show="tab.messages.length === 0" class="flex items-center justify-center h-full">
-                                    <div class="text-center">
-                                        <div class="text-[10px] tracking-widest text-[var(--v3)] mb-2">CLAUDE_CODE_SESSION</div>
-                                        <div class="text-xs text-[var(--v3)]" x-text="'Target: ' + tab.project_path"></div>
-                                        <div class="text-[9px] text-[var(--v3)] mt-1">Type a message to start_</div>
-                                    </div>
-                                </div>
-                                <!-- Messages -->
-                                <template x-for="(msg, mi) in tab.messages" :key="msg.id || mi">
-                                    <!-- User message -->
-                                    <div x-show="msg.role === 'user'" class="flex justify-end">
-                                        <div class="max-w-[70%] px-3 py-2 bg-[rgba(180,74,255,0.1)] border border-[var(--v-dim)] text-sm text-[var(--ng2)]">
-                                            <div x-text="msg.content"></div>
-                                        </div>
-                                    </div>
-                                    <!-- Assistant message -->
-                                    <div x-show="msg.role === 'assistant'" class="flex justify-start">
-                                        <div class="max-w-[80%] px-3 py-2 bg-[var(--bg2)] border border-[var(--v-dim)] text-sm">
-                                            <div class="md" x-html="renderMarkdown(msg.content)"></div>
-                                        </div>
-                                    </div>
-                                    <!-- Tool call indicator -->
-                                    <div x-show="msg.role === 'tool'" class="flex justify-start">
-                                        <div class="px-3 py-1.5 bg-[var(--bg)] border border-[var(--v-dim)] text-[10px] text-[var(--amber)] tracking-wider">
-                                            [TOOL] <span x-text="msg.content"></span>
-                                        </div>
-                                    </div>
-                                </template>
-                                <!-- Streaming indicator -->
-                                <div x-show="tab.is_streaming" class="flex justify-start">
-                                    <div class="px-3 py-1.5 bg-[var(--bg2)] border border-[var(--v-dim)] text-[10px] text-[var(--v)] tracking-widest">
-                                        <span class="blink">STREAMING_</span>
-                                    </div>
-                                </div>
+                            <!-- Messages area — rendered via x-html + chatTick for reactivity -->
+                            <div class="flex-1 overflow-y-auto p-4 space-y-3" :id="'chat-messages-' + tab.tab_id"
+                                 x-html="renderChatHTML(tab)"
+                                 @click="onChatClick($event)"
+                                 @scroll="onChatScroll(tab, $event)">
                             </div>
+                            <!-- Scroll-to-bottom FAB -->
+                            <button x-show="tab.scrolledUp" x-cloak
+                                    @click.stop="scrollToBottom(tab)"
+                                    class="absolute bottom-20 right-4 z-10 px-2.5 py-1.5 bg-[var(--bg2)] border border-[var(--v2)] text-[var(--v)] text-[10px] tracking-wider hover:bg-[rgba(180,74,255,0.15)] transition-all shadow-lg"
+                                    title="Scroll to bottom">↓ BOTTOM</button>
                             <!-- Input area -->
-                            <div class="border-t-2 border-[var(--v-dim)] bg-[var(--bg2)] p-3 flex gap-2 shrink-0">
-                                <input x-model="tab.input_text" @keydown.enter="sendChatMessage(tab)"
-                                       type="text" placeholder="Type a message_"
-                                       class="flex-1 bg-[var(--bg)] border border-[var(--v-dim)] px-3 py-2 text-sm text-[var(--ng2)] tracking-wider"
-                                       :disabled="tab.is_streaming">
+                            <div class="border-t-2 border-[var(--v-dim)] bg-[var(--bg2)] p-3 flex gap-2 shrink-0 items-end">
+                                <textarea x-model="tab.input_text"
+                                          @keydown.enter="if (!$event.shiftKey) { $event.preventDefault(); sendChatMessage(tab); }"
+                                          placeholder="Type a message_ (Shift+Enter for newline)"
+                                          rows="2"
+                                          class="flex-1 bg-[var(--bg)] border border-[var(--v-dim)] px-3 py-2 text-sm text-[var(--ng2)] tracking-wider resize-none editor"
+                                          :disabled="tab.is_streaming"></textarea>
                                 <button @click="sendChatMessage(tab)" :disabled="tab.is_streaming || !tab.input_text?.trim()"
-                                        class="px-4 py-2 border border-[var(--v)] text-[var(--v)] text-xs tracking-wider hover:bg-[rgba(180,74,255,0.1)] disabled:opacity-30 transition-all">
+                                        class="px-4 py-2 border border-[var(--v)] text-[var(--v)] text-xs tracking-wider hover:bg-[rgba(180,74,255,0.1)] disabled:opacity-30 transition-all shrink-0">
                                     [> SEND]
                                 </button>
                                 <button @click="cancelChatStream(tab)" x-show="tab.is_streaming"
-                                        class="px-3 py-2 border border-[var(--red)] text-[var(--red)] text-xs tracking-wider hover:bg-[rgba(255,51,51,0.1)] transition-all">
+                                        class="px-3 py-2 border border-[var(--red)] text-[var(--red)] text-xs tracking-wider hover:bg-[rgba(255,51,51,0.1)] transition-all shrink-0">
                                     [X]
                                 </button>
                             </div>
@@ -784,10 +858,43 @@
                 </div>
             </div><!-- end Chat section -->
 
+            <!-- New session path modal -->
+            <div x-show="showNewSessionModal" x-cloak class="fixed inset-0 z-40 flex items-center justify-center bg-black/60" @click.self="showNewSessionModal = false">
+                <div class="bg-[var(--bg2)] border-2 border-[var(--v-dim)] p-5 max-w-md mx-4 w-full">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="text-sm text-[var(--v)] tracking-widest">NEW_SESSION</div>
+                        <button @click="showNewSessionModal = false" class="text-[var(--v3)] hover:text-[var(--red)] text-xs">[X]</button>
+                    </div>
+                    <div class="text-[10px] text-[var(--v3)] tracking-wider mb-2">PROJECT_PATH_</div>
+                    <input x-model="newSessionPath" type="text" placeholder="e.g. F:\Projects\myapp or ."
+                           @keydown.enter="createSessionFromModal()"
+                           class="w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)] mb-3 tracking-wider"
+                           x-ref="newSessionInput">
+                    <div class="flex gap-2">
+                        <button @click="createSessionFromModal()"
+                                class="flex-1 px-3 py-1.5 border border-[var(--v)] text-[var(--v)] text-xs tracking-wider hover:bg-[rgba(180,74,255,0.1)] transition-all">[> CONNECT]</button>
+                        <button @click="showNewSessionModal = false"
+                                class="px-3 py-1.5 border border-[var(--v-dim)] text-[var(--v3)] text-xs tracking-wider hover:border-[var(--ng3)] transition-all">CANCEL</button>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 
     <script>
+        // Global copy handler for IDE code blocks
+        window._copyCode = function(btn, preId) {
+            const pre = document.getElementById(preId);
+            if (!pre) return;
+            const text = pre.textContent || pre.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                btn.textContent = '[COPIED]';
+                btn.classList.add('copied');
+                setTimeout(() => { btn.textContent = '[COPY]'; btn.classList.remove('copied'); }, 1500);
+            }).catch(() => {});
+        };
+
         function app() {
             return {
                 section: 'lab',  // top-level: 'lab' or 'chat'
@@ -806,13 +913,33 @@
                 changesLog: '',
                 promptSaving: false,
                 configSaving: false,
-                runConfig: { iterations:10, timeout:5, max_time:600, project:'.' },
+                runConfig: { iterations:10, timeout:5, max_time:600, project:'.', strategy:'default' },
                 runStatus: { running:false, current_exp:0, total_exps:0, started_at:null, recent_logs:[], error:null },
                 toast: { show:false, message:'', type:'success' },
                 catSpeech: '',  // reactive trigger for cat speech bubble
                 organismSVG: '',  // organism visualizer SVG
                 organismStage: 'DORMANT',  // organism evolution stage name
                 runElapsed: '',  // elapsed time since run started
+                settings: JSON.parse(localStorage.getItem('ar-settings') || '{"matrixRain":true,"crtEffect":true,"catCompanion":true,"theme":"synthwave"}'),
+                _matrixRainStopped: false,
+
+                // Theme definitions — CSS variable overrides
+                themes: {
+                    synthwave: {
+                        '--ng': '#39ff14', '--ng2': '#b8f0c8', '--ng3': '#3a6a48', '--ng-dim': '#1a2820',
+                        '--bg': 'rgba(12,11,20,0.82)', '--bg2': 'rgba(17,15,28,0.78)', '--bg3': 'rgba(24,21,40,0.75)',
+                        '--v': '#b44aff', '--v2': '#9050cc', '--v3': '#6b3a8f', '--v-dim': '#1e1430',
+                        '--pink': '#ff00aa', '--cyan': '#00e5ff', '--yellow': '#ffe033', '--red': '#ff3366', '--amber': '#ffaa00',
+                        'body-bg': '#0c0b14', 'body-color': '#b8f0c8',
+                    },
+                    dracula: {
+                        '--ng': '#50fa7b', '--ng2': '#f8f8f2', '--ng3': '#6272a4', '--ng-dim': '#2d3450',
+                        '--bg': 'rgba(40,42,54,0.92)', '--bg2': 'rgba(50,52,68,0.88)', '--bg3': 'rgba(68,71,90,0.85)',
+                        '--v': '#bd93f9', '--v2': '#9a6edd', '--v3': '#7c5bbf', '--v-dim': '#3d3f5c',
+                        '--pink': '#ff79c6', '--cyan': '#8be9fd', '--yellow': '#f1fa8c', '--red': '#ff5555', '--amber': '#ffb86c',
+                        'body-bg': '#282a36', 'body-color': '#f8f8f2',
+                    },
+                },
 
                 // Chat state
                 chatTabs: [],
@@ -822,6 +949,9 @@
                 showSessionPickerModal: false,
                 sessionPickerSearch: '',
                 pastSessions: [],
+                showNewSessionModal: false,
+                newSessionPath: '.',
+                chatTick: 0,  // reactive ticker — forces Alpine re-render after ws.onmessage mutations
 
                 // Pagination
                 get filteredExperiments() {
@@ -848,8 +978,10 @@
 
                 // Init
                 async init() {
-                    // Matrix rain background
-                    if (window.MatrixRain) MatrixRain.init();
+                    // Apply saved settings before initializing UI features
+                    this.applySettings();
+                    // Matrix rain background (only if enabled in settings)
+                    if (this.settings.matrixRain && window.MatrixRain) MatrixRain.init();
                     await Promise.all([this.loadStats(), this.loadExperiments()]);
                     this._lastExpCount = this.stats.total_experiments || 0;
                     // Start cat companion in sidebar immediately
@@ -880,13 +1012,13 @@
                     }, 1000);
 
                     // Keyboard shortcuts
-                    const LAB_PAGES = ['dashboard','experiments','changes','prompt','config','run'];
+                    const LAB_PAGES = ['dashboard','experiments','changes','prompt','config','run','settings'];
                     window.addEventListener('keydown', (e) => {
                         // Alt+1 → Research Lab, Alt+2 → Chat
                         if (e.altKey && e.key === '1') { e.preventDefault(); this.navigateSection('lab'); }
                         if (e.altKey && e.key === '2') { e.preventDefault(); this.navigateSection('chat'); }
-                        // Alt+3..8 → lab sub-pages
-                        if (e.altKey && e.key >= '3' && e.key <= '8') {
+                        // Alt+3..9 → lab sub-pages
+                        if (e.altKey && e.key >= '3' && e.key <= '9') {
                             e.preventDefault();
                             this.navigateSection('lab');
                             this.$nextTick(() => this.navigate(LAB_PAGES[parseInt(e.key) - 3]));
@@ -954,7 +1086,10 @@
                 async loadStats() {
                     try {
                         const prevTotal = this.stats.total_experiments || 0;
-                        this.stats = await this.api('/api/stats');
+                        const data = await this.api('/api/stats');
+                        // Guarantee last_experiment is never null/undefined
+                        data.last_experiment = data.last_experiment || { number: 0, title: 'No experiments yet', date: '', type: '', score: '0.5', decision: 'N/A', what_done: '', files_modified: [], results: '', notes: '' };
+                        this.stats = data;
                         const newTotal = this.stats.total_experiments || 0;
                         // Pet: detect new experiments
                         if (newTotal > prevTotal) {
@@ -1046,27 +1181,33 @@
 
                 // === Chat methods ===
                 async openFileBrowserForTab() {
-                    if (this.chatTabs.length >= 5) this.showTabLimitWarning = true;
-                    // The file-browser component handles path selection via $dispatch
-                    if (window.fileBrowserOpen) {
-                        window.fileBrowserOpen('.');
-                    }
+                    if (this.chatTabs.length >= 5) { this.showTabLimitWarning = true; return; }
+                    this.newSessionPath = '.';
+                    this.showNewSessionModal = true;
+                    this.$nextTick(() => {
+                        const input = this.$refs.newSessionInput;
+                        if (input) { input.focus(); input.select(); }
+                    });
                 },
 
-                onPathSelected(event) {
-                    const path = event.detail.path;
-                    this.createChatTab(path);
+                async createSessionFromModal() {
+                    const path = (this.newSessionPath || '.').trim();
+                    if (!path) return;
+                    this.showNewSessionModal = false;
+                    await this.createChatTab(path);
                 },
 
                 async createChatTab(projectPath, resumeId) {
+                    console.log('[chat] createChatTab:', projectPath, 'resume:', resumeId);
                     try {
                         const res = await this.api('/api/sessions', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ cwd: projectPath, resume: resumeId || null }),
                         });
+                        console.log('[chat] session created:', JSON.stringify(res));
                         if (res.warning) this.showToast(res.warning, 'error');
-                        if (!res.session_id) return;
+                        if (!res.session_id) { console.error('[chat] no session_id in response'); return; }
                         const label = projectPath.split(/[\\/]/).filter(Boolean).pop() || projectPath;
                         const tab = {
                             tab_id: 'tab-' + Date.now(),
@@ -1077,6 +1218,7 @@
                             is_active: true,
                             is_streaming: false,
                             input_text: '',
+                            scrolledUp: false,
                             created_at: new Date().toISOString(),
                         };
                         this.chatTabs.push(tab);
@@ -1084,6 +1226,7 @@
                         this.connectChatWebSocket(tab);
                         this.showToast('SESSION STARTED', 'success');
                     } catch (e) {
+                        console.error('[chat] createChatTab failed:', e);
                         this.showToast('SESSION FAILED: ' + e.message, 'error');
                     }
                 },
@@ -1115,17 +1258,25 @@
 
                 connectChatWebSocket(tab) {
                     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-                    const ws = new WebSocket(`${protocol}//${location.host}/ws/chat/${tab.session_id}`);
+                    const url = `${protocol}//${location.host}/ws/chat/${tab.session_id}`;
+                    console.log('[ws] connecting to:', url);
+                    const ws = new WebSocket(url);
                     this.chatWs[tab.tab_id] = ws;
+                    // Capture Alpine reactive context — ws callbacks run outside Alpine scope
+                    const _app = this;
+
+                    ws.onopen = () => console.log('[ws] connected:', tab.session_id);
 
                     ws.onmessage = (event) => {
                         try {
                             const msg = JSON.parse(event.data);
+                            console.log('[ws]', msg.type, msg.event_type || '', '- data keys:', Object.keys(msg.data || {}).slice(0,5).join(','));
                             if (msg.type === 'claude_event') {
                                 const data = msg.data || {};
                                 const etype = data.type || msg.event_type;
-                                if (etype === 'text' || etype === 'assistant') {
-                                    const text = typeof data === 'object' ? (data.text || '') : String(data);
+                                if (etype === 'text') {
+                                    // StreamEvent type — raw text
+                                    const text = data.text || '';
                                     if (text) {
                                         const lastMsg = tab.messages[tab.messages.length - 1];
                                         if (lastMsg && lastMsg.role === 'assistant' && lastMsg.is_streaming) {
@@ -1134,32 +1285,82 @@
                                             tab.messages.push({ role: 'assistant', content: text, is_streaming: true });
                                         }
                                         tab.is_streaming = true;
-                                        this.$nextTick(() => {
-                                            const el = this.$refs.chatMessages;
-                                            if (el) el.scrollTop = el.scrollHeight;
-                                        });
+                                        _app.chatTick++;
+                                    }
+                                } else if (etype === 'assistant') {
+                                    // AssistantMessage — content blocks: [{"text":"..."}, {"thinking":"..."}, ...]
+                                    const content = data.content;
+                                    let text = '';
+                                    if (Array.isArray(content)) {
+                                        for (const block of content) {
+                                            if (block.text) text += block.text;
+                                        }
+                                    } else if (typeof content === 'string') {
+                                        text = content;
+                                    }
+                                    console.log('[ws] assistant extracted text:', JSON.stringify(text).slice(0, 200), 'len:', text.length, 'msgs before:', tab.messages.length);
+                                    if (text) {
+                                        const lastMsg = tab.messages[tab.messages.length - 1];
+                                        if (lastMsg && lastMsg.role === 'assistant' && lastMsg.is_streaming) {
+                                            lastMsg.content += text;
+                                        } else {
+                                            tab.messages.push({ role: 'assistant', content: text, is_streaming: true });
+                                        }
+                                        tab.is_streaming = true;
+                                        _app.chatTick++;
                                     }
                                 } else if (etype === 'tool') {
-                                    tab.messages.push({ role: 'tool', content: data.name || 'tool_call' });
+                                    const name = data.name || (data.tool_name ? data.tool_name : 'tool_call');
+                                    // Extract tool details for rich visualization
+                                    const toolInput = data.input || data.tool_input || {};
+                                    const toolUse = data.tool_use || {};
+                                    const input = toolInput.input || toolUse.input || toolInput || {};
+                                    let toolType = 'other';
+                                    let toolDetail = '';
+                                    const nameLower = (name || '').toLowerCase();
+                                    if (nameLower.includes('read') || nameLower.includes('read_file')) {
+                                        toolType = 'read';
+                                        toolDetail = (input.file_path || input.path || '').split(/[\\/]/).pop() || name;
+                                    } else if (nameLower.includes('edit') || nameLower.includes('write') || nameLower.includes('create_file')) {
+                                        toolType = nameLower.includes('edit') ? 'edit' : 'write';
+                                        toolDetail = (input.file_path || input.path || '').split(/[\\/]/).pop() || name;
+                                    } else if (nameLower.includes('bash') || nameLower.includes('command') || nameLower.includes('shell')) {
+                                        toolType = 'bash';
+                                        const cmd = (input.command || input.cmd || '');
+                                        toolDetail = cmd.length > 80 ? cmd.slice(0, 80) + '...' : cmd;
+                                    } else if (nameLower.includes('glob') || nameLower.includes('search') || nameLower.includes('grep')) {
+                                        toolType = 'search';
+                                        toolDetail = input.pattern || input.query || name;
+                                    } else {
+                                        toolDetail = name;
+                                    }
+                                    tab.messages.push({ role: 'tool', content: name, toolType, toolDetail });
+                                    _app.chatTick++;
                                 }
                             } else if (msg.type === 'stream_end') {
                                 tab.is_streaming = false;
                                 const lastMsg = tab.messages[tab.messages.length - 1];
                                 if (lastMsg) lastMsg.is_streaming = false;
+                                _app.chatTick++;
                             } else if (msg.type === 'error') {
                                 tab.messages.push({ role: 'assistant', content: '[ERROR] ' + (msg.message || 'Unknown error') });
                                 tab.is_streaming = false;
+                                _app.chatTick++;
                             }
+                            // Smart scroll: only auto-scroll when user is near bottom
+                            setTimeout(() => _app.smartScroll(tab), 50);
                         } catch(e) {
                             console.error('[ws parse]', e);
                         }
                     };
 
-                    ws.onclose = () => {
+                    ws.onclose = (e) => {
+                        console.log('[ws] closed:', tab.session_id, 'code:', e.code, 'reason:', e.reason);
                         tab.is_streaming = false;
                     };
 
-                    ws.onerror = () => {
+                    ws.onerror = (e) => {
+                        console.error('[ws] error:', tab.session_id, e);
                         tab.messages.push({ role: 'assistant', content: '[ERROR] WebSocket connection failed' });
                         tab.is_streaming = false;
                     };
@@ -1169,12 +1370,20 @@
                     if (!tab.input_text?.trim() || tab.is_streaming) return;
                     const content = tab.input_text.trim();
                     tab.input_text = '';
+                    tab.scrolledUp = false;
                     tab.messages.push({ role: 'user', content: content, id: 'msg-' + Date.now() });
+                    this.chatTick++;
+                    // Always scroll to bottom after user sends a message
+                    setTimeout(() => {
+                        const el = document.getElementById('chat-messages-' + tab.tab_id);
+                        if (el) el.scrollTop = el.scrollHeight;
+                    }, 50);
                     const ws = this.chatWs[tab.tab_id];
                     if (ws && ws.readyState === WebSocket.OPEN) {
                         ws.send(JSON.stringify({ type: 'message', content: content }));
                     } else {
                         tab.messages.push({ role: 'assistant', content: '[ERROR] Not connected. Session may have ended.' });
+                        this.chatTick++;
                     }
                 },
 
@@ -1184,6 +1393,94 @@
                         ws.send(JSON.stringify({ type: 'cancel' }));
                     }
                     tab.is_streaming = false;
+                },
+
+                renderChatHTML(tab) {
+                    // Touch chatTick so Alpine tracks this dependency for re-renders
+                    const _ = this.chatTick;
+                    if (!tab || !tab.messages || tab.messages.length === 0) {
+                        return '<div style="display:flex;align-items:center;justify-content:center;height:100%;text-align:center">'
+                            + '<div>'
+                            + '<div style="font-size:10px;letter-spacing:0.2em;color:var(--v3);margin-bottom:8px">CLAUDE_CODE_SESSION</div>'
+                            + '<div style="font-size:12px;color:var(--v3)">Target: ' + this.escHtml(tab?.project_path || '') + '</div>'
+                            + '<div style="font-size:9px;color:var(--v3);margin-top:4px">Type a message to start_</div>'
+                            + '</div></div>';
+                    }
+                    let html = '';
+                    const icons = { read:'&#x1f4d6;', edit:'&#x270f;', write:'&#x1f4be;', bash:'&#x2328;', search:'&#x1f50d;', other:'&#x2699;' };
+                    const colors = { read:'var(--cyan)', edit:'var(--yellow)', write:'var(--ng)', bash:'var(--pink)', search:'var(--amber)', other:'var(--v3)' };
+                    const labels = { read:'READ', edit:'EDIT', write:'WRITE', bash:'BASH', search:'SEARCH', other:'TOOL' };
+                    const msgs = tab.messages;
+                    let i = 0;
+                    while (i < msgs.length) {
+                        const msg = msgs[i];
+                        if (msg.role === 'user') {
+                            html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:0">'
+                                + '<div class="chat-role chat-role-user">USER_</div>'
+                                + '<div style="max-width:70%;padding:8px 12px;background:rgba(180,74,255,0.1);border:1px solid var(--v-dim);font-size:14px;color:var(--ng2)">'
+                                + this.escHtml(msg.content || '')
+                                + '</div></div>';
+                        } else if (msg.role === 'assistant') {
+                            // During streaming: raw escaped text (O(1) per token).
+                            // On completion: full markdown render (O(n) once).
+                            const contentHtml = msg.is_streaming
+                                ? '<pre style="white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit;font-size:inherit">' + this.escHtml(msg.content) + '</pre>'
+                                : '<div class="md">' + this.renderMarkdown(msg.content) + '</div>';
+                            html += '<div style="display:flex;flex-direction:column;align-items:flex-start;gap:0">'
+                                + '<div class="chat-role chat-role-assistant">CLAUDE_</div>'
+                                + '<div style="max-width:80%;padding:8px 12px;background:var(--bg2);border:1px solid var(--v-dim);font-size:14px">'
+                                + contentHtml
+                                + '</div></div>';
+                        } else if (msg.role === 'tool') {
+                            const tt = msg.toolType || 'other';
+                            const td = msg.toolDetail || msg.content || '';
+                            const icons = { read:'&#x1f4d6;', edit:'&#x270f;', write:'&#x1f4be;', bash:'&#x2328;', search:'&#x1f50d;', other:'&#x2699;' };
+                            const colors = { read:'var(--cyan)', edit:'var(--yellow)', write:'var(--ng)', bash:'var(--pink)', search:'var(--amber)', other:'var(--v3)' };
+                            const labels = { read:'READ', edit:'EDIT', write:'WRITE', bash:'BASH', search:'SEARCH', other:'TOOL' };
+                            html += '<div style="display:flex;justify-content:flex-start;align-items:center;gap:6px;padding:3px 0">'
+                                + '<span style="font-size:11px">' + (icons[tt] || icons.other) + '</span>'
+                                + '<span style="font-size:9px;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.15em;font-weight:bold;min-width:42px">[' + (labels[tt] || 'TOOL') + ']</span>'
+                                + '<span style="font-size:11px;color:var(--ng3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60ch" title="' + this.escHtml(td) + '">' + this.escHtml(td) + '</span>'
+                                + '</div>';
+                        }
+                    }
+                    if (tab.is_streaming) {
+                        html += '<div style="display:flex;justify-content:flex-start">'
+                            + '<div style="padding:6px 12px;background:var(--bg2);border:1px solid var(--v-dim);font-size:10px;color:var(--v);letter-spacing:0.1em">'
+                            + '<span class="blink">STREAMING_</span>'
+                            + '</div></div>';
+                    }
+                    return html;
+                },
+
+                escHtml(str) {
+                    if (!str) return '';
+                    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                },
+
+                onChatClick(event) {
+                    // Allow links in rendered markdown to work
+                    if (event.target.tagName === 'A') {
+                        event.target.target = '_blank';
+                    }
+                },
+
+                onChatScroll(tab, event) {
+                    const el = event.target;
+                    tab.scrolledUp = !(el.scrollTop + el.clientHeight >= el.scrollHeight - 100);
+                },
+
+                smartScroll(tab) {
+                    if (!tab.scrolledUp) {
+                        const el = document.getElementById('chat-messages-' + tab.tab_id);
+                        if (el) el.scrollTop = el.scrollHeight;
+                    }
+                },
+
+                scrollToBottom(tab) {
+                    const el = document.getElementById('chat-messages-' + tab.tab_id);
+                    if (el) el.scrollTop = el.scrollHeight;
+                    tab.scrolledUp = false;
                 },
 
                 async showSessionPicker() {
@@ -1202,7 +1499,72 @@
                     await this.createChatTab(session.project_path, session.session_id);
                 },
 
-                renderMarkdown(t) { if(!t) return ''; try { const html = marked.parse(t, { breaks: true }); const str = typeof html === 'string' ? html : String(html); return DOMPurify.sanitize(str); } catch(e) { console.error('[renderMarkdown]', e); return t.replace(/</g,'&lt;').replace(/\n/g,'<br>'); } },
+                toggleSetting(key) {
+                    this.settings[key] = !this.settings[key];
+                    localStorage.setItem('ar-settings', JSON.stringify(this.settings));
+                    this.applySettings();
+                },
+
+                applySettings() {
+                    // Theme
+                    this.applyTheme(this.settings.theme || 'synthwave');
+                    // CRT effect
+                    document.body.classList.toggle('crt', this.settings.crtEffect);
+                    document.body.classList.toggle('flicker', this.settings.crtEffect);
+                    // Matrix rain (runtime toggle)
+                    if (window.MatrixRain && typeof MatrixRain.toggle === 'function') {
+                        if (!this.settings.matrixRain && !this._matrixRainStopped) {
+                            MatrixRain.toggle();
+                            this._matrixRainStopped = true;
+                        } else if (this.settings.matrixRain && this._matrixRainStopped) {
+                            MatrixRain.toggle();
+                            this._matrixRainStopped = false;
+                        }
+                    }
+                    // Cat companion
+                    if (window.CatModule) {
+                        if (!this.settings.catCompanion && CatModule.isActive()) {
+                            CatModule.stop();
+                        } else if (this.settings.catCompanion && !CatModule.isActive()) {
+                            const el = document.getElementById('cat-canvas');
+                            if (el) CatModule.start(el, 'neutral', 4);
+                        }
+                    }
+                },
+
+                renderMarkdown(t) {
+                    if(!t) return '';
+                    try {
+                        const html = marked.parse(t, { breaks: true });
+                        const str = typeof html === 'string' ? html : String(html);
+                        const clean = DOMPurify.sanitize(str, { ADD_ATTR: ['class'] });
+                        // Wrap <pre><code class="language-X"> blocks in IDE-style container
+                        return clean.replace(/<pre><code(?:\s+class="language-(\w+)")?>([\s\S]*?)<\/code><\/pre>/g,
+                            (match, lang, code) => {
+                                const label = lang ? lang.toUpperCase() : 'CODE';
+                                const id = 'cb-' + Math.random().toString(36).slice(2, 8);
+                                return '<div class="code-block"><div class="code-header">'
+                                    + '<span class="code-lang">' + label + '</span>'
+                                    + '<span class="code-copy" onclick="window._copyCode(this,\'' + id + '\')">[COPY]</span>'
+                                    + '</div><pre id="' + id + '"><code>' + code + '</code></pre></div>';
+                            });
+                    } catch(e) { console.error('[renderMarkdown]', e); return t.replace(/</g,'&lt;').replace(/\n/g,'<br>'); }
+                },
+
+                applyTheme(name) {
+                    const vars = this.themes[name];
+                    if (!vars) return;
+                    const root = document.documentElement;
+                    for (const [prop, val] of Object.entries(vars)) {
+                        if (prop === 'body-bg') {
+                            document.body.style.background = val;
+                        } else if (prop === 'body-color') {
+                            document.body.style.color = val;
+                        } else {
+                            root.style.setProperty(prop, val);
+                        }
+                    }
+                },
                 insertTab(e) { const ta=e.target, s=ta.selectionStart; ta.value=ta.value.substring(0,s)+'    '+ta.value.substring(ta.selectionEnd); ta.selectionStart=ta.selectionEnd=s+4; this.prompt=ta.value; },
                 showToast(msg, type='success') { this.toast={show:true,message:msg,type}; setTimeout(()=>{this.toast.show=false},3000); },
 
