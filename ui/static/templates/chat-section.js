@@ -51,6 +51,41 @@
             <button class="chat-toolbar-btn" @click="collapseAllMessages()" title="Collapse all long messages">FOLD ALL</button>
             <button class="chat-toolbar-btn" @click="expandAllMessages()" title="Expand all folded messages">UNFOLD</button>
             <div class="chat-toolbar-sep"></div>
+            <div class="relative">
+                <button class="chat-toolbar-btn" :class="showPinsPanel && 'active'" @click="showPinsPanel = !showPinsPanel" title="Pinned messages">
+                    &#x1F4CC; PINS
+                    <span x-show="pinnedMessages.length > 0" x-cloak class="pins-count-badge" x-text="pinnedMessages.length"></span>
+                </button>
+                <!-- Pins panel dropdown -->
+                <div x-show="showPinsPanel" x-cloak x-transition.duration.150ms
+                     @click.outside="showPinsPanel = false"
+                     class="pins-panel">
+                    <div class="pins-panel-header">
+                        <span>&#x1F4CC; PINNED_MESSAGES</span>
+                        <div class="flex items-center gap-1">
+                            <span x-show="pinnedMessages.length > 0" class="text-[0.5rem] text-[var(--v3)]" x-text="pinnedMessages.length + '/' + 20"></span>
+                            <button x-show="pinnedMessages.length > 0" @click.stop="clearAllPins()" class="text-[0.5rem] text-[var(--red)] hover:text-[var(--ng2)] tracking-wider px-1">CLEAR ALL</button>
+                        </div>
+                    </div>
+                    <div class="pins-panel-list">
+                        <template x-for="(pin, idx) in pinnedMessages" :key="idx">
+                            <div class="pin-item" @click="scrollToPin(pin)">
+                                <div class="pin-item-header">
+                                    <span class="pin-item-tab" x-text="pin.tabLabel"></span>
+                                    <span class="pin-item-time" x-text="fmtTime(pin.ts)"></span>
+                                    <button @click.stop="unpinMessage(idx)" class="pin-item-unpin" title="Unpin">&#x2715;</button>
+                                </div>
+                                <div class="pin-item-preview" x-text="pin.preview"></div>
+                            </div>
+                        </template>
+                        <div x-show="pinnedMessages.length === 0" class="pins-panel-empty">
+                            No pinned messages yet_
+                            <div class="text-[0.5rem] text-[var(--v3)] mt-1">Hover assistant message → PIN</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="chat-toolbar-sep"></div>
             <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider" x-show="activeTab" x-text="(activeTab?.messages?.length || 0) + ' MSGS'"></span>
             <div class="flex-1"></div>
             <button class="chat-toolbar-btn" @click="openChatSearch()" title="Search in chat (Ctrl+F)">&#x1f50d;</button>

@@ -441,6 +441,68 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .msg-actions button.act-fold:hover { color: var(--amber); border-color: rgba(255,170,0,0.3); }
 .msg-actions button.act-del:hover { color: var(--red); border-color: rgba(255,51,102,0.3); }
 .msg-actions button.act-quote:hover { color: var(--v); border-color: rgba(180,74,255,0.3); }
+.msg-actions button.act-pin:hover { color: var(--amber); border-color: rgba(255,170,0,0.3); }
+.msg-actions button.act-pin.pinned { color: var(--amber); border-color: rgba(255,170,0,0.3); background: rgba(255,170,0,0.06); }
+
+/* === PINNED MESSAGE STYLES === */
+.msg-pinned { border-left: 2px solid var(--amber); padding-left: 6px; }
+.pin-indicator { font-size: 0.625rem; margin-left: 4px; }
+@keyframes pin-highlight { 0% { background: rgba(255,170,0,0.15); } 100% { background: transparent; } }
+.pin-highlight { animation: pin-highlight 1.5s ease-out; }
+
+/* === PINS PANEL === */
+.pins-count-badge {
+    font-size: 0.4375rem; min-width: 12px; height: 12px; line-height: 12px;
+    text-align: center; border-radius: 6px; padding: 0 3px; margin-left: 3px;
+    background: rgba(255,170,0,0.15); color: var(--amber); font-weight: bold;
+}
+.pins-panel {
+    position: absolute; top: 100%; left: 0; z-index: 30;
+    width: 360px; max-height: 320px;
+    background: var(--bg2); border: 1px solid var(--v-dim);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    display: flex; flex-direction: column;
+}
+.pins-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 10px; border-bottom: 1px solid var(--v-dim);
+    font-size: 0.5625rem; letter-spacing: 0.1em; color: var(--v);
+    background: rgba(0,0,0,0.15); flex-shrink: 0;
+}
+.pins-panel-list {
+    flex: 1; overflow-y: auto; padding: 4px;
+}
+.pins-panel-empty {
+    text-align: center; padding: 20px 10px;
+    font-size: 0.625rem; color: var(--v3); letter-spacing: 0.1em;
+}
+.pin-item {
+    padding: 6px 8px; cursor: pointer; border: 1px solid transparent;
+    transition: all 0.12s; border-radius: 2px; margin-bottom: 2px;
+}
+.pin-item:hover { border-color: var(--v-dim); background: rgba(180,74,255,0.04); }
+.pin-item-header {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 3px;
+}
+.pin-item-tab {
+    font-size: 0.5rem; color: var(--cyan); letter-spacing: 0.08em;
+    background: rgba(0,229,255,0.06); padding: 1px 5px; border-radius: 2px;
+    max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pin-item-time {
+    font-size: 0.4375rem; color: var(--v3); letter-spacing: 0.08em;
+}
+.pin-item-unpin {
+    margin-left: auto; font-size: 0.5625rem; color: var(--v3);
+    cursor: pointer; padding: 0 3px; background: none; border: none;
+    transition: color 0.12s;
+}
+.pin-item-unpin:hover { color: var(--red); }
+.pin-item-preview {
+    font-size: 0.5625rem; color: var(--ng3); line-height: 1.5;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 100%;
+}
 
 /* === CHAT EDIT MODE BANNER === */
 .edit-mode-banner {

@@ -592,17 +592,19 @@ window.AppChat = (function() {
                             + '<span class="tsi-dots"><span></span><span></span><span></span></span>'
                             + '</div>';
                     }
-                    html += '<div class="msg-wrap chat-msg-fadein chat-msg-row">'
+                    const isPinned = this.pinnedMessages.some(p => p.tabId === tab.tab_id && p.msgIdx === i);
+                    html += '<div class="msg-wrap chat-msg-fadein chat-msg-row' + (isPinned ? ' msg-pinned' : '') + '">'
                         + '<div class="chat-avatar chat-avatar-asst">' + avatarAsst + '</div>'
                         + '<div class="chat-body">'
                         + '<div class="msg-actions">'
                         + '<button class="act-copy" onclick="event.stopPropagation();window._app.copyChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Copy">COPY</button>'
                         + '<button class="act-quote" onclick="event.stopPropagation();window._app.quoteMessage(\'' + tab.tab_id + '\',' + i + ')" title="Quote in reply">QUOTE</button>'
                         + (isLastAssistant ? '<button class="act-regen" onclick="event.stopPropagation();window._app.regenerateResponse(\'' + tab.tab_id + '\')" title="Regenerate">REGEN</button>' : '')
+                        + '<button class="act-pin' + (isPinned ? ' pinned' : '') + '" onclick="event.stopPropagation();window._app.togglePinMessage(\'' + tab.tab_id + '\',' + i + ')" title="' + (isPinned ? 'Unpin' : 'Pin') + ' message">' + (isPinned ? 'UNPIN' : 'PIN') + '</button>'
                         + (aFold ? '<button class="act-fold" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + i + ')" title="Fold/Unfold">' + (msg.collapsed ? 'UNFOLD' : 'FOLD') + '</button>' : '')
                         + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Delete">DEL</button>'
                         + '</div>'
-                        + '<div class="chat-role chat-role-assistant">CLAUDE_' + (aTime ? ' <span style="color:var(--v3);font-weight:normal">' + aTime + '</span>' : '') + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + reactionHtml + '</div>'
+                        + '<div class="chat-role chat-role-assistant">CLAUDE_' + (isPinned ? ' <span class="pin-indicator" title="Pinned message">&#x1F4CC;</span>' : '') + (aTime ? ' <span style="color:var(--v3);font-weight:normal">' + aTime + '</span>' : '') + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + reactionHtml + '</div>'
                         + thinkingHtml
                         + thinkingIndicatorHtml
                         + '<div class="chat-bubble-asst" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit">'
@@ -1002,6 +1004,69 @@ window.AppChat = (function() {
             if (!tab || !tab.messages[msgIdx]) return;
             tab.messages[msgIdx].collapsed = !tab.messages[msgIdx].collapsed;
             this.chatTick++;
+        },
+
+        // ========== CHAT: PIN MESSAGES ==========
+        togglePinMessage(tabId, msgIdx) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab || !tab.messages[msgIdx]) return;
+            const msg = tab.messages[msgIdx];
+            const existingIdx = this.pinnedMessages.findIndex(p => p.tabId === tabId && p.msgIdx === msgIdx);
+            if (existingIdx >= 0) {
+                this.pinnedMessages.splice(existingIdx, 1);
+                this.showToast('UNPINNED');
+            } else {
+                // Limit to 20 pins total
+                if (this.pinnedMessages.length >= 20) {
+                    this.pinnedMessages.shift();
+                }
+                const content = msg.content || '';
+                const preview = content.length > 120 ? content.slice(0, 120) + '...' : content;
+                this.pinnedMessages.push({
+                    tabId: tabId,
+                    tabLabel: tab.label || tab.project_path,
+                    msgIdx: msgIdx,
+                    role: msg.role,
+                    preview: preview,
+                    ts: msg.ts || Date.now(),
+                });
+                this.showToast('PINNED');
+            }
+            this.chatTick++;
+        },
+        unpinMessage(idx) {
+            if (idx >= 0 && idx < this.pinnedMessages.length) {
+                this.pinnedMessages.splice(idx, 1);
+                this.chatTick++;
+            }
+        },
+        scrollToPin(pin) {
+            // Switch to the correct tab first
+            if (pin.tabId !== this.activeChatTab) {
+                this.activateChatTab(pin.tabId);
+            }
+            this.$nextTick(() => {
+                const el = document.getElementById('chat-messages-' + pin.tabId);
+                if (!el) return;
+                // Find the message element by index — messages are rendered in order
+                const msgWraps = el.querySelectorAll('.msg-wrap.chat-msg-row');
+                if (msgWraps[pin.msgIdx]) {
+                    msgWraps[pin.msgIdx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Brief highlight
+                    msgWraps[pin.msgIdx].classList.add('pin-highlight');
+                    setTimeout(() => msgWraps[pin.msgIdx].classList.remove('pin-highlight'), 1500);
+                }
+            });
+        },
+        clearAllPins() {
+            this.pinnedMessages = [];
+            this.chatTick++;
+            this.showToast('ALL PINS CLEARED');
+        },
+        getActiveTabPins() {
+            const tabId = this.activeChatTab;
+            if (!tabId) return [];
+            return this.pinnedMessages.filter(p => p.tabId === tabId);
         },
         collapseAllMessages() {
             const tab = this.activeTab;

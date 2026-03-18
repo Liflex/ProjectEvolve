@@ -80,6 +80,10 @@ function _buildAppData() {
         // Chat Search (Ctrl+F)
         chatSearch: { show: false, query: '', total: 0, current: 0, _elements: [] },
 
+        // Pinned messages
+        pinnedMessages: [], // [{tabId, msgIdx, role, preview, ts, content}]
+        showPinsPanel: false,
+
         // Live Log
         liveLog: [],
         liveLogFilter: 'all',
