@@ -398,10 +398,10 @@ window.AppChat = (function() {
                     const isLastAssistant = !msg.is_streaming && !tab.is_streaming && msgs.slice(i + 1).filter(m => m.role === 'assistant').length === 0;
                     let thinkingHtml = '';
                     if (msg.thinking && msg.thinking.trim().length > 0) {
-                        const showThinking = _app.settings.showThinking !== false;
+                        const showThinking = this.settings.showThinking !== false;
                         const thinkingPreview = msg.thinking.length > 120 ? msg.thinking.slice(0, 120) + '...' : msg.thinking;
-                        const escapedPreview = _app.escHtml(thinkingPreview).replace(/\n/g, '<br>');
-                        const escapedFull = _app.escHtml(msg.thinking).replace(/\n/g, '<br>');
+                        const escapedPreview = this.escHtml(thinkingPreview).replace(/\n/g, '<br>');
+                        const escapedFull = this.escHtml(msg.thinking).replace(/\n/g, '<br>');
                         const thinkId = 'think-' + tab.tab_id + '-' + i;
                         thinkingHtml = '<div class="thinking-block" style="margin-bottom:4px">'
                             + '<div class="thinking-toggle" onclick="var b=document.getElementById(\'' + thinkId + '\');var a=this.querySelector(\'[data-tarrow]\');if(b.style.display===\'none\'){b.style.display=\'block\';a.textContent=\'\\u25BC\';this.classList.add(\'open\');}else{b.style.display=\'none\';a.textContent=\'\\u25B6\';this.classList.remove(\'open\');}" '
@@ -503,17 +503,33 @@ window.AppChat = (function() {
                 const lastMsg = msgs[msgs.length - 1];
                 const hasContent = lastMsg && lastMsg.role === 'assistant' && lastMsg.content && lastMsg.content.trim().length > 0;
                 if (!hasContent) {
+                    // Show thinking buffer if available, otherwise show typing indicator
+                    const thinkingBuf = tab._thinkingBuffer || '';
+                    const showThinking = this.settings.showThinking !== false;
+                    let thinkingIndicatorHtml = '';
+                    if (thinkingBuf.trim()) {
+                        const thinkPreview = thinkingBuf.length > 200 ? thinkingBuf.slice(-200) : thinkingBuf;
+                        thinkingIndicatorHtml = '<div class="thinking-block" style="margin-bottom:4px">'
+                            + '<div style="display:flex;align-items:center;gap:6px;padding:3px 8px;border:1px solid var(--v-dim);background:rgba(180,74,255,0.04);font-size:10px;letter-spacing:0.1em;color:var(--v3)">'
+                            + '<span class="thinking-spinner" style="width:10px;height:10px"></span>'
+                            + '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--amber);flex-shrink:0"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5.1 7.5l.9-1.8A6 6 0 0 1 6 10a6 6 0 1 1 12 0c0 1.5-.5 2.8-1.4 3.9l-1.4-1.4c.6-.7.8-1.5.8-2.5 0-2.2-1.8-4-4-4S8 7.8 8 10s1.8 4 4 4c.7 0 1.3-.2 1.9-.5l1.2 1.5A5.8 5.8 0 0 1 12 16a6 6 0 0 1-6-6 8 8 0 0 0 6 8z"/></svg>'
+                            + '<span style="color:var(--amber);font-weight:bold;letter-spacing:0.12em">THINKING</span>'
+                            + '<span style="color:var(--v3);opacity:0.6;font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + this.escHtml(thinkPreview.slice(-80)) + '</span>'
+                            + '</div>'
+                            + (showThinking ? '<div style="border:1px solid var(--v-dim);border-top:none;background:rgba(12,11,20,0.4);padding:6px 10px;font-size:12px;color:var(--ng3);line-height:1.6;font-style:italic;max-height:200px;overflow-y:auto">' + this.escHtml(thinkPreview).replace(/\n/g, '<br>') + '</div>' : '')
+                            + '</div>';
+                    }
                     html += '<div class="chat-msg-fadein chat-msg-row">'
                         + '<div class="chat-avatar chat-avatar-asst">' + avatarAsst + '</div>'
                         + '<div class="chat-body">'
-                        + '<div class="chat-role chat-role-asistant">CLAUDE_</div>'
-                        + '<div class="chat-bubble-asst typing-indicator-bubble" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);display:flex;align-items:center;gap:10px">'
+                        + '<div class="chat-role chat-role-assistant">CLAUDE_</div>'
+                        + thinkingIndicatorHtml
+                        + (!thinkingBuf.trim() ? '<div class="chat-bubble-asst typing-indicator-bubble" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);display:flex;align-items:center;gap:10px">'
                         + '<span class="thinking-spinner"></span>'
-                        + '<div class="typing-dots">'
-                        + '<span></span><span></span><span></span>'
-                        + '</div>'
+                        + '<div class="typing-dots"><span></span><span></span><span></span></div>'
                         + '<span style="font-size:10px;color:var(--v3);letter-spacing:0.12em">думает...</span>'
-                        + '</div></div></div>';
+                        + '</div>' : '')
+                        + '</div></div>';
                 } else {
                     html += '<div class="chat-msg-row" style="opacity:0.6">'
                         + '<div class="chat-avatar chat-avatar-asst" style="opacity:0.3">' + avatarAsst + '</div>'

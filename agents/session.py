@@ -35,7 +35,7 @@ class ClaudeSession:
         session_id: Optional[str] = None,
         resume_id: Optional[str] = None,
         max_turns: int = 10,
-        permission_mode: str = "accept_edits",
+        permission_mode: str = "acceptEdits",
     ):
         self.session_id = session_id or str(uuid.uuid4())[:8]
         self.cwd = cwd
@@ -61,11 +61,21 @@ class ClaudeSession:
         prompt: str,
         continue_conversation: bool = True,
     ) -> AsyncIterator[dict]:
-        """Send a prompt to the agent and yield stream events."""
-        if self.status not in (SessionStatus.ACTIVE, SessionStatus.STARTING):
+        """Send a prompt to the agent and yield stream events.
+
+        Supports re-sending after COMPLETED/CANCELLED/ERROR by resetting
+        to ACTIVE and using continue_conversation for multi-turn context.
+        """
+        if self.status == SessionStatus.ACTIVE and self._task and not self._task.done():
             raise RuntimeError(
-                f"Cannot send to session in state {self.status.value}"
+                f"Cannot send to session while a query is already in progress (state {self.status.value})"
             )
+        if self.status not in (SessionStatus.ACTIVE, SessionStatus.STARTING):
+            logger.info(
+                "Session %s: re-activating from %s to continue conversation",
+                self.session_id, self.status.value,
+            )
+            self.status = SessionStatus.ACTIVE
 
         self.status = SessionStatus.ACTIVE
         self.message_count += 1
@@ -73,24 +83,40 @@ class ClaudeSession:
         try:
             from claude_code_sdk import query, ClaudeCodeOptions
 
+            import os
+            clean_env = {}
+            for var in ("CLAUDECODE", "CLAUDE_SESSION_ID"):
+                if var in os.environ:
+                    clean_env[var] = ""
+
             options = ClaudeCodeOptions(
                 cwd=self.cwd,
                 max_turns=self.max_turns,
                 permission_mode=self.permission_mode,
+                env=clean_env,
             )
 
-            if self.resume_id:
+            if self.resume_id and self.message_count == 1:
+                # Only use resume_id for the very first message.
+                # Subsequent messages must use continue_conversation
+                # to maintain multi-turn context within the same session.
                 options.resume = self.resume_id
+                self.resume_id = None
             elif continue_conversation and self.message_count > 1:
                 options.continue_conversation = True
 
             logger.debug(
-                "Session %s: sending query (turn %d, resume=%s)",
+                "Session %s: sending query (turn %d, resume=%s, continue=%s)",
                 self.session_id, self.message_count, self.resume_id,
+                getattr(options, 'continue_conversation', False),
             )
 
-            # query() is an async generator (not awaitable) — iterate directly
-            self._query_result = query(prompt=prompt, options=options)
+            # Use streaming mode (AsyncIterable prompt) to avoid Windows
+            # command-line length limit when prompts are large.
+            async def _single_message():
+                yield {"type": "user", "message": {"role": "user", "content": prompt}}
+
+            self._query_result = query(prompt=_single_message(), options=options)
             async for message in self._query_result:
                 # SDK Message types are dataclasses — convert to dict
                 try:
