@@ -161,6 +161,16 @@
                             <span class="edit-mode-hint">— subsequent messages will be discarded. ESC to cancel.</span>
                             <button @click="cancelEditMode(tab.tab_id)" class="edit-mode-cancel" title="Cancel edit (ESC)">[X] CANCEL</button>
                         </div>
+                        <!-- Quote panel -->
+                        <div x-show="tab._quotedMsg" x-transition.duration.150ms
+                             class="quote-panel">
+                            <div class="quote-panel-header">
+                                <span class="quote-panel-icon">&#x275d;</span>
+                                <span class="quote-panel-role" x-text="'REPLYING TO ' + (tab._quotedMsg?.role || '')"></span>
+                                <button @click="clearQuote(tab.tab_id)" class="quote-panel-close" title="Cancel quote">[X]</button>
+                            </div>
+                            <div class="quote-panel-text" x-text="tab._quotedMsg?.text || ''"></div>
+                        </div>
                         <!-- Drag & Drop overlay -->
                         <div x-show="chatDragOver" x-transition.opacity.duration.150ms
                              class="absolute inset-0 z-20 flex items-center justify-center"
@@ -234,6 +244,14 @@
                     </button>
                     <div class="text-[0.625rem] text-[var(--v3)] tracking-wider">or press [+ NEW TAB] above_</div>
                     <div class="text-[0.625rem] text-[var(--v3)] mt-3 tracking-wider">&#x2191; resume past session from sidebar</div>
+                    <div class="chat-empty-shortcuts">
+                        <div class="text-[0.5rem] text-[var(--v3)] tracking-widest mt-6 mb-3">KEYBOARD_SHORTCUTS</div>
+                        <div class="chat-shortcut-row"><kbd>Ctrl+K</kbd><span>Command Palette</span></div>
+                        <div class="chat-shortcut-row"><kbd>Ctrl+F</kbd><span>Search in chat</span></div>
+                        <div class="chat-shortcut-row"><kbd>/</kbd><span>Skill autocomplete</span></div>
+                        <div class="chat-shortcut-row"><kbd>Shift+Enter</kbd><span>New line</span></div>
+                        <div class="chat-shortcut-row"><kbd>ESC</kbd><span>Cancel edit</span></div>
+                    </div>
                 </div>
             </div>
         </div>

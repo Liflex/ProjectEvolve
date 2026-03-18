@@ -278,7 +278,13 @@ window.AppChat = (function() {
 
         sendChatMessage(tab) {
             if (!tab.input_text?.trim() || tab.is_streaming) return;
-            const content = tab.input_text.trim();
+            let content = tab.input_text.trim();
+            // Prepend quoted message if present
+            if (tab._quotedMsg) {
+                const quotePrefix = '> [' + tab._quotedMsg.role + ']: ' + tab._quotedMsg.text.split('\n').join('\n> ') + '\n\n';
+                content = quotePrefix + content;
+                tab._quotedMsg = null;
+            }
             tab.input_text = '';
             tab._editMode = null; // clear edit mode on send
             this.resizeInputForTab(tab);
@@ -499,6 +505,7 @@ window.AppChat = (function() {
                         + '<div class="chat-body">'
                         + '<div class="msg-actions">'
                         + '<button class="act-copy" onclick="event.stopPropagation();window._app.copyChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Copy">COPY</button>'
+                        + '<button class="act-quote" onclick="event.stopPropagation();window._app.quoteMessage(\'' + tab.tab_id + '\',' + i + ')" title="Quote in reply">QUOTE</button>'
                         + '<button class="act-edit" onclick="event.stopPropagation();window._app.editUserMsg(\'' + tab.tab_id + '\',' + i + ')" title="Edit & resend">EDIT</button>'
                         + (uFold ? '<button class="act-fold" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + i + ')" title="Fold/Unfold">' + (msg.collapsed ? 'UNFOLD' : 'FOLD') + '</button>' : '')
                         + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Delete">DEL</button>'
@@ -590,6 +597,7 @@ window.AppChat = (function() {
                         + '<div class="chat-body">'
                         + '<div class="msg-actions">'
                         + '<button class="act-copy" onclick="event.stopPropagation();window._app.copyChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Copy">COPY</button>'
+                        + '<button class="act-quote" onclick="event.stopPropagation();window._app.quoteMessage(\'' + tab.tab_id + '\',' + i + ')" title="Quote in reply">QUOTE</button>'
                         + (isLastAssistant ? '<button class="act-regen" onclick="event.stopPropagation();window._app.regenerateResponse(\'' + tab.tab_id + '\')" title="Regenerate">REGEN</button>' : '')
                         + (aFold ? '<button class="act-fold" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + i + ')" title="Fold/Unfold">' + (msg.collapsed ? 'UNFOLD' : 'FOLD') + '</button>' : '')
                         + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Delete">DEL</button>'
@@ -945,6 +953,29 @@ window.AppChat = (function() {
             if (!tab || !tab.messages[msgIdx]) return;
             tab.messages.splice(msgIdx, 1);
             this.chatTick++;
+        },
+        quoteMessage(tabId, msgIdx) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab || !tab.messages[msgIdx]) return;
+            const msg = tab.messages[msgIdx];
+            if (!msg.content) return;
+            // Take first 3 lines or 300 chars for quote
+            const lines = msg.content.split('\n').slice(0, 3);
+            let quote = lines.join('\n');
+            if (quote.length > 300) quote = quote.slice(0, 300) + '...';
+            const role = msg.role === 'user' ? 'USER' : msg.role === 'assistant' ? 'CLAUDE' : 'TOOL';
+            tab._quotedMsg = { role: role, text: quote };
+            tab.input_text = '';
+            this.chatTick++;
+            this.$nextTick(() => {
+                const textarea = document.querySelector('#chat-messages-' + tabId)?.closest('.flex.flex-col')?.querySelector('textarea');
+                if (textarea) textarea.focus();
+                this.resizeInputForTab(tab);
+            });
+        },
+        clearQuote(tabId) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (tab) { tab._quotedMsg = null; this.chatTick++; }
         },
         toggleReaction(tabId, msgIdx, type) {
             const tab = this.chatTabs.find(t => t.tab_id === tabId);

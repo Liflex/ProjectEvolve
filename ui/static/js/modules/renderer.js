@@ -88,10 +88,12 @@ window.AppRenderer = (function() {
                         const highlighted = this.highlightCode(code, lang);
                         const lines = highlighted.split('\n');
                         if (lines.length > 1 && lines[lines.length - 1].trim() === '') lines.pop();
+                        const lineCount = lines.length;
                         const numbered = lines.map(l => '<span class="code-line">' + (l || ' ') + '</span>').join('\n');
                         const accentColor = langAccents[(lang || '').toLowerCase()] || 'var(--md-code-header-accent, var(--v3))';
                         return '<div class="code-block"><div class="code-header">'
                             + '<span class="code-lang" style="color:' + accentColor + '">' + label + '</span>'
+                            + '<span class="code-lines-count">' + lineCount + ' lines</span>'
                             + '<span class="code-copy" onclick="window._copyCode(this,\'' + id + '\')">[COPY]</span>'
                             + '</div><pre id="' + id + '"><code>' + numbered + '</code></pre></div>';
                     });
