@@ -202,7 +202,12 @@ window.AppChat = (function() {
                         const lastMsg = tab.messages[tab.messages.length - 1];
                         if (lastMsg) lastMsg.is_streaming = false;
                         if (window.CatModule && CatModule.isActive()) {
-                            CatModule.setExpression('happy');
+                            // Cat: analyze agent response for contextual comment
+                            if (CatModule.analyzeAgentResponse && lastMsg && lastMsg.content) {
+                                CatModule.analyzeAgentResponse(lastMsg.content);
+                            } else {
+                                CatModule.setExpression('happy');
+                            }
                             setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2000);
                         }
                         _app.chatTick++;
@@ -247,6 +252,10 @@ window.AppChat = (function() {
             tab.scrolledUp = false;
             tab.messages.push({ role: 'user', content: content, id: 'msg-' + Date.now(), ts: Date.now() });
             this.chatTick++;
+            // Cat: analyze user message for contextual skill tips
+            if (window.CatModule && CatModule.isActive() && CatModule.analyzeChatContext) {
+                CatModule.analyzeChatContext(content);
+            }
             setTimeout(() => {
                 const el = document.getElementById('chat-messages-' + tab.tab_id);
                 if (el) el.scrollTop = el.scrollHeight;
@@ -310,6 +319,17 @@ window.AppChat = (function() {
                     this.slashMenu.selected = 0;
                     this.slashMenu.show = this.slashMenu.items.length > 0;
                     this.slashMenu._tabId = tab.tab_id;
+                    // Cat: react when slash menu opens with skills
+                    if (skills.length > 0 && window.CatModule && CatModule.isActive() && !CatModule.getSpeech()) {
+                        const slashCatTips = [
+                            'Выбирай скилл! =^_^=',
+                            '*уши навострил* Скиллы!',
+                            'Мурр... /help покажет все_',
+                            'Специальные команды! =^.^=',
+                        ];
+                        CatModule.setSpeechText(slashCatTips[Math.floor(Math.random() * slashCatTips.length)], 3000);
+                        if (Math.random() < 0.5 && CatModule.triggerEarTwitch) CatModule.triggerEarTwitch();
+                    }
                     return;
                 }
             }

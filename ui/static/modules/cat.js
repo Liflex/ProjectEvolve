@@ -271,6 +271,89 @@
         ],
     };
 
+    // Chat context-aware skill tips (keyword → tips)
+    const CHAT_SKILL_TIPS = {
+        commit: [
+            'Попробуй /commit для автокоммита! =^_^=',
+            'Нужен коммит? /commit поможет! Мяу!',
+            '/commit — я знаю хороший скилл для этого_',
+        ],
+        git: [
+            'Git-операции? /commit создаст коммит автоматически!',
+            'Мурр... /commit упростит работу с git_',
+        ],
+        refactor: [
+            'Рефакторинг? /simplify проверит качество кода!',
+            '/simplify — ревью кода на эффективность! Мяу!',
+            'Попробуй /simplify перед рефакторингом_',
+        ],
+        code: [
+            'Писашь код? /code-reviewer сделает полный обзор!',
+            '/simplify проверит код на проблемы_',
+            'Мурр... /code-reviewer найдёт проблемы!',
+        ],
+        spec: [
+            'Нужна спецификация? /speckit.specify поможет!',
+            '/speckit.features — быстрая генерация фичи!',
+            'Spec Kit: /speckit.plan для плана реализации!',
+        ],
+        test: [
+            'Тестируешь? /code-reviewer проверит код_',
+            '*уши насторожились* Качество кода важно!',
+        ],
+        bug: [
+            'Баг? Опиши его агенту — он поможет! Мяу!',
+            '/simplify может найти корень проблемы_',
+            '*концентрируется* Расскажи подробнее о баге...',
+        ],
+        deploy: [
+            'Деплой? /push автоматизирует релиз!',
+            '/push — релиз одной командой! Мяу!',
+        ],
+        improve: [
+            'Улучшения? /simplify проверит что можно лучше!',
+            '/code-reviewer для комплексного анализа_',
+        ],
+    };
+
+    // Agent response content type tips
+    const AGENT_RESPONSE_TIPS = {
+        code_block: [
+            'Ого, код! *внимательно смотрит* =^.^=',
+            'Красивый код! *одобряет*',
+            '*изучает код* Мурр...',
+            'Код принят! =^._.^=',
+        ],
+        tool_call: [
+            '*следит за инструментом*...',
+            'Агент работает... Мяу!',
+            '*прищурился* Интересный инструмент_',
+        ],
+        long_response: [
+            'Много текста... *зевает* но я внимательно!',
+            '*читает*... Мурр... интересно!',
+            'Подробный ответ! =^_^=',
+        ],
+        markdown_table: [
+            'Таблица! *нравится organised данные*',
+            '*изучает таблицу* Мурр...',
+        ],
+    };
+
+    // Idle chat tips (when user is in chat but not typing)
+    const CHAT_IDLE_TIPS = [
+        'Спроси меня о скиллах! /help покажет все_',
+        'Попробуй /commit или /simplify!',
+        'Spec Kit: /speckit.specify для новой фичи!',
+        'Набери / для списка команд_',
+        '/code-reviewer — полный обзор кода!',
+        '*ждёт сообщение* Мурр...',
+        'Попробуй /speckit.features для быстрой фичи!',
+        'Хочешь коммит? /commit поможет!',
+        'Shift+Enter для новой строки_',
+        '/simplify — улучшит твой код!',
+    ];
+
     // Page-aware contextual tips
     const PAGE_TIPS = {
         dashboard: [
@@ -520,17 +603,22 @@
                 grumpy: ['Хмф...', '*недовольно смотрит*', 'Можно получше...', 'Не всё KEEP...'],
                 sleepy: ['*зевает*... Мяу...', '*сонно моргает*', 'Скучно... дай задачу...'],
             };
-            // Page-aware tips take priority, fallback to mood tips, then generic tips
-            const pagePool = PAGE_TIPS[_currentPage];
+            // Page-aware tips take priority, chat idle tips for chat page
             let pool;
-            if (pagePool && Math.random() < 0.7) {
-                // 70% page-specific tips
-                pool = pagePool;
-            } else if (moodTips[_mood]) {
-                // 30% mood-specific or generic
-                pool = moodTips[_mood];
+            if (_currentPage === 'chat' && Math.random() < 0.6) {
+                // 60% chat-specific idle tips when on chat page
+                pool = CHAT_IDLE_TIPS;
             } else {
-                pool = SPEECH.tip;
+                const pagePool = PAGE_TIPS[_currentPage];
+                if (pagePool && Math.random() < 0.7) {
+                    // 70% page-specific tips
+                    pool = pagePool;
+                } else if (moodTips[_mood]) {
+                    // 30% mood-specific or generic
+                    pool = moodTips[_mood];
+                } else {
+                    pool = SPEECH.tip;
+                }
             }
             currentSpeech = pickRandom(pool);
             if (speechTimer) clearTimeout(speechTimer);
@@ -633,6 +721,63 @@
             if (_stretchTicks > 0) return;
             _stretchTicks = 12;
             _stretchPhase = 0;
+        },
+
+        /**
+         * Analyze user chat message and trigger contextual cat reaction.
+         * Returns true if a reaction was triggered.
+         * @param {string} message - user message text
+         */
+        analyzeChatContext(message) {
+            if (!message || !animating) return false;
+            const lower = message.toLowerCase();
+            // Check each keyword category
+            for (const [keyword, tips] of Object.entries(CHAT_SKILL_TIPS)) {
+                if (lower.includes(keyword)) {
+                    // Don't trigger on slash commands (they're already handled)
+                    if (lower.startsWith('/')) continue;
+                    // Only trigger ~40% of the time to avoid spam
+                    if (Math.random() < 0.4) {
+                        setSpeechText(pickRandom(tips), 6000);
+                        if (Math.random() < 0.5) triggerEarTwitch();
+                        return true;
+                    }
+                }
+            }
+            return false;
+        },
+
+        /**
+         * React to agent response content.
+         * @param {string} content - agent response text
+         */
+        analyzeAgentResponse(content) {
+            if (!content || !animating) return;
+            const hasCode = (content.match(/```[\s\S]*?```/g) || []).length;
+            const hasTable = content.includes('|---|') || content.includes('| --- |');
+            const isLong = content.length > 1500;
+            const hasToolCalls = content.includes('tool_call') || content.includes('ToolCall') || content.includes('⏺') || content.includes('Command');
+
+            // Only react ~30% of the time
+            if (Math.random() > 0.3) return;
+
+            if (hasCode >= 2) {
+                setSpeechText(pickRandom(AGENT_RESPONSE_TIPS.code_block), 5000);
+                if (Math.random() < 0.4) setExpression('happy');
+            } else if (hasToolCalls) {
+                setSpeechText(pickRandom(AGENT_RESPONSE_TIPS.tool_call), 5000);
+            } else if (isLong) {
+                setSpeechText(pickRandom(AGENT_RESPONSE_TIPS.long_response), 5000);
+            } else if (hasTable) {
+                setSpeechText(pickRandom(AGENT_RESPONSE_TIPS.markdown_table), 5000);
+            }
+        },
+
+        /**
+         * Get a random idle chat tip (for chat page when user is idle).
+         */
+        getChatIdleTip() {
+            return pickRandom(CHAT_IDLE_TIPS);
         },
 
         /** Set current page for contextual tips. */
