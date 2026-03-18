@@ -49,6 +49,7 @@ window.AppChat = (function() {
                 };
                 this.chatTabs.push(tab);
                 this.activeChatTab = tab.tab_id;
+                this._setupScrollPreservation(tab);
                 this.connectChatWebSocket(tab);
                 this.showToast('SESSION STARTED', 'success');
             } catch (e) {
@@ -645,13 +646,33 @@ window.AppChat = (function() {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         },
 
+        // ========== CHAT: SCROLL PRESERVATION ==========
+        _setupScrollPreservation(tab) {
+            this.$nextTick(() => {
+                const el = document.getElementById('chat-messages-' + tab.tab_id);
+                if (!el || tab._scrollPreservationSetup) return;
+                tab._scrollPreservationSetup = true;
+                let lastHeight = el.scrollHeight;
+                const observer = new MutationObserver(() => {
+                    if (el.scrollHeight === lastHeight) return;
+                    lastHeight = el.scrollHeight;
+                    if (tab.scrolledUp && tab._distFromBottom > 50) {
+                        const target = el.scrollHeight - tab._distFromBottom - el.clientHeight;
+                        if (target > 0) el.scrollTop = target;
+                    }
+                });
+                observer.observe(el, { childList: true, subtree: true });
+                tab._scrollObserver = observer;
+            });
+        },
         // ========== CHAT: SCROLL & CLICK ==========
         onChatClick(event) {
             if (event.target.tagName === 'A') { event.target.target = '_blank'; }
         },
         onChatScroll(tab, event) {
             const el = event.target;
-            tab.scrolledUp = !(el.scrollTop + el.clientHeight >= el.scrollHeight - 100);
+            tab._distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+            tab.scrolledUp = tab._distFromBottom > 100;
         },
         smartScroll(tab) {
             if (!tab.scrolledUp) {
@@ -663,6 +684,7 @@ window.AppChat = (function() {
             const el = document.getElementById('chat-messages-' + tab.tab_id);
             if (el) el.scrollTop = el.scrollHeight;
             tab.scrolledUp = false;
+            tab._distFromBottom = 0;
         },
 
         // ========== CHAT: MESSAGE ACTIONS ==========

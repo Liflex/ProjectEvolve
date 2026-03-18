@@ -108,21 +108,28 @@
                     </div>
                 </div>
                 <!-- Log entries -->
-                <div id="live-log-container"
-                     class="bg-[var(--bg)] pixel-border p-3 max-h-[500px] overflow-y-auto text-[0.6875rem] leading-relaxed font-mono"
-                     @scroll="if ($el.scrollTop + $el.clientHeight < $el.scrollHeight - 30) liveLogAutoScroll = false">
-                    <template x-for="(entry,i) in filteredLiveLog()" :key="'ll'+i">
-                        <div class="flex gap-2 py-0.5 hover:bg-[var(--bg3)] px-1 -mx-1 transition-colors live-log-entry"
-                             :class="'live-log-type-' + entry.type">
-                            <span class="text-[0.5625rem] text-[var(--v3)] shrink-0 w-14 text-right tabular-nums" x-text="entry.ts"></span>
-                            <span class="shrink-0 w-3 text-center" :style="'color:' + entry.color" x-text="entry.icon"></span>
-                            <span class="break-all" :style="'color:' + entry.color" x-text="entry.text"></span>
+                <div class="relative">
+                    <div id="live-log-container"
+                         class="bg-[var(--bg)] pixel-border p-3 max-h-[500px] overflow-y-auto text-[0.6875rem] leading-relaxed font-mono"
+                         @scroll="if ($el.scrollTop + $el.clientHeight < $el.scrollHeight - 100) liveLogAutoScroll = false">
+                        <template x-for="(entry,i) in filteredLiveLog()" :key="'ll'+i">
+                            <div class="flex gap-2 py-0.5 hover:bg-[var(--bg3)] px-1 -mx-1 transition-colors live-log-entry"
+                                 :class="'live-log-type-' + entry.type">
+                                <span class="text-[0.5625rem] text-[var(--v3)] shrink-0 w-14 text-right tabular-nums" x-text="entry.ts"></span>
+                                <span class="shrink-0 w-3 text-center" :style="'color:' + entry.color" x-text="entry.icon"></span>
+                                <span class="break-all" :style="'color:' + entry.color" x-text="entry.text"></span>
+                            </div>
+                        </template>
+                        <!-- Paused indicator -->
+                        <div x-show="liveLogPaused" class="sticky bottom-0 left-0 right-0 bg-[var(--amber)]/10 border-t border-[var(--amber)]/30 px-3 py-1 text-[0.5625rem] text-[var(--amber)] tracking-wider text-center">
+                            &#x23F8; LOG PAUSED &#x2014; incoming events buffered
                         </div>
-                    </template>
-                    <!-- Paused indicator -->
-                    <div x-show="liveLogPaused" class="sticky bottom-0 left-0 right-0 bg-[var(--amber)]/10 border-t border-[var(--amber)]/30 px-3 py-1 text-[0.5625rem] text-[var(--amber)] tracking-wider text-center">
-                        &#x23F8; LOG PAUSED &#x2014; incoming events buffered
                     </div>
+                    <!-- Scroll-to-bottom FAB -->
+                    <button x-show="!liveLogAutoScroll" x-cloak
+                            @click.stop="liveLogAutoScroll = true; scrollLiveLog()"
+                            class="absolute right-3 bottom-3 z-10 px-2 py-1 bg-[var(--bg2)] border border-[var(--v2)] text-[var(--v)] text-[0.5625rem] tracking-wider hover:bg-[rgba(180,74,255,0.15)] transition-all shadow-lg"
+                            title="Resume auto-scroll">&#x2193; BOTTOM</button>
                 </div>
                 <!-- Empty state -->
                 <div x-show="liveLog.length === 0" class="text-center py-8 text-[var(--v3)] text-xs tracking-widest">AWAITING_TRANSMISSION_</div>
