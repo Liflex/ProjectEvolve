@@ -519,6 +519,7 @@ window.AppChat = (function() {
                     const aLines = (msg.content || '').split('\n').length;
                     // Timing & token metadata
                     let aMetaHtml = '';
+                    const reaction = msg.reaction || ''; // 'up', 'down', or ''
                     if (!msg.is_streaming) {
                         const metaParts = [];
                         if (msg.duration) metaParts.push(this.fmtDuration(msg.duration));
@@ -530,6 +531,22 @@ window.AppChat = (function() {
                             aMetaHtml = ' <span class="msg-meta-badge">' + metaParts.join(' · ') + '</span>';
                         }
                     }
+                    // Reactions: thumbs up/down (only on completed assistant messages)
+                    let reactionHtml = '';
+                    if (!msg.is_streaming && msg.content && !msg.content.startsWith('[ERROR]')) {
+                        reactionHtml = '<span class="msg-reactions">'
+                            + '<button class="msg-reaction-btn' + (reaction === 'up' ? ' active-up' : '') + '" onclick="event.stopPropagation();window._app.toggleReaction(\'' + tab.tab_id + '\',' + i + ',\'up\')" title="Полезный ответ">&#x1F44D;</button>'
+                            + '<button class="msg-reaction-btn' + (reaction === 'down' ? ' active-down' : '') + '" onclick="event.stopPropagation();window._app.toggleReaction(\'' + tab.tab_id + '\',' + i + ',\'down\')" title="Не помогло">&#x1F44E;</button>'
+                            + '</span>';
+                    }
+                    // Thinking indicator when agent is thinking but no content yet
+                    let thinkingIndicatorHtml = '';
+                    if (msg.is_streaming && tab.is_thinking && !msg.content) {
+                        thinkingIndicatorHtml = '<div class="thinking-streaming-indicator">'
+                            + '<span class="tsi-label">THINKING</span>'
+                            + '<span class="tsi-dots"><span></span><span></span><span></span></span>'
+                            + '</div>';
+                    }
                     html += '<div class="msg-wrap chat-msg-fadein chat-msg-row">'
                         + '<div class="chat-avatar chat-avatar-asst">' + avatarAsst + '</div>'
                         + '<div class="chat-body">'
@@ -539,8 +556,9 @@ window.AppChat = (function() {
                         + (aFold ? '<button class="act-fold" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + i + ')" title="Fold/Unfold">' + (msg.collapsed ? 'UNFOLD' : 'FOLD') + '</button>' : '')
                         + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Delete">DEL</button>'
                         + '</div>'
-                        + '<div class="chat-role chat-role-assistant">CLAUDE_' + (aTime ? ' <span style="color:var(--v3);font-weight:normal">' + aTime + '</span>' : '') + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + '</div>'
+                        + '<div class="chat-role chat-role-assistant">CLAUDE_' + (aTime ? ' <span style="color:var(--v3);font-weight:normal">' + aTime + '</span>' : '') + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + reactionHtml + '</div>'
                         + thinkingHtml
+                        + thinkingIndicatorHtml
                         + '<div class="chat-bubble-asst" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit">'
                         + (aCollapsed
                             ? '<div class="chat-collapsed-preview"><div class="md">' + this.linkFilePaths(this.renderMarkdown(msg.content.slice(0, 300))) + '</div></div>'
@@ -643,18 +661,18 @@ window.AppChat = (function() {
                         + '<div class="chat-body">'
                         + '<div class="chat-role chat-role-assistant">CLAUDE_</div>'
                         + thinkingIndicatorHtml
-                        + (!thinkingBuf.trim() ? '<div class="chat-bubble-asst typing-indicator-bubble" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);display:flex;align-items:center;gap:10px">'
-                        + '<span class="thinking-spinner"></span>'
-                        + '<div class="typing-dots"><span></span><span></span><span></span></div>'
-                        + '<span style="font-size:0.625rem;color:var(--v3);letter-spacing:0.12em">думает...</span>'
+                        + (!thinkingBuf.trim() ? '<div class="thinking-streaming-indicator">'
+                        + '<span class="tsi-label">THINKING</span>'
+                        + '<span class="tsi-dots"><span></span><span></span><span></span></span>'
                         + '</div>' : '')
                         + '</div></div>';
                 } else {
                     html += '<div class="chat-msg-row" style="opacity:0.6">'
                         + '<div class="chat-avatar chat-avatar-asst" style="opacity:0.3">' + avatarAsst + '</div>'
-                        + '<div style="display:flex;align-items:center;gap:6px;padding:4px 0">'
+                        + '<div style="display:flex;align-items:center;gap:8px;padding:4px 0">'
                         + '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:breathe 1.2s ease-in-out infinite"></span>'
-                        + '<span style="font-size:0.5625rem;color:var(--cyan);letter-spacing:0.1em">STREAMING</span>'
+                        + '<span style="font-size:0.5625rem;color:var(--cyan);letter-spacing:0.1em">STREAMING_</span>'
+                        + '<span class="typing-dots" style="opacity:0.5"><span></span><span></span><span></span></span>'
                         + '</div></div>';
                 }
             }
@@ -849,6 +867,26 @@ window.AppChat = (function() {
             tab.messages.splice(msgIdx, 1);
             this.chatTick++;
         },
+        toggleReaction(tabId, msgIdx, type) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab || !tab.messages[msgIdx]) return;
+            const msg = tab.messages[msgIdx];
+            // Toggle: if same reaction, remove it; otherwise set new
+            msg.reaction = (msg.reaction === type) ? '' : type;
+            this.chatTick++;
+            // Cat reaction to user feedback
+            if (window.CatModule && CatModule.isActive()) {
+                if (type === 'up') {
+                    CatModule.setExpression('happy');
+                    CatModule.setSpeechText('Рад, что помогло! =^_^=', 3000);
+                    setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 3000);
+                } else if (type === 'down') {
+                    CatModule.setExpression('angry');
+                    CatModule.setSpeechText('Попробуй REGEN или переформулируй_ Мяу!', 4000);
+                    setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000);
+                }
+            }
+        },
         toggleMsgCollapse(tabId, msgIdx) {
             const tab = this.chatTabs.find(t => t.tab_id === tabId);
             if (!tab || !tab.messages[msgIdx]) return;
@@ -942,6 +980,8 @@ window.AppChat = (function() {
                     let meta = '';
                     if (msg.duration) meta += ' ⏱ ' + this.fmtDuration(msg.duration);
                     if (msg.msgTokens?.cost > 0) meta += ' 💰 $' + msg.msgTokens.cost.toFixed(4);
+                    if (msg.reaction === 'up') meta += ' 👍';
+                    else if (msg.reaction === 'down') meta += ' 👎';
                     md += '## Claude' + meta + '\n\n' + (msg.content || '') + '\n\n';
                 }
                 else if (msg.role === 'tool') {
