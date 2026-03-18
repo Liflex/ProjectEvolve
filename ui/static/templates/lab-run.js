@@ -1,0 +1,137 @@
+// Template: Lab Run Control — loaded before Alpine initializes
+(function() {
+    const el = document.getElementById('lab-run-root');
+    if (!el) return;
+    el.innerHTML = `
+        <div class="mb-5">
+            <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">EVOLUTION_CONTROL</h2>
+            <p class="text-xs text-[var(--ng3)] mt-1">START_SEQUENCE_</p>
+        </div>
+
+        <div>
+            <!-- config + logs -->
+            <!-- Config panel (collapses when running) -->
+            <div x-show="!runStatus.running" x-transition class="pixel-border bg-[var(--bg2)] p-4 mb-3">
+                <div class="text-[0.5625rem] tracking-widest text-[var(--v3)] mb-3">LAUNCH_PARAMETERS_</div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">PROJECT_PATH</label><input x-model="runConfig.project" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]" placeholder="."></div>
+                    <div><label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">ITERATIONS</label><input x-model.number="runConfig.iterations" type="number" min="1" max="500" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
+                    <div><label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">INTERVAL_MIN</label><input x-model.number="runConfig.timeout" type="number" min="0" max="60" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
+                    <div><label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">MAX_TIME_SEC</label><input x-model.number="runConfig.max_time" type="number" min="60" max="3600" step="60" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
+                    <div><label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">TOKEN_THRESHOLD</label><input x-model.number="runConfig.token_threshold" type="number" min="20000" max="200000" step="10000" class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]"></div>
+                </div>
+                <!-- Strategy selector -->
+                <div class="mt-3">
+                    <label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">STRATEGY_</label>
+                    <select x-model="runConfig.strategy"
+                        class="mt-0.5 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)]">
+                        <option value="default">BALANCED &#x2014; Full-featured research cycle</option>
+                        <option value="execution">EXECUTION &#x2014; Goals & features, minimal overhead</option>
+                        <option value="quality">QUALITY &#x2014; Bug fixes, security & tests</option>
+                    </select>
+                </div>
+                <div class="mt-3 flex gap-2">
+                    <button @click="startRun()" class="border border-[var(--v)] text-[var(--v)] text-xs tracking-wider px-5 py-2 hover:bg-[rgba(180,74,255,0.1)] transition-all">[> INITIATE]</button>
+                </div>
+            </div>
+
+            <!-- Running controls (shown when active) -->
+            <div x-show="runStatus.running" x-transition class="pixel-border bg-[var(--bg2)] p-4 mb-3">
+                <div class="flex items-center gap-3 mb-1">
+                    <span class="w-2 h-2 bg-[var(--v)] pulse"></span>
+                    <span class="text-xs text-[var(--v)] tracking-widest">EXPERIMENT_RUNNING_</span>
+                    <span class="text-[0.625rem] text-[var(--cyan)]" x-text="runStatus.current_exp ? 'EXP_' + runStatus.current_exp + '/' + runStatus.total_exps : ''"></span>
+                    <span class="text-[0.625rem] text-[var(--v3)]" x-text="runStatus.started_at"></span>
+                    <span class="text-[0.625rem] text-[var(--yellow)] tabular-nums" x-text="runElapsed"></span>
+                    <button @click="stopRun()" class="ml-auto border border-[var(--red)] text-[var(--red)] text-xs tracking-wider px-5 py-1.5 hover:bg-[rgba(255,51,51,0.1)] transition-all">[X TERMINATE]</button>
+                </div>
+                <!-- Progress bar -->
+                <div x-show="runStatus.total_exps > 0" class="mt-2 h-1.5 bg-[var(--bg)] pixel-border overflow-hidden">
+                    <div class="h-full bg-[var(--v)] transition-all duration-500" :style="'width:' + Math.max(0, Math.min(100, (runStatus.current_exp / runStatus.total_exps) * 100)) + '%'"></div>
+                </div>
+                <!-- Token budget bar -->
+                <div x-show="runStatus.tokens" class="mt-2">
+                    <div class="flex items-center gap-3 text-[0.5625rem] tracking-wider">
+                        <span class="text-[var(--v3)]">TOKENS_</span>
+                        <span class="tabular-nums" :class="runStatus.tokens && runStatus.tokens.input_tokens > runStatus.tokens.soft_threshold ? 'text-[var(--amber)]' : 'text-[var(--cyan)]'"
+                              x-text="runStatus.tokens ? (runStatus.tokens.input_tokens/1000).toFixed(1)+'K / '+(runStatus.tokens.threshold/1000).toFixed(0)+'K' : ''"></span>
+                        <span x-show="runStatus.tokens && runStatus.tokens.output_tokens > 0" class="text-[var(--v3)] tabular-nums" x-text="runStatus.tokens ? 'OUT '+((runStatus.tokens.output_tokens||0)/1000).toFixed(1)+'K' : ''"></span>
+                        <span class="text-[var(--v3)]">|</span>
+                        <span class="tabular-nums" :class="runStatus.tokens && runStatus.tokens.input_tokens > runStatus.tokens.soft_threshold ? 'text-[var(--amber)]' : 'text-[var(--v3)]'"
+                              x-text="runStatus.tokens ? Math.round(((runStatus.tokens.input_tokens||0) / (runStatus.tokens.threshold||100000)) * 100) + '%' : ''"></span>
+                        <span class="text-[var(--v3)]">|</span>
+                        <span class="text-[var(--ng2)] tabular-nums" x-text="runStatus.tokens ? 'avg: '+(runStatus.tokens.avg_experiment_tokens/1000).toFixed(1)+'K/exp' : ''"></span>
+                        <span class="text-[var(--v3)]">|</span>
+                        <span class="text-[var(--yellow)] tabular-nums" x-text="runStatus.tokens ? '$'+runStatus.tokens.total_cost_usd.toFixed(4) : ''"></span>
+                        <span x-show="runStatus.tokens && runStatus.tokens.should_reset" class="text-[var(--amber)] blink">RESET_PENDING</span>
+                        <span x-show="runStatus.session_id" class="ml-auto text-[var(--v3)]" x-text="'SID:' + (runStatus.session_id || '').substring(0,8)"></span>
+                    </div>
+                    <div class="mt-1 h-1 bg-[var(--bg)] pixel-border overflow-hidden">
+                        <div class="h-full transition-all duration-500"
+                             :class="runStatus.tokens && runStatus.tokens.input_tokens > runStatus.tokens.threshold * 0.9 ? 'bg-[var(--red)]' : runStatus.tokens && runStatus.tokens.input_tokens > runStatus.tokens.soft_threshold ? 'bg-[var(--amber)]' : 'bg-[var(--cyan)]'"
+                             :style="'width:' + Math.min(100, ((runStatus.tokens?.input_tokens||0) / (runStatus.tokens?.threshold||100000)) * 100) + '%'"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Streaming Log -->
+            <div class="pixel-border bg-[var(--bg2)] p-4">
+                <!-- Log toolbar -->
+                <div class="flex items-center gap-2 mb-3 flex-wrap">
+                    <span class="flex items-center gap-1.5 text-[0.625rem] tracking-wider" :class="runStatus.running ? 'text-[var(--v)]' : 'text-[var(--v3)]'">
+                        <span class="w-1.5 h-1.5" :class="runStatus.running ? 'bg-[var(--v)] pulse' : 'bg-[var(--v3)]'"></span>
+                        <span x-text="runStatus.running ? 'LIVE' : runStatus.error ? 'ERROR' : 'STANDBY'"></span>
+                    </span>
+                    <!-- Filter buttons -->
+                    <div class="flex gap-1 ml-2">
+                        <template x-for="[key, label] in [['all','ALL'],['exp','EXP'],['agent','AGENT'],['tool','TOOL'],['info','INFO'],['error','ERR']]" :key="key">
+                            <button @click="liveLogFilter = key"
+                                    class="text-[0.5625rem] tracking-wider px-1.5 py-0.5 transition-all"
+                                    :class="liveLogFilter === key ? 'text-[var(--v)] border border-[var(--v)] bg-[rgba(180,74,255,0.08)]' : 'text-[var(--v3)] border border-[var(--v-dim)] hover:text-[var(--ng2)]'"
+                                    x-text="label"></button>
+                        </template>
+                    </div>
+                    <!-- Entry count -->
+                    <span class="text-[0.5625rem] text-[var(--v3)] ml-1" x-text="filteredLiveLog().length + '/' + liveLog.length"></span>
+                    <!-- Actions -->
+                    <div class="ml-auto flex items-center gap-2">
+                        <button @click="toggleLiveLogPause()"
+                                class="text-[0.625rem] tracking-wider transition-colors"
+                                :class="liveLogPaused ? 'text-[var(--amber)]' : 'text-[var(--v3)] hover:text-[var(--cyan)]'"
+                                x-text="liveLogPaused ? '&#x25B6; RESUME' : '&#x275A;&#x275A; PAUSE'"></button>
+                        <button @click="clearLiveLog()" class="text-[0.625rem] text-[var(--v3)] hover:text-[var(--red)] tracking-wider">CLEAR</button>
+                        <button @click="liveLogAutoScroll = !liveLogAutoScroll"
+                                class="text-[0.625rem] tracking-wider transition-colors"
+                                :class="liveLogAutoScroll ? 'text-[var(--cyan)]' : 'text-[var(--v3)]'"
+                                x-text="liveLogAutoScroll ? '&#x2193; AUTO' : '&#x2193; MANUAL'"></button>
+                        <button @click="pollRunStatus()" class="text-[0.625rem] text-[var(--v3)] hover:text-[var(--cyan)] tracking-wider">PING</button>
+                    </div>
+                </div>
+                <!-- Log entries -->
+                <div id="live-log-container"
+                     class="bg-[var(--bg)] pixel-border p-3 max-h-[500px] overflow-y-auto text-[0.6875rem] leading-relaxed font-mono"
+                     @scroll="if ($el.scrollTop + $el.clientHeight < $el.scrollHeight - 30) liveLogAutoScroll = false">
+                    <template x-for="(entry,i) in filteredLiveLog()" :key="'ll'+i">
+                        <div class="flex gap-2 py-0.5 hover:bg-[var(--bg3)] px-1 -mx-1 transition-colors live-log-entry"
+                             :class="'live-log-type-' + entry.type">
+                            <span class="text-[0.5625rem] text-[var(--v3)] shrink-0 w-14 text-right tabular-nums" x-text="entry.ts"></span>
+                            <span class="shrink-0 w-3 text-center" :style="'color:' + entry.color" x-text="entry.icon"></span>
+                            <span class="break-all" :style="'color:' + entry.color" x-text="entry.text"></span>
+                        </div>
+                    </template>
+                    <!-- Paused indicator -->
+                    <div x-show="liveLogPaused" class="sticky bottom-0 left-0 right-0 bg-[var(--amber)]/10 border-t border-[var(--amber)]/30 px-3 py-1 text-[0.5625rem] text-[var(--amber)] tracking-wider text-center">
+                        &#x23F8; LOG PAUSED &#x2014; incoming events buffered
+                    </div>
+                </div>
+                <!-- Empty state -->
+                <div x-show="liveLog.length === 0" class="text-center py-8 text-[var(--v3)] text-xs tracking-widest">AWAITING_TRANSMISSION_</div>
+                <!-- Error panel -->
+                <div x-show="runStatus.error" class="mt-3 bg-[rgba(255,51,51,0.05)] pixel-border p-2" style="border-color:rgba(255,51,51,0.3)">
+                    <div class="text-[0.5625rem] text-[var(--red)] tracking-widest mb-1">ERROR_REPORT_</div>
+                    <pre class="text-[0.625rem] text-[var(--red)]/60 whitespace-pre-wrap" x-text="runStatus.error"></pre>
+                </div>
+            </div>
+        </div>
+    `;
+})();

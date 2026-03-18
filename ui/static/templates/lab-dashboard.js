@@ -1,0 +1,146 @@
+// Template: Lab Dashboard — loaded before Alpine initializes
+(function() {
+    const el = document.getElementById('lab-dashboard-root');
+    if (!el) return;
+    el.innerHTML = `
+        <div class="mb-6">
+            <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">SYSTEM OVERVIEW</h2>
+            <p class="text-xs text-[var(--v3)] mt-1 tracking-wider">PROJECT EVOLUTION METRICS_</p>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <div class="pixel-border bg-[var(--bg2)] p-3">
+                <div class="text-[0.5625rem] tracking-widest text-[var(--v3)]">TOTAL_EXPS</div>
+                <div class="text-3xl text-[var(--v)] mt-1 glow-sm" style="font-family:'Press Start 2P',monospace" x-text="String(stats.total_experiments || 0).padStart(3,'0')"></div>
+            </div>
+            <div class="pixel-border bg-[var(--bg2)] p-3">
+                <div class="text-[0.5625rem] tracking-widest text-[var(--v3)]">AVG_QUALITY</div>
+                <div class="text-3xl mt-1 text-[var(--v)] glow-sm" style="font-family:'Press Start 2P',monospace" x-text="(stats.avg_score || 0).toFixed(2)"></div>
+            </div>
+            <div class="pixel-border bg-[var(--bg2)] p-3">
+                <div class="text-[0.5625rem] tracking-widest text-[var(--v3)]">KEEP/DISCARD</div>
+                <div class="flex items-baseline gap-2 mt-1">
+                    <span class="text-3xl text-[var(--v)] glow-sm" style="font-family:'Press Start 2P',monospace" x-text="stats.keep_count || 0"></span>
+                    <span class="text-[var(--v3)]">/</span>
+                    <span class="text-2xl text-[var(--red)]/50" style="font-family:'Press Start 2P',monospace" x-text="stats.discard_count || 0"></span>
+                </div>
+                <div class="text-[0.5625rem] text-[var(--v3)] mt-1" x-text="stats.total_experiments ? ((stats.keep_count / stats.total_experiments) * 100).toFixed(0) + '% SURVIVAL' : ''"></div>
+            </div>
+            <div class="pixel-border bg-[var(--bg2)] p-3">
+                <div class="text-[0.5625rem] tracking-widest text-[var(--v3)]">DIVERSITY</div>
+                <div class="text-3xl text-[var(--pink)] mt-1 glow-sm" style="font-family:'Press Start 2P',monospace" x-text="Object.keys(stats.type_distribution || {}).length"></div>
+                <div class="text-[0.5625rem] text-[var(--v3)] mt-1">TYPES DISCOVERED</div>
+            </div>
+        </div>
+
+        <!-- Score Chart + Types -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div class="lg:col-span-2 pixel-border bg-[var(--bg2)] p-4" @mouseleave="chartHover=null">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="text-[0.5625rem] tracking-widest text-[var(--v3)]">QUALITY_TIMELINE_</div>
+                    <div class="flex items-center gap-3 text-[0.5rem] text-[var(--v3)]">
+                        <span class="flex items-center gap-1"><span class="inline-block w-2 h-0.5 rounded bg-[var(--v)]"></span>SCORE</span>
+                        <span class="flex items-center gap-1"><span class="inline-block w-2 h-0.5 rounded bg-[var(--amber)]" style="border-bottom:1px dashed var(--amber)"></span>AVG(3)</span>
+                        <span class="flex items-center gap-1"><span class="inline-block w-1.5 h-1.5 rounded-full bg-[var(--ng)]"></span>KEEP</span>
+                        <span class="flex items-center gap-1"><span class="inline-block w-1.5 h-1.5 rounded-full bg-[var(--red)]"></span>DISCARD</span>
+                    </div>
+                </div>
+                <template x-if="!stats.score_trend || stats.score_trend.length === 0">
+                    <div class="text-center py-8 text-[var(--v3)] text-sm tracking-widest">NO_DATA</div>
+                </template>
+                <template x-if="stats.score_trend && stats.score_trend.length > 0">
+                    <div class="relative overflow-x-auto">
+                        <svg :viewBox="'0 0 ' + Math.max((stats.score_trend?.length || 0) * 28 + 50, 200) + ' 110'" class="w-full h-36"
+                             @mousemove="chartHover = scoreTrendHitTest($event)" @click="chartHover && navigate('experiments'); $nextTick(() => loadExperiment(chartHover.number))">
+                            <defs>
+                                <linearGradient id="scoreGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="var(--v)" stop-opacity="0.15"/>
+                                    <stop offset="100%" stop-color="var(--v)" stop-opacity="0.01"/>
+                                </linearGradient>
+                                <filter id="glowDot"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+                            </defs>
+                            <!-- Grid -->
+                            <line x1="40" y1="5" x2="40" y2="85" stroke="var(--v-dim)" stroke-width="0.5"/>
+                            <line x1="40" y1="85" :x2="(stats.score_trend?.length || 0) * 28 + 40" y2="85" stroke="var(--v-dim)" stroke-width="0.5"/>
+                            <line x1="40" y1="45" :x2="(stats.score_trend?.length || 0) * 28 + 40" y2="45" stroke="var(--v-dim)" stroke-width="0.3" stroke-dasharray="2 4"/>
+                            <text x="22" y="48" fill="var(--v3)" font-size="7" font-family="'VT323',monospace" text-anchor="end">0.5</text>
+                            <line x1="40" y1="28" :x2="(stats.score_trend?.length || 0) * 28 + 40" y2="28" stroke="var(--amber)" stroke-width="0.4" stroke-dasharray="4 3" opacity="0.6"/>
+                            <text x="22" y="31" fill="var(--amber)" font-size="7" font-family="'VT323',monospace" text-anchor="end" opacity="0.7">0.7</text>
+                            <line x1="40" y1="16" :x2="(stats.score_trend?.length || 0) * 28 + 40" y2="16" stroke="var(--cyan)" stroke-width="0.4" stroke-dasharray="4 3" opacity="0.6"/>
+                            <text x="22" y="19" fill="var(--cyan)" font-size="7" font-family="'VT323',monospace" text-anchor="end" opacity="0.7">0.85</text>
+                            <text x="8" y="9" fill="var(--v3)" font-size="7" font-family="'VT323',monospace">1.0</text>
+                            <text x="8" y="89" fill="var(--v3)" font-size="7" font-family="'VT323',monospace">0.0</text>
+                            <!-- Area fill -->
+                            <polygon :points="'40,85 ' + (stats.score_trend || []).map((p,i) => (40+i*28)+','+(85-(p.score||0)*80)).join(' ') + ' ' + (40+Math.max(0,(stats.score_trend||[]).length-1)*28)+',85'"
+                                     fill="url(#scoreGrad)"/>
+                            <!-- Score line -->
+                            <polyline fill="none" stroke="var(--v)" stroke-width="1.5" stroke-linejoin="round" opacity="0.8"
+                                      :points="(stats.score_trend || []).map((p,i) => (40+i*28)+','+(85-(p.score||0)*80)).join(' ')"/>
+                            <!-- Moving average (3-point) -->
+                            <polyline fill="none" stroke="var(--amber)" stroke-width="1" stroke-linejoin="round" stroke-dasharray="4 3" opacity="0.7"
+                                      :points="movingAvgPoints()"/>
+                            <!-- Hover crosshair -->
+                            <template x-if="chartHover && chartHover.idx != null">
+                                <g>
+                                    <line :x1="40 + ((chartHover?.idx)||0) * 28" y1="5" :x2="40 + ((chartHover?.idx)||0) * 28" y2="85" stroke="var(--v-dim)" stroke-width="0.5" stroke-dasharray="2 2"/>
+                                    <circle :cx="40 + ((chartHover?.idx)||0) * 28" :cy="85 - ((chartHover?.score)||0)*80" r="5" fill="var(--v)" opacity="0.2"/>
+                                    <circle :cx="40 + ((chartHover?.idx)||0) * 28" :cy="85 - ((chartHover?.score)||0)*80" r="3" fill="var(--v)" filter="url(#glowDot)"/>
+                                </g>
+                            </template>
+                            <!-- Data points + x-axis labels -->
+                            <g x-html="scoreTrendSvg()"></g>
+                        </svg>
+                        <!-- Tooltip -->
+                        <div x-show="chartHover && chartHover.idx != null" x-transition.opacity
+                             class="absolute z-20 bg-[var(--bg)] border border-[var(--v-dim)] rounded px-3 py-2 pointer-events-none shadow-lg"
+                             :style="'left:' + ((chartHover||{}).px || 0) + 'px; top:' + (((chartHover||{}).py || 0) - 10) + 'px; transform:translateX(-50%)'">
+                            <div class="text-[0.625rem] text-[var(--v3)]" x-text="'#' + ((chartHover||{}).number || '')"></div>
+                            <div class="text-xs text-[var(--ng2)] max-w-[200px] truncate" x-text="(chartHover||{}).title"></div>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="text-sm" :class="scoreCls((chartHover||{}).score)" style="font-family:'Press Start 2P',monospace" x-text="(chartHover||{}).score"></span>
+                                <span class="text-[0.625rem]" :class="decisionCls((chartHover||{}).decision)" x-text="(chartHover||{}).decision"></span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <div class="pixel-border bg-[var(--bg2)] p-4">
+                <div class="text-[0.5625rem] tracking-widest text-[var(--v3)] mb-3">GENOME_MAP_</div>
+                <div class="space-y-2" x-show="stats.type_distribution">
+                    <template x-for="[type, count] in Object.entries(stats.type_distribution || {}).sort((a,b) => b[1]-a[1])" :key="type">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[0.6875rem] px-1.5 py-px w-20 truncate" :class="typeBadgeCls(type)" x-text="type"></span>
+                            <div class="flex-1 h-1.5 bg-[var(--bg)]">
+                                <div class="h-full transition-all duration-500" :class="typeBarCls(type)"
+                                     :style="'width:' + (count / (stats.total_experiments||1) * 100) + '%'"></div>
+                            </div>
+                            <span class="text-[0.6875rem] text-[var(--v3)] w-6 text-right" x-text="count"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Last Experiment -->
+        <div x-show="stats.last_experiment && stats.last_experiment.number" class="mt-3 pixel-border bg-[var(--bg2)] p-4">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[0.5625rem] tracking-widest text-[var(--v3)]">LATEST_MUTATION_</span>
+                <button @click="navigate('experiments'); $nextTick(() => loadExperiment(stats.last_experiment?.number))" class="text-[0.625rem] text-[var(--cyan)] hover:text-white tracking-wider">INSPECT_</button>
+            </div>
+            <div class="flex items-start gap-3">
+                <span class="text-[var(--v3)] text-xs mt-0.5" style="font-family:'Press Start 2P',monospace" x-text="'#'+String(stats.last_experiment?.number || 0).padStart(2,'0')"></span>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-sm text-[var(--ng2)]" x-text="stats.last_experiment?.title"></span>
+                        <span class="text-[0.5625rem] px-1 py-px" :class="typeBadgeCls(stats.last_experiment?.type)" x-text="stats.last_experiment?.type"></span>
+                        <span class="text-[0.5625rem]" :class="decisionCls(stats.last_experiment?.decision)" x-text="stats.last_experiment?.decision"></span>
+                    </div>
+                    <div class="text-[0.625rem] text-[var(--v3)] mt-0.5" x-text="stats.last_experiment?.date"></div>
+                    <div class="text-xs text-[var(--ng3)] mt-1 line-clamp-2" x-text="stats.last_experiment?.what_done"></div>
+                </div>
+                <div class="text-xl text-[var(--v)] glow-sm shrink-0" style="font-family:'Press Start 2P',monospace" x-text="stats.last_experiment?.score"></div>
+            </div>
+        </div>
+    `;
+})();

@@ -54,16 +54,16 @@
                     <button @click="cmd.action(); cmdPalette.show = false;"
                             class="w-full text-left px-3 py-2 flex items-center gap-3 transition-colors"
                             :class="idx === cmdPalette.selected ? 'bg-[rgba(180,74,255,0.1)] text-[var(--v)]' : 'text-[var(--ng2)] hover:bg-[var(--bg2)]'">
-                        <span class="text-[9px] tracking-widest text-[var(--v3)] w-16 shrink-0" x-text="cmd.category"></span>
+                        <span class="text-[0.5625rem] tracking-widest text-[var(--v3)] w-16 shrink-0" x-text="cmd.category"></span>
                         <span class="text-sm flex-1" x-text="cmd.label"></span>
-                        <span class="text-[9px] text-[var(--v3)]" x-text="cmd.shortcut || ''"></span>
+                        <span class="text-[0.5625rem] text-[var(--v3)]" x-text="cmd.shortcut || ''"></span>
                     </button>
                 </template>
             </div>
             <!-- No results -->
-            <div x-show="cmdPalette._results.length === 0" class="py-6 text-center text-[10px] text-[var(--v3)] tracking-widest">NO_COMMANDS_FOUND_</div>
+            <div x-show="cmdPalette._results.length === 0" class="py-6 text-center text-[0.625rem] text-[var(--v3)] tracking-widest">NO_COMMANDS_FOUND_</div>
             <!-- Footer -->
-            <div class="border-t border-[var(--v-dim)] px-3 py-2 flex items-center gap-4 text-[9px] text-[var(--v3)]">
+            <div class="border-t border-[var(--v-dim)] px-3 py-2 flex items-center gap-4 text-[0.5625rem] text-[var(--v3)]">
                 <span><kbd class="px-1 border border-[var(--v-dim)]">&#x2191;&#x2193;</kbd> navigate</span>
                 <span><kbd class="px-1 border border-[var(--v-dim)]">Enter</kbd> execute</span>
                 <span><kbd class="px-1 border border-[var(--v-dim)]">Esc</kbd> close</span>
@@ -135,7 +135,7 @@
                         <div class="text-sm text-[var(--v)] tracking-widest">NEW_SESSION</div>
                         <button @click="showNewSessionModal = false" class="text-[var(--v3)] hover:text-[var(--red)] text-xs">[X]</button>
                     </div>
-                    <div class="text-[10px] text-[var(--v3)] tracking-wider mb-2">PROJECT_PATH_</div>
+                    <div class="text-[0.625rem] text-[var(--v3)] tracking-wider mb-2">PROJECT_PATH_</div>
                     <input x-model="newSessionPath" type="text" placeholder="e.g. F:\Projects\myapp or ."
                            @keydown.enter="createSessionFromModal()"
                            class="w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)] mb-3 tracking-wider"
@@ -174,7 +174,7 @@
     <!-- Matrix rain toggle (inside x-data scope via x-data on body) -->
     <div x-data="{ matrixPaused: false }" class="contents">
         <button @click="matrixPaused = window.MatrixRain ? MatrixRain.toggle() : true"
-                class="fixed bottom-4 right-4 z-50 px-2 py-1 text-[10px] tracking-widest border border-[var(--v-dim)] bg-[rgba(12,11,20,0.7)] text-[var(--v3)] hover:text-[var(--v)] hover:border-[var(--v2)] transition-all"
+                class="fixed bottom-4 right-4 z-50 px-2 py-1 text-[0.625rem] tracking-widest border border-[var(--v-dim)] bg-[rgba(12,11,20,0.7)] text-[var(--v3)] hover:text-[var(--v)] hover:border-[var(--v2)] transition-all"
                 x-text="matrixPaused ? '> RESUME' : '> PAUSE'">
         </button>
     </div>

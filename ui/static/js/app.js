@@ -318,10 +318,10 @@ function _buildAppData() {
         },
         applySettings() {
             this.applyTheme(this.settings.theme || 'synthwave');
-            // Font size: set CSS variable for rem-based scaling + zoom for px-based elements
+            // Font size: rem-based scaling — html font-size drives all rem units
             const fontSize = this.settings.fontSize || 16;
             document.documentElement.style.setProperty('--user-font-size', fontSize + 'px');
-            document.documentElement.style.zoom = Math.max(0.6, Math.min(2.0, fontSize / 16));
+            document.documentElement.style.fontSize = fontSize + 'px';
             if (this.settings.chatDensity === 'compact') {
                 document.documentElement.style.setProperty('--chat-msg-padding', '4px 8px');
                 document.documentElement.style.setProperty('--chat-msg-gap', '2px');

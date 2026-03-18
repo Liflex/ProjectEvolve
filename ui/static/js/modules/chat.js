@@ -359,9 +359,9 @@ window.AppChat = (function() {
             if (!tab || !tab.messages || tab.messages.length === 0) {
                 return '<div style="display:flex;align-items:center;justify-content:center;height:100%;text-align:center">'
                     + '<div>'
-                    + '<div style="font-size:10px;letter-spacing:0.2em;color:var(--v3);margin-bottom:8px">CLAUDE_CODE_SESSION</div>'
-                    + '<div style="font-size:12px;color:var(--v3)">Target: ' + this.escHtml(tab?.project_path || '') + '</div>'
-                    + '<div style="font-size:9px;color:var(--v3);margin-top:4px">Type a message to start_</div>'
+                    + '<div style="font-size:0.625rem;letter-spacing:0.2em;color:var(--v3);margin-bottom:8px">CLAUDE_CODE_SESSION</div>'
+                    + '<div style="font-size:0.75rem;color:var(--v3)">Target: ' + this.escHtml(tab?.project_path || '') + '</div>'
+                    + '<div style="font-size:0.5625rem;color:var(--v3);margin-top:4px">Type a message to start_</div>'
                     + '</div></div>';
             }
             let html = '';
@@ -405,14 +405,14 @@ window.AppChat = (function() {
                         const thinkId = 'think-' + tab.tab_id + '-' + i;
                         thinkingHtml = '<div class="thinking-block" style="margin-bottom:4px">'
                             + '<div class="thinking-toggle" onclick="var b=document.getElementById(\'' + thinkId + '\');var a=this.querySelector(\'[data-tarrow]\');if(b.style.display===\'none\'){b.style.display=\'block\';a.textContent=\'\\u25BC\';this.classList.add(\'open\');}else{b.style.display=\'none\';a.textContent=\'\\u25B6\';this.classList.remove(\'open\');}" '
-                            + 'style="display:flex;align-items:center;gap:6px;padding:3px 8px;cursor:pointer;border:1px solid var(--v-dim);background:rgba(180,74,255,0.04);user-select:none;font-size:10px;letter-spacing:0.1em;color:var(--v3);transition:background 0.15s" '
+                            + 'style="display:flex;align-items:center;gap:6px;padding:3px 8px;cursor:pointer;border:1px solid var(--v-dim);background:rgba(180,74,255,0.04);user-select:none;font-size:0.625rem;letter-spacing:0.1em;color:var(--v3);transition:background 0.15s" '
                             + 'onmouseenter="this.style.background=\'rgba(180,74,255,0.08)\'" onmouseleave="this.style.background=\'rgba(180,74,255,0.04)\'">'
-                            + '<span data-tarrow style="font-size:7px;min-width:8px;color:var(--v3)">' + (showThinking ? '&#x25BC;' : '&#x25B6;') + '</span>'
+                            + '<span data-tarrow style="font-size:0.4375rem;min-width:8px;color:var(--v3)">' + (showThinking ? '&#x25BC;' : '&#x25B6;') + '</span>'
                             + '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--amber);flex-shrink:0"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5.1 7.5l.9-1.8A6 6 0 0 1 6 10a6 6 0 1 1 12 0c0 1.5-.5 2.8-1.4 3.9l-1.4-1.4c.6-.7.8-1.5.8-2.5 0-2.2-1.8-4-4-4S8 7.8 8 10s1.8 4 4 4c.7 0 1.3-.2 1.9-.5l1.2 1.5A5.8 5.8 0 0 1 12 16a6 6 0 0 1-6-6 8 8 0 0 0 6 8z"/></svg>'
                             + '<span style="color:var(--amber);font-weight:bold;letter-spacing:0.12em">THINKING</span>'
-                            + '<span style="color:var(--v3);opacity:0.6;font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50ch">' + escapedPreview + '</span>'
+                            + '<span style="color:var(--v3);opacity:0.6;font-size:0.5625rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50ch">' + escapedPreview + '</span>'
                             + '</div>'
-                            + '<div id="' + thinkId + '" style="display:' + (showThinking ? 'block' : 'none') + ';border:1px solid var(--v-dim);border-top:none;background:rgba(12,11,20,0.4);padding:6px 10px;font-size:12px;color:var(--ng3);line-height:1.6;font-style:italic;max-height:200px;overflow-y:auto">'
+                            + '<div id="' + thinkId + '" style="display:' + (showThinking ? 'block' : 'none') + ';border:1px solid var(--v-dim);border-top:none;background:rgba(12,11,20,0.4);padding:6px 10px;font-size:0.75rem;color:var(--ng3);line-height:1.6;font-style:italic;max-height:200px;overflow-y:auto">'
                             + escapedFull
                             + '</div></div>';
                     }
@@ -450,29 +450,29 @@ window.AppChat = (function() {
                         if (tp && (tt === 'read' || tt === 'edit' || tt === 'write')) {
                             const fname = tp.split(/[\\/]/).pop();
                             detailHtml += '<div style="display:flex;align-items:center;gap:6px;padding:2px 0 2px 18px">'
-                                + '<span style="font-size:10px">' + (icons[tt] || icons.other) + '</span>'
-                                + '<span style="font-size:8px;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.12em;font-weight:bold;min-width:36px">[' + (labels[tt] || 'TOOL') + ']</span>'
-                                + '<span class="fp-link" style="font-size:10px" title="' + this.escHtml(tp) + ' — click to copy" onclick="event.stopPropagation();navigator.clipboard.writeText(\'' + this.escHtml(tp).replace(/'/g, "\\'") + '\').then(function(){window._app&&window._app.showToast(\'Путь скопирован\')})">' + this.escHtml(fname) + '</span>'
-                                + '<span style="font-size:9px;color:var(--v3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0" title="' + this.escHtml(tp) + '">' + this.escHtml(tp) + '</span>'
+                                + '<span style="font-size:0.625rem">' + (icons[tt] || icons.other) + '</span>'
+                                + '<span style="font-size:0.5rem;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.12em;font-weight:bold;min-width:36px">[' + (labels[tt] || 'TOOL') + ']</span>'
+                                + '<span class="fp-link" style="font-size:0.625rem" title="' + this.escHtml(tp) + ' — click to copy" onclick="event.stopPropagation();navigator.clipboard.writeText(\'' + this.escHtml(tp).replace(/'/g, "\\'") + '\').then(function(){window._app&&window._app.showToast(\'Путь скопирован\')})">' + this.escHtml(fname) + '</span>'
+                                + '<span style="font-size:0.5625rem;color:var(--v3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0" title="' + this.escHtml(tp) + '">' + this.escHtml(tp) + '</span>'
                                 + '</div>';
                         } else if (tt === 'bash') {
                             detailHtml += '<div style="display:flex;align-items:flex-start;gap:6px;padding:2px 0 2px 18px">'
-                                + '<span style="font-size:10px;margin-top:1px">' + (icons[tt] || icons.other) + '</span>'
-                                + '<span style="font-size:8px;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.12em;font-weight:bold;min-width:36px;margin-top:1px">[' + (labels[tt] || 'TOOL') + ']</span>'
-                                + '<code style="font-size:10px;color:var(--tok-str, var(--ng2));background:var(--code-bg, var(--bg));padding:1px 6px;border:1px solid var(--v-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60ch;display:inline-block" title="' + this.escHtml(td) + '">$ ' + this.escHtml(td) + '</code>'
+                                + '<span style="font-size:0.625rem;margin-top:1px">' + (icons[tt] || icons.other) + '</span>'
+                                + '<span style="font-size:0.5rem;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.12em;font-weight:bold;min-width:36px;margin-top:1px">[' + (labels[tt] || 'TOOL') + ']</span>'
+                                + '<code style="font-size:0.625rem;color:var(--tok-str, var(--ng2));background:var(--code-bg, var(--bg));padding:1px 6px;border:1px solid var(--v-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60ch;display:inline-block" title="' + this.escHtml(td) + '">$ ' + this.escHtml(td) + '</code>'
                                 + '</div>';
                         } else if (tt === 'search') {
                             detailHtml += '<div style="display:flex;align-items:center;gap:6px;padding:2px 0 2px 18px">'
-                                + '<span style="font-size:10px">' + (icons[tt] || icons.other) + '</span>'
-                                + '<span style="font-size:8px;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.12em;font-weight:bold;min-width:36px">[' + (labels[tt] || 'TOOL') + ']</span>'
-                                + '<code style="font-size:10px;color:var(--yellow);padding:1px 4px">' + this.escHtml(td) + '</code>'
-                                + (tp ? '<span style="font-size:9px;color:var(--v3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40ch" title="' + this.escHtml(tp) + '">in ' + this.escHtml(tp) + '</span>' : '')
+                                + '<span style="font-size:0.625rem">' + (icons[tt] || icons.other) + '</span>'
+                                + '<span style="font-size:0.5rem;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.12em;font-weight:bold;min-width:36px">[' + (labels[tt] || 'TOOL') + ']</span>'
+                                + '<code style="font-size:0.625rem;color:var(--yellow);padding:1px 4px">' + this.escHtml(td) + '</code>'
+                                + (tp ? '<span style="font-size:0.5625rem;color:var(--v3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40ch" title="' + this.escHtml(tp) + '">in ' + this.escHtml(tp) + '</span>' : '')
                                 + '</div>';
                         } else {
                             detailHtml += '<div style="display:flex;align-items:center;gap:6px;padding:2px 0 2px 18px">'
-                                + '<span style="font-size:10px">' + (icons[tt] || icons.other) + '</span>'
-                                + '<span style="font-size:8px;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.12em;font-weight:bold;min-width:36px">[' + (labels[tt] || 'TOOL') + ']</span>'
-                                + '<span style="font-size:10px;color:var(--ng3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55ch" title="' + this.escHtml(td) + '">' + this.escHtml(td) + '</span>'
+                                + '<span style="font-size:0.625rem">' + (icons[tt] || icons.other) + '</span>'
+                                + '<span style="font-size:0.5rem;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.12em;font-weight:bold;min-width:36px">[' + (labels[tt] || 'TOOL') + ']</span>'
+                                + '<span style="font-size:0.625rem;color:var(--ng3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55ch" title="' + this.escHtml(td) + '">' + this.escHtml(td) + '</span>'
                                 + '</div>';
                         }
                     }
@@ -480,16 +480,16 @@ window.AppChat = (function() {
                     const detailDisplay = collapsed ? 'none' : 'block';
                     const typeIcons = [...new Set(toolGroup.map(t => icons[t.toolType || 'other'] || icons.other))].join(' ');
                     const headerTarget = primaryTarget
-                        ? '<span class="fp-link" style="font-size:10px" title="' + this.escHtml(primaryTarget) + ' — click to copy" onclick="event.stopPropagation();navigator.clipboard.writeText(\'' + this.escHtml(primaryTarget).replace(/'/g, "\\'") + '\').then(function(){window._app&&window._app.showToast(\'Путь скопирован\')})">' + this.escHtml(primaryTarget.split(/[\\/]/).pop()) + '</span>'
-                        + '<span style="font-size:8px;color:var(--v3);font-family:monospace;margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:30ch" title="' + this.escHtml(primaryTarget) + '">' + this.escHtml(primaryTarget) + '</span>'
-                        : '<span style="font-size:9px;color:var(--ng3);letter-spacing:0.08em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50ch" title="' + this.escHtml(summaryText) + '">' + this.escHtml(summaryText) + '</span>';
+                        ? '<span class="fp-link" style="font-size:0.625rem" title="' + this.escHtml(primaryTarget) + ' — click to copy" onclick="event.stopPropagation();navigator.clipboard.writeText(\'' + this.escHtml(primaryTarget).replace(/'/g, "\\'") + '\').then(function(){window._app&&window._app.showToast(\'Путь скопирован\')})">' + this.escHtml(primaryTarget.split(/[\\/]/).pop()) + '</span>'
+                        + '<span style="font-size:0.5rem;color:var(--v3);font-family:monospace;margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:30ch" title="' + this.escHtml(primaryTarget) + '">' + this.escHtml(primaryTarget) + '</span>'
+                        : '<span style="font-size:0.5625rem;color:var(--ng3);letter-spacing:0.08em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50ch" title="' + this.escHtml(summaryText) + '">' + this.escHtml(summaryText) + '</span>';
                     html += '<div class="chat-msg-row" style="padding:2px 0"><div class="chat-avatar chat-avatar-tool">' + avatarTool + '</div><div style="flex:1;min-width:0">'
                         + '<div onclick="var d=this.nextElementSibling,a=this.querySelector(\'[data-arrow]\');if(d.style.display===\'none\'){d.style.display=\'block\';a.textContent=\'\\u25BC\';}else{d.style.display=\'none\';a.textContent=\'\\u25B6\';}" '
                         + 'style="display:flex;align-items:center;gap:6px;padding:4px 6px;cursor:pointer;border:1px solid var(--v-dim);background:rgba(180,74,255,0.03);user-select:none" '
                         + 'onmouseenter="this.style.borderColor=\'var(--v2)\'" onmouseleave="this.style.borderColor=\'var(--v-dim)\'">'
-                        + '<span data-arrow style="font-size:8px;color:var(--v3);min-width:10px">' + arrowChar + '</span>'
-                        + '<span style="font-size:10px">' + typeIcons + '</span>'
-                        + '<span style="font-size:9px;color:var(--v);letter-spacing:0.12em;font-weight:bold">' + countLabel + '</span>'
+                        + '<span data-arrow style="font-size:0.5rem;color:var(--v3);min-width:10px">' + arrowChar + '</span>'
+                        + '<span style="font-size:0.625rem">' + typeIcons + '</span>'
+                        + '<span style="font-size:0.5625rem;color:var(--v);letter-spacing:0.12em;font-weight:bold">' + countLabel + '</span>'
                         + headerTarget
                         + '</div>'
                         + '<div style="display:' + detailDisplay + ';border:1px solid var(--v-dim);border-top:none;background:rgba(12,11,20,0.5);padding:4px 6px">'
@@ -510,13 +510,13 @@ window.AppChat = (function() {
                     if (thinkingBuf.trim()) {
                         const thinkPreview = thinkingBuf.length > 200 ? thinkingBuf.slice(-200) : thinkingBuf;
                         thinkingIndicatorHtml = '<div class="thinking-block" style="margin-bottom:4px">'
-                            + '<div style="display:flex;align-items:center;gap:6px;padding:3px 8px;border:1px solid var(--v-dim);background:rgba(180,74,255,0.04);font-size:10px;letter-spacing:0.1em;color:var(--v3)">'
+                            + '<div style="display:flex;align-items:center;gap:6px;padding:3px 8px;border:1px solid var(--v-dim);background:rgba(180,74,255,0.04);font-size:0.625rem;letter-spacing:0.1em;color:var(--v3)">'
                             + '<span class="thinking-spinner" style="width:10px;height:10px"></span>'
                             + '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--amber);flex-shrink:0"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5.1 7.5l.9-1.8A6 6 0 0 1 6 10a6 6 0 1 1 12 0c0 1.5-.5 2.8-1.4 3.9l-1.4-1.4c.6-.7.8-1.5.8-2.5 0-2.2-1.8-4-4-4S8 7.8 8 10s1.8 4 4 4c.7 0 1.3-.2 1.9-.5l1.2 1.5A5.8 5.8 0 0 1 12 16a6 6 0 0 1-6-6 8 8 0 0 0 6 8z"/></svg>'
                             + '<span style="color:var(--amber);font-weight:bold;letter-spacing:0.12em">THINKING</span>'
-                            + '<span style="color:var(--v3);opacity:0.6;font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + this.escHtml(thinkPreview.slice(-80)) + '</span>'
+                            + '<span style="color:var(--v3);opacity:0.6;font-size:0.5625rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + this.escHtml(thinkPreview.slice(-80)) + '</span>'
                             + '</div>'
-                            + (showThinking ? '<div style="border:1px solid var(--v-dim);border-top:none;background:rgba(12,11,20,0.4);padding:6px 10px;font-size:12px;color:var(--ng3);line-height:1.6;font-style:italic;max-height:200px;overflow-y:auto">' + this.escHtml(thinkPreview).replace(/\n/g, '<br>') + '</div>' : '')
+                            + (showThinking ? '<div style="border:1px solid var(--v-dim);border-top:none;background:rgba(12,11,20,0.4);padding:6px 10px;font-size:0.75rem;color:var(--ng3);line-height:1.6;font-style:italic;max-height:200px;overflow-y:auto">' + this.escHtml(thinkPreview).replace(/\n/g, '<br>') + '</div>' : '')
                             + '</div>';
                     }
                     html += '<div class="chat-msg-fadein chat-msg-row">'
@@ -527,7 +527,7 @@ window.AppChat = (function() {
                         + (!thinkingBuf.trim() ? '<div class="chat-bubble-asst typing-indicator-bubble" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);display:flex;align-items:center;gap:10px">'
                         + '<span class="thinking-spinner"></span>'
                         + '<div class="typing-dots"><span></span><span></span><span></span></div>'
-                        + '<span style="font-size:10px;color:var(--v3);letter-spacing:0.12em">думает...</span>'
+                        + '<span style="font-size:0.625rem;color:var(--v3);letter-spacing:0.12em">думает...</span>'
                         + '</div>' : '')
                         + '</div></div>';
                 } else {
@@ -535,7 +535,7 @@ window.AppChat = (function() {
                         + '<div class="chat-avatar chat-avatar-asst" style="opacity:0.3">' + avatarAsst + '</div>'
                         + '<div style="display:flex;align-items:center;gap:6px;padding:4px 0">'
                         + '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:breathe 1.2s ease-in-out infinite"></span>'
-                        + '<span style="font-size:9px;color:var(--cyan);letter-spacing:0.1em">STREAMING</span>'
+                        + '<span style="font-size:0.5625rem;color:var(--cyan);letter-spacing:0.1em">STREAMING</span>'
                         + '</div></div>';
                 }
             }
