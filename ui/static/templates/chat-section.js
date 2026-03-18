@@ -54,6 +54,7 @@
             <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider" x-show="activeTab" x-text="(activeTab?.messages?.length || 0) + ' MSGS'"></span>
             <div class="flex-1"></div>
             <button class="chat-toolbar-btn" @click="openChatSearch()" title="Search in chat (Ctrl+F)">&#x1f50d;</button>
+            <button class="chat-toolbar-btn" @click="openCmdPalette()" title="Command Palette (Ctrl+K)" style="font-size:0.5rem;letter-spacing:0.1em">CTRL+K</button>
             <button x-show="chatBottomPanel !== 'closed'" class="chat-toolbar-btn" @click="chatBottomPanel = 'closed'" title="Close panel">[X] PANEL</button>
         </div>
 

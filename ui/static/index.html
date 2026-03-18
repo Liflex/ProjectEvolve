@@ -36,37 +36,54 @@
          :class="toast.type === 'success' ? 'border-[var(--ng)] text-[var(--ng)] bg-[rgba(57,255,20,0.08)]' : toast.type === 'error' ? 'border-[var(--red)] text-[var(--red)] bg-[rgba(255,51,51,0.08)]' : 'border-[var(--cyan)] text-[var(--cyan)] bg-[rgba(0,229,255,0.08)]'"
          x-text="toast.message"></div>
 
-    <!-- Command Palette (Ctrl+Shift+P) -->
-    <div x-show="cmdPalette.show" x-cloak class="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]" @click.self="cmdPalette.show = false">
-        <div class="bg-[var(--bg)] border-2 border-[var(--v-dim)] w-full max-w-lg mx-4 shadow-2xl" @click.stop>
+    <!-- Command Palette (Ctrl+K / Ctrl+Shift+P) -->
+    <div x-show="cmdPalette.show" x-cloak class="fixed inset-0 z-50 flex items-start justify-center pt-[12vh]" @click.self="closeCmdPalette()" @keydown.escape.window="closeCmdPalette()">
+        <div class="cmd-palette w-full max-w-xl mx-4" @click.stop>
             <!-- Search input -->
-            <div class="flex items-center border-b border-[var(--v-dim)] px-3">
-                <span class="text-[var(--v3)] text-xs mr-2">></span>
-                <input id="cmd-palette-input" x-model="cmdPalette.query" @input="filterCmdPalette()"
+            <div class="cmd-palette-input-wrap">
+                <span class="cmd-palette-prefix">&#x276F;</span>
+                <input id="cmd-palette-input" x-model="cmdPalette.query"
                        @keydown="onCmdPaletteKeydown($event)"
-                       placeholder="Type a command..."
-                       class="flex-1 bg-transparent py-3 text-sm text-[var(--ng2)] tracking-wider outline-none"
+                       placeholder="Type a command... (Ctrl+K)"
+                       class="cmd-palette-input"
                        autocomplete="off" spellcheck="false">
+                <span class="cmd-palette-shortcut-hint" x-show="!cmdPalette.query" x-text="'Ctrl+K'"></span>
             </div>
+            <!-- Recently used (shown when query is empty) -->
+            <template x-if="!cmdPalette.query && cmdPalette._recent.length > 0">
+                <div>
+                    <div style="padding:6px 14px 2px;font-size:0.5rem;letter-spacing:0.15em;color:var(--v3)">RECENT</div>
+                    <div class="cmd-palette-results" style="max-height:20vh">
+                        <template x-for="(cmd, idx) in cmdPalette._recent" :key="'recent-'+cmd.id">
+                            <div class="cmd-palette-item" :class="idx === cmdPalette.selected && 'cmd-palette-item-active'"
+                                 @click="executePaletteCmd(cmd)" @mouseenter="cmdPalette.selected = idx">
+                                <span class="cmd-palette-cat" x-text="cmd.category"></span>
+                                <span class="cmd-palette-item-label" x-text="cmd.label"></span>
+                                <span class="cmd-palette-item-shortcut" x-text="cmd.shortcut || ''"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
             <!-- Results -->
-            <div class="max-h-[50vh] overflow-y-auto py-1">
-                <template x-for="(cmd, idx) in cmdPalette._results" :key="cmd.id">
-                    <button @click="cmd.action(); cmdPalette.show = false;"
-                            class="w-full text-left px-3 py-2 flex items-center gap-3 transition-colors"
-                            :class="idx === cmdPalette.selected ? 'bg-[rgba(180,74,255,0.1)] text-[var(--v)]' : 'text-[var(--ng2)] hover:bg-[var(--bg2)]'">
-                        <span class="text-[0.5625rem] tracking-widest text-[var(--v3)] w-16 shrink-0" x-text="cmd.category"></span>
-                        <span class="text-sm flex-1" x-text="cmd.label"></span>
-                        <span class="text-[0.5625rem] text-[var(--v3)]" x-text="cmd.shortcut || ''"></span>
-                    </button>
+            <div class="cmd-palette-results" style="max-height:40vh" x-show="cmdPalette.query">
+                <template x-for="(cmd, idx) in filteredCommands" :key="cmd.id">
+                    <div class="cmd-palette-item" :class="idx === cmdPalette.selected && 'cmd-palette-item-active'"
+                         @click="executePaletteCmd(cmd)" @mouseenter="cmdPalette.selected = idx">
+                        <span class="cmd-palette-cat" x-text="cmd.category"></span>
+                        <span class="cmd-palette-item-label" x-text="highlightMatch(cmd.label, cmdPalette.query)"></span>
+                        <span class="cmd-palette-item-shortcut" x-text="cmd.shortcut || ''"></span>
+                    </div>
                 </template>
             </div>
             <!-- No results -->
-            <div x-show="cmdPalette._results.length === 0" class="py-6 text-center text-[0.625rem] text-[var(--v3)] tracking-widest">NO_COMMANDS_FOUND_</div>
+            <div x-show="cmdPalette.query && filteredCommands.length === 0" class="cmd-palette-no-results">NO_COMMANDS_FOUND_</div>
             <!-- Footer -->
-            <div class="border-t border-[var(--v-dim)] px-3 py-2 flex items-center gap-4 text-[0.5625rem] text-[var(--v3)]">
-                <span><kbd class="px-1 border border-[var(--v-dim)]">&#x2191;&#x2193;</kbd> navigate</span>
-                <span><kbd class="px-1 border border-[var(--v-dim)]">Enter</kbd> execute</span>
-                <span><kbd class="px-1 border border-[var(--v-dim)]">Esc</kbd> close</span>
+            <div class="cmd-palette-footer">
+                <span><kbd style="padding:0 4px;border:1px solid var(--v-dim)">&#x2191;&#x2193;</kbd> navigate</span>
+                <span><kbd style="padding:0 4px;border:1px solid var(--v-dim)">Enter</kbd> execute</span>
+                <span><kbd style="padding:0 4px;border:1px solid var(--v-dim)">Esc</kbd> close</span>
+                <span style="margin-left:auto;color:var(--v-dim)">Ctrl+K / Ctrl+Shift+P</span>
             </div>
         </div>
     </div>

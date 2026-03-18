@@ -89,8 +89,8 @@ function _buildAppData() {
         _browseEntries: [],
         _preflightResult: null,
 
-        // Command Palette (Ctrl+Shift+P)
-        cmdPalette: { show: false, query: '', selected: 0, _results: [] },
+        // Command Palette (Ctrl+K / Ctrl+Shift+P)
+        cmdPalette: { show: false, query: '', selected: 0, _recent: [] },
         cmdPaletteCommands: [
             // Navigation
             { id: 'nav-dashboard', label: 'Research Lab: Dashboard', shortcut: 'Alt+3', category: 'NAV', action: () => { this.navigateSection('lab'); this.$nextTick(() => this.navigate('dashboard')); } },
@@ -107,6 +107,11 @@ function _buildAppData() {
             { id: 'chat-clear', label: 'Chat: Clear Messages', category: 'CHAT', action: () => { if (this.activeTab) this.clearActiveChat(); } },
             { id: 'chat-export', label: 'Chat: Export as Markdown', category: 'CHAT', action: () => { if (this.activeTab) this.exportActiveChat(); } },
             { id: 'chat-resume', label: 'Chat: Resume Session', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.showSessionPicker()); } },
+            { id: 'chat-fold-all', label: 'Chat: Fold All Messages', category: 'CHAT', action: () => { if (this.activeTab) this.collapseAllMessages(); } },
+            { id: 'chat-unfold-all', label: 'Chat: Unfold All Messages', category: 'CHAT', action: () => { if (this.activeTab) this.expandAllMessages(); } },
+            { id: 'chat-raw-log', label: 'Chat: Toggle Raw Tool Log', category: 'CHAT', action: () => { this.toggleBottomPanel('rawlog'); } },
+            { id: 'chat-tools', label: 'Chat: Toggle Tools Summary', category: 'CHAT', action: () => { this.toggleBottomPanel('summary'); } },
+            { id: 'chat-search', label: 'Chat: Search in Messages', shortcut: 'Ctrl+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.openChatSearch()); } },
             // Themes
             { id: 'theme-synthwave', label: 'Theme: Synthwave', category: 'THEME', action: () => { this.settings.theme = 'synthwave'; localStorage.setItem('ar-settings', JSON.stringify(this.settings)); this.applySettings(); this.showToast('Synthwave'); } },
             { id: 'theme-darcula', label: 'Theme: Darcula (JetBrains)', category: 'THEME', action: () => { this.settings.theme = 'darcula'; localStorage.setItem('ar-settings', JSON.stringify(this.settings)); this.applySettings(); this.showToast('Darcula'); } },
@@ -229,11 +234,13 @@ function _buildAppData() {
                 }
                 if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
                     e.preventDefault();
-                    this.cmdPalette.show = !this.cmdPalette.show;
-                    if (this.cmdPalette.show) {
-                        this.cmdPalette.query = ''; this.cmdPalette.selected = 0;
-                        this.$nextTick(() => { const inp = document.getElementById('cmd-palette-input'); if (inp) inp.focus(); });
-                    }
+                    this.openCmdPalette();
+                }
+                // Ctrl+K opens command palette (like VS Code)
+                if ((e.ctrlKey || e.metaKey) && e.key === 'k' && !e.shiftKey) {
+                    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+                    e.preventDefault();
+                    this.openCmdPalette();
                 }
                 if (e.key === 'Escape' && this.cmdPalette.show) { this.cmdPalette.show = false; }
                 if ((e.ctrlKey || e.metaKey) && e.key === 'f' && this.section === 'chat' && this.activeTab) {
@@ -310,6 +317,15 @@ function _buildAppData() {
             this.cmdPalette.show = true;
             this.cmdPalette.query = '';
             this.cmdPalette.selected = 0;
+            // Load recent commands from localStorage
+            try {
+                const stored = localStorage.getItem('ar-cmd-recent');
+                const recentIds = stored ? JSON.parse(stored) : [];
+                this.cmdPalette._recent = recentIds
+                    .map(id => this.cmdPaletteCommands.find(c => c.id === id))
+                    .filter(Boolean)
+                    .slice(0, 5);
+            } catch (e) { this.cmdPalette._recent = []; }
             this.$nextTick(() => {
                 const inp = document.getElementById('cmd-palette-input');
                 if (inp) inp.focus();
@@ -318,17 +334,39 @@ function _buildAppData() {
         closeCmdPalette() {
             this.cmdPalette.show = false;
         },
-        executeCmdPalette() {
-            const results = this.filteredCommands;
-            if (results.length === 0) return;
-            const cmd = results[this.cmdPalette.selected];
+        executePaletteCmd(cmd) {
             if (!cmd) return;
             this.cmdPalette.show = false;
+            // Track as recently used
+            try {
+                let recentIds = JSON.parse(localStorage.getItem('ar-cmd-recent') || '[]');
+                recentIds = recentIds.filter(id => id !== cmd.id);
+                recentIds.unshift(cmd.id);
+                recentIds = recentIds.slice(0, 10);
+                localStorage.setItem('ar-cmd-recent', JSON.stringify(recentIds));
+            } catch (e) {}
             if (cmd.action) cmd.action();
         },
+        executeCmdPalette() {
+            // If query is empty, execute from recent list; otherwise from filtered
+            const items = this.cmdPalette.query ? this.filteredCommands : this.cmdPalette._recent;
+            if (items.length === 0) return;
+            const cmd = items[this.cmdPalette.selected];
+            this.executePaletteCmd(cmd);
+        },
+        highlightMatch(label, query) {
+            if (!query || !query.trim()) return this.escHtml(label);
+            const q = query.trim();
+            const idx = label.toLowerCase().indexOf(q.toLowerCase());
+            if (idx === -1) return this.escHtml(label);
+            const before = this.escHtml(label.slice(0, idx));
+            const match = this.escHtml(label.slice(idx, idx + q.length));
+            const after = this.escHtml(label.slice(idx + q.length));
+            return before + '<span style="color:var(--v);font-weight:bold">' + match + '</span>' + after;
+        },
         onCmdPaletteKeydown(e) {
-            const results = this.filteredCommands;
-            if (e.key === 'ArrowDown') { e.preventDefault(); this.cmdPalette.selected = Math.min(this.cmdPalette.selected + 1, results.length - 1); }
+            const items = this.cmdPalette.query ? this.filteredCommands : this.cmdPalette._recent;
+            if (e.key === 'ArrowDown') { e.preventDefault(); this.cmdPalette.selected = Math.min(this.cmdPalette.selected + 1, items.length - 1); }
             else if (e.key === 'ArrowUp') { e.preventDefault(); this.cmdPalette.selected = Math.max(this.cmdPalette.selected - 1, 0); }
             else if (e.key === 'Enter') { e.preventDefault(); this.executeCmdPalette(); }
         },
