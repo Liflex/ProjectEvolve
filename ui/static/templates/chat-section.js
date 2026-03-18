@@ -177,13 +177,26 @@
                                 <!-- Slash command menu -->
                                 <div x-show="slashMenu.show && slashMenu._tabId === tab.tab_id"
                                      x-transition.opacity.duration.100ms
-                                     class="slash-menu absolute bottom-full left-0 mb-1 w-64 z-10">
+                                     class="slash-menu absolute bottom-full left-0 mb-1 z-10"
+                                     style="width:380px;max-height:320px;overflow-y:auto">
                                     <template x-for="(item, idx) in slashMenu.items" :key="item.cmd">
-                                        <div class="slash-menu-item"
-                                             :class="idx === slashMenu.selected && 'selected'"
-                                             @mousedown.prevent="selectSlashCommand(item)">
-                                            <span class="slash-cmd" x-text="item.cmd"></span>
-                                            <span class="slash-desc" x-text="item.desc"></span>
+                                        <div>
+                                            <!-- Category separator before first skill -->
+                                            <template x-if="item.cat === 'skill' && (idx === 0 || slashMenu.items[idx-1]?.cat !== 'skill')">
+                                                <div class="flex items-center gap-2 px-3 py-1 border-t border-[var(--v-dim)]" style="margin-top:2px">
+                                                    <span style="font-size:0.4375rem;letter-spacing:0.2em;color:var(--cyan)">CLAUDE_CODE_SKILLS</span>
+                                                    <span style="font-size:0.4375rem;color:var(--v3)">— отправляются агенту</span>
+                                                </div>
+                                            </template>
+                                            <div class="slash-menu-item"
+                                                 :class="idx === slashMenu.selected && 'selected'"
+                                                 @mousedown.prevent="selectSlashCommand(item)">
+                                                <span class="slash-cmd" x-text="item.cmd"
+                                                      :style="item.cat === 'skill' ? 'color:var(--cyan)' : ''"></span>
+                                                <span class="slash-desc" x-text="item.desc"></span>
+                                                <span x-show="item.cat === 'skill'"
+                                                      style="font-size:0.4375rem;color:var(--v3);letter-spacing:0.1em;margin-left:auto;white-space:nowrap;flex-shrink:0">SKILL</span>
+                                            </div>
                                         </div>
                                     </template>
                                 </div>

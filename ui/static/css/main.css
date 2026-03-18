@@ -476,15 +476,13 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .slash-menu {
     background: var(--bg2);
     border: 1px solid var(--v-dim);
-    max-height: 200px;
-    overflow-y: auto;
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
 }
 .slash-menu-item {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 5px 10px;
+    padding: 4px 10px;
     cursor: pointer;
     transition: background 0.1s;
     font-size: 0.75rem;
@@ -492,16 +490,19 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .slash-menu-item:hover, .slash-menu-item.selected {
     background: rgba(180,74,255,0.1);
 }
+.slash-menu-item.selected {
+    background: rgba(180,74,255,0.15);
+}
 .slash-menu-item .slash-cmd {
     color: var(--v);
     font-family: var(--code-font, monospace);
     font-size: 0.6875rem;
-    min-width: 70px;
+    min-width: 120px;
     flex-shrink: 0;
 }
 .slash-menu-item .slash-desc {
     color: var(--v3);
-    font-size: 0.6875rem;
+    font-size: 0.625rem;
 }
 
 /* === THEME PREVIEW CARDS === */

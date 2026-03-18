@@ -296,10 +296,17 @@ window.AppChat = (function() {
             const text = (tab.input_text || '');
             if (text.startsWith('/')) {
                 const query = text.slice(1).toLowerCase().split(' ')[0];
-                if (query.length < 15) {
-                    this.slashMenu.items = this.slashCommands.filter(c =>
-                        c.cmd.slice(1).startsWith(query) || c.desc.toLowerCase().includes(query)
+                if (query.length < 25) {
+                    // Sort: local commands first, then skills
+                    const local = this.slashCommands.filter(c =>
+                        (c.cat !== 'skill') &&
+                        (c.cmd.slice(1).startsWith(query) || c.desc.toLowerCase().includes(query))
                     );
+                    const skills = this.slashCommands.filter(c =>
+                        (c.cat === 'skill') &&
+                        (c.cmd.slice(1).startsWith(query) || c.desc.toLowerCase().includes(query))
+                    );
+                    this.slashMenu.items = [...local, ...skills];
                     this.slashMenu.selected = 0;
                     this.slashMenu.show = this.slashMenu.items.length > 0;
                     this.slashMenu._tabId = tab.tab_id;
@@ -326,8 +333,15 @@ window.AppChat = (function() {
             if (!cmd) return;
             const tab = this.activeTab;
             if (!tab) return;
-            tab.input_text = '';
             this.slashMenu.show = false;
+            // Skill commands: insert into input and send to agent
+            if (cmd.cat === 'skill') {
+                tab.input_text = cmd.cmd;
+                this.$nextTick(() => { this.sendChatMessage(tab); });
+                return;
+            }
+            // Local commands
+            tab.input_text = '';
             switch (cmd.action) {
                 case 'clear': this.clearActiveChat(); break;
                 case 'export': this.exportActiveChat(); break;
@@ -339,8 +353,10 @@ window.AppChat = (function() {
                     this.showToast('CHAT DENSITY: ' + this.settings.chatDensity.toUpperCase());
                     break;
                 case 'help': {
-                    const helpMsg = this.slashCommands.map(c => '`' + c.cmd + '` — ' + c.desc).join('\n');
-                    tab.messages.push({ role: 'assistant', content: '**Доступные команды:**\n\n' + helpMsg + '\n\n_Перетащите файл в поле ввода для вставки содержимого_', ts: Date.now() });
+                    const locals = this.slashCommands.filter(c => c.cat !== 'skill').map(c => '`' + c.cmd + '` — ' + c.desc).join('\n');
+                    const skills = this.slashCommands.filter(c => c.cat === 'skill').map(c => '`' + c.cmd + '` — ' + c.desc).join('\n');
+                    const helpMsg = '**Локальные команды:**\n\n' + locals + '\n\n**Claude Code скиллы:**\n\n' + skills + '\n\n_Выберите скилл из списка или введите / для autocomplete_';
+                    tab.messages.push({ role: 'assistant', content: helpMsg, ts: Date.now() });
                     this.chatTick++;
                     break;
                 }
