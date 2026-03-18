@@ -441,14 +441,14 @@ window.AppChat = (function() {
                         const thinkId = 'think-' + tab.tab_id + '-' + i;
                         thinkingHtml = '<div class="thinking-block" style="margin-bottom:4px">'
                             + '<div class="thinking-toggle" onclick="var b=document.getElementById(\'' + thinkId + '\');var a=this.querySelector(\'[data-tarrow]\');if(b.style.display===\'none\'){b.style.display=\'block\';a.textContent=\'\\u25BC\';this.classList.add(\'open\');}else{b.style.display=\'none\';a.textContent=\'\\u25B6\';this.classList.remove(\'open\');}" '
-                            + 'style="display:flex;align-items:center;gap:6px;padding:3px 8px;cursor:pointer;border:1px solid var(--v-dim);background:rgba(180,74,255,0.04);user-select:none;font-size:0.625rem;letter-spacing:0.1em;color:var(--v3);transition:background 0.15s" '
-                            + 'onmouseenter="this.style.background=\'rgba(180,74,255,0.08)\'" onmouseleave="this.style.background=\'rgba(180,74,255,0.04)\'">'
+                            + 'style="display:flex;align-items:center;gap:6px;padding:3px 8px;cursor:pointer;border:1px solid var(--v-dim);background:var(--thinking-bg);user-select:none;font-size:0.625rem;letter-spacing:0.1em;color:var(--v3);transition:background 0.15s" '
+                            + 'onmouseenter="this.style.background=\'var(--thinking-bg-hover)\'" onmouseleave="this.style.background=\'var(--thinking-bg)\'">'
                             + '<span data-tarrow style="font-size:0.4375rem;min-width:8px;color:var(--v3)">' + (showThinking ? '&#x25BC;' : '&#x25B6;') + '</span>'
                             + '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--amber);flex-shrink:0"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5.1 7.5l.9-1.8A6 6 0 0 1 6 10a6 6 0 1 1 12 0c0 1.5-.5 2.8-1.4 3.9l-1.4-1.4c.6-.7.8-1.5.8-2.5 0-2.2-1.8-4-4-4S8 7.8 8 10s1.8 4 4 4c.7 0 1.3-.2 1.9-.5l1.2 1.5A5.8 5.8 0 0 1 12 16a6 6 0 0 1-6-6 8 8 0 0 0 6 8z"/></svg>'
                             + '<span style="color:var(--amber);font-weight:bold;letter-spacing:0.12em">THINKING</span>'
                             + '<span style="color:var(--v3);opacity:0.6;font-size:0.5625rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50ch">' + escapedPreview + '</span>'
                             + '</div>'
-                            + '<div id="' + thinkId + '" style="display:' + (showThinking ? 'block' : 'none') + ';border:1px solid var(--v-dim);border-top:none;background:rgba(12,11,20,0.4);padding:6px 10px;font-size:0.75rem;color:var(--ng3);line-height:1.6;font-style:italic;max-height:200px;overflow-y:auto">'
+                            + '<div id="' + thinkId + '" style="display:' + (showThinking ? 'block' : 'none') + ';border:1px solid var(--v-dim);border-top:none;background:var(--thinking-content-bg);padding:6px 10px;font-size:0.75rem;color:var(--ng3);line-height:1.6;font-style:italic;max-height:200px;overflow-y:auto">'
                             + escapedFull
                             + '</div></div>';
                     }
@@ -521,14 +521,14 @@ window.AppChat = (function() {
                         : '<span style="font-size:0.5625rem;color:var(--ng3);letter-spacing:0.08em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50ch" title="' + this.escHtml(summaryText) + '">' + this.escHtml(summaryText) + '</span>';
                     html += '<div class="chat-msg-row" style="padding:2px 0"><div class="chat-avatar chat-avatar-tool">' + avatarTool + '</div><div style="flex:1;min-width:0">'
                         + '<div onclick="var d=this.nextElementSibling,a=this.querySelector(\'[data-arrow]\');if(d.style.display===\'none\'){d.style.display=\'block\';a.textContent=\'\\u25BC\';}else{d.style.display=\'none\';a.textContent=\'\\u25B6\';}" '
-                        + 'style="display:flex;align-items:center;gap:6px;padding:4px 6px;cursor:pointer;border:1px solid var(--v-dim);background:rgba(180,74,255,0.03);user-select:none" '
+                        + 'style="display:flex;align-items:center;gap:6px;padding:4px 6px;cursor:pointer;border:1px solid var(--v-dim);background:var(--tool-header-bg);user-select:none" '
                         + 'onmouseenter="this.style.borderColor=\'var(--v2)\'" onmouseleave="this.style.borderColor=\'var(--v-dim)\'">'
                         + '<span data-arrow style="font-size:0.5rem;color:var(--v3);min-width:10px">' + arrowChar + '</span>'
                         + '<span style="font-size:0.625rem">' + typeIcons + '</span>'
                         + '<span style="font-size:0.5625rem;color:var(--v);letter-spacing:0.12em;font-weight:bold">' + countLabel + '</span>'
                         + headerTarget
                         + '</div>'
-                        + '<div style="display:' + detailDisplay + ';border:1px solid var(--v-dim);border-top:none;background:rgba(12,11,20,0.5);padding:4px 6px">'
+                        + '<div style="display:' + detailDisplay + ';border:1px solid var(--v-dim);border-top:none;background:var(--tool-detail-bg);padding:4px 6px">'
                         + detailHtml
                         + '</div></div></div>';
                 } else {
@@ -546,13 +546,13 @@ window.AppChat = (function() {
                     if (thinkingBuf.trim()) {
                         const thinkPreview = thinkingBuf.length > 200 ? thinkingBuf.slice(-200) : thinkingBuf;
                         thinkingIndicatorHtml = '<div class="thinking-block" style="margin-bottom:4px">'
-                            + '<div style="display:flex;align-items:center;gap:6px;padding:3px 8px;border:1px solid var(--v-dim);background:rgba(180,74,255,0.04);font-size:0.625rem;letter-spacing:0.1em;color:var(--v3)">'
+                            + '<div style="display:flex;align-items:center;gap:6px;padding:3px 8px;border:1px solid var(--v-dim);background:var(--thinking-bg);font-size:0.625rem;letter-spacing:0.1em;color:var(--v3)">'
                             + '<span class="thinking-spinner" style="width:10px;height:10px"></span>'
                             + '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--amber);flex-shrink:0"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5.1 7.5l.9-1.8A6 6 0 0 1 6 10a6 6 0 1 1 12 0c0 1.5-.5 2.8-1.4 3.9l-1.4-1.4c.6-.7.8-1.5.8-2.5 0-2.2-1.8-4-4-4S8 7.8 8 10s1.8 4 4 4c.7 0 1.3-.2 1.9-.5l1.2 1.5A5.8 5.8 0 0 1 12 16a6 6 0 0 1-6-6 8 8 0 0 0 6 8z"/></svg>'
                             + '<span style="color:var(--amber);font-weight:bold;letter-spacing:0.12em">THINKING</span>'
                             + '<span style="color:var(--v3);opacity:0.6;font-size:0.5625rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + this.escHtml(thinkPreview.slice(-80)) + '</span>'
                             + '</div>'
-                            + (showThinking ? '<div style="border:1px solid var(--v-dim);border-top:none;background:rgba(12,11,20,0.4);padding:6px 10px;font-size:0.75rem;color:var(--ng3);line-height:1.6;font-style:italic;max-height:200px;overflow-y:auto">' + this.escHtml(thinkPreview).replace(/\n/g, '<br>') + '</div>' : '')
+                            + (showThinking ? '<div style="border:1px solid var(--v-dim);border-top:none;background:var(--thinking-content-bg);padding:6px 10px;font-size:0.75rem;color:var(--ng3);line-height:1.6;font-style:italic;max-height:200px;overflow-y:auto">' + this.escHtml(thinkPreview).replace(/\n/g, '<br>') + '</div>' : '')
                             + '</div>';
                     }
                     html += '<div class="chat-msg-fadein chat-msg-row">'

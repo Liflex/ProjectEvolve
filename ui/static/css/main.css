@@ -50,6 +50,12 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     --yellow:#ffe033;       /* warm yellow */
     --red:   #ff3366;       /* soft red */
     --amber: #ffaa00;
+    /* Theme-aware agent output */
+    --thinking-bg: rgba(180,74,255,0.04);
+    --thinking-bg-hover: rgba(180,74,255,0.08);
+    --thinking-content-bg: rgba(12,11,20,0.4);
+    --tool-header-bg: rgba(180,74,255,0.03);
+    --tool-detail-bg: rgba(12,11,20,0.5);
 }
 
 /* === NAV === */
@@ -156,10 +162,10 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     transition: background 0.15s;
 }
 .thinking-toggle.open {
-    background: rgba(180,74,255,0.06) !important;
+    background: var(--thinking-bg-hover) !important;
 }
 .thinking-toggle:hover {
-    background: rgba(180,74,255,0.08) !important;
+    background: var(--thinking-bg-hover) !important;
 }
 
 /* === IDE STATUS BAR === */

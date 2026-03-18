@@ -39,6 +39,9 @@ window.AppThemes = (function() {
                 '--tok-kw': '#b44aff', '--tok-str': '#39ff14', '--tok-cmt': '#6b3a8f',
                 '--tok-fn': '#00e5ff', '--tok-num': '#ff00aa',
                 '--code-bg': 'rgba(8,7,16,0.95)', '--code-header-bg': 'rgba(24,21,40,0.9)', '--code-lang-color': '#b44aff',
+                '--thinking-bg': 'rgba(180,74,255,0.04)', '--thinking-bg-hover': 'rgba(180,74,255,0.08)',
+                '--thinking-content-bg': 'rgba(12,11,20,0.4)',
+                '--tool-header-bg': 'rgba(180,74,255,0.03)', '--tool-detail-bg': 'rgba(12,11,20,0.5)',
             },
             darcula: {
                 '--ng': '#a9b7c6', '--ng2': '#a9b7c6', '--ng3': '#606366', '--ng-dim': '#3c3f41',
@@ -55,6 +58,9 @@ window.AppThemes = (function() {
                 '--tok-kw': '#cc7832', '--tok-str': '#6a8759', '--tok-cmt': '#808080',
                 '--tok-fn': '#ffc66d', '--tok-num': '#6897bb',
                 '--code-bg': 'rgba(30,30,30,0.98)', '--code-header-bg': 'rgba(49,49,49,0.95)', '--code-lang-color': '#a9b7c6',
+                '--thinking-bg': 'rgba(152,118,170,0.06)', '--thinking-bg-hover': 'rgba(152,118,170,0.1)',
+                '--thinking-content-bg': 'rgba(30,30,30,0.5)',
+                '--tool-header-bg': 'rgba(152,118,170,0.04)', '--tool-detail-bg': 'rgba(30,30,30,0.6)',
             },
             'one-dark': {
                 '--ng': '#abb2bf', '--ng2': '#abb2bf', '--ng3': '#5c6370', '--ng-dim': '#282c34',
@@ -71,6 +77,9 @@ window.AppThemes = (function() {
                 '--tok-kw': '#c678dd', '--tok-str': '#98c379', '--tok-cmt': '#5c6370',
                 '--tok-fn': '#61afef', '--tok-num': '#d19a66',
                 '--code-bg': 'rgba(33,37,43,0.98)', '--code-header-bg': 'rgba(47,52,62,0.95)', '--code-lang-color': '#e5c07b',
+                '--thinking-bg': 'rgba(198,120,221,0.06)', '--thinking-bg-hover': 'rgba(198,120,221,0.1)',
+                '--thinking-content-bg': 'rgba(33,37,43,0.5)',
+                '--tool-header-bg': 'rgba(198,120,221,0.04)', '--tool-detail-bg': 'rgba(33,37,43,0.6)',
             },
             dracula: {
                 '--ng': '#f8f8f2', '--ng2': '#f8f8f2', '--ng3': '#6272a4', '--ng-dim': '#21222c',
@@ -87,6 +96,9 @@ window.AppThemes = (function() {
                 '--tok-kw': '#ff79c6', '--tok-str': '#f1fa8c', '--tok-cmt': '#6272a4',
                 '--tok-fn': '#50fa7b', '--tok-num': '#bd93f9',
                 '--code-bg': 'rgba(33,34,44,0.98)', '--code-header-bg': 'rgba(46,48,63,0.95)', '--code-lang-color': '#bd93f9',
+                '--thinking-bg': 'rgba(189,147,249,0.06)', '--thinking-bg-hover': 'rgba(189,147,249,0.1)',
+                '--thinking-content-bg': 'rgba(33,34,44,0.5)',
+                '--tool-header-bg': 'rgba(189,147,249,0.04)', '--tool-detail-bg': 'rgba(33,34,44,0.6)',
             },
         },
 
