@@ -3,11 +3,15 @@ window._copyCode = function(btn, preId) {
     const pre = document.getElementById(preId);
     if (!pre) return;
     const text = pre.textContent || pre.innerText;
+    const origText = btn.textContent;
     navigator.clipboard.writeText(text).then(() => {
-        btn.textContent = '[COPIED]';
+        btn.innerHTML = '&#x2713; COPIED';
         btn.classList.add('copied');
-        setTimeout(() => { btn.textContent = '[COPY]'; btn.classList.remove('copied'); }, 1500);
-    }).catch(() => {});
+        setTimeout(() => { btn.textContent = origText; btn.classList.remove('copied'); }, 1500);
+    }).catch(() => {
+        btn.innerHTML = '&#x2717; FAIL';
+        setTimeout(() => { btn.textContent = origText; }, 1500);
+    });
 };
 
 function _buildAppData() {

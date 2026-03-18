@@ -148,10 +148,19 @@
                         <span x-show="tab.tokens.input > tab.tokens.threshold * 0.9" class="text-[0.5625rem] text-[var(--red)] blink tracking-wider">HIGH_CTX</span>
                     </div>
                     <!-- Input area -->
-                    <div class="border-t-2 border-[var(--v-dim)] bg-[var(--bg2)] p-3 shrink-0 relative"
+                    <div class="border-t-2 bg-[var(--bg2)] p-3 shrink-0 relative"
+                         :class="tab._editMode ? 'border-t-2 border-[var(--yellow)]' : 'border-t-2 border-[var(--v-dim)]'"
                          @dragover.prevent="chatDragOver = true"
                          @dragleave.prevent="chatDragOver = false"
                          @drop.prevent="handleChatDrop(tab, $event)">
+                        <!-- Edit mode banner -->
+                        <div x-show="tab._editMode" x-transition.duration.150ms
+                             class="edit-mode-banner">
+                            <span class="edit-mode-icon">&#x270f;</span>
+                            <span class="edit-mode-label">EDITING MESSAGE</span>
+                            <span class="edit-mode-hint">— subsequent messages will be discarded. ESC to cancel.</span>
+                            <button @click="cancelEditMode(tab.tab_id)" class="edit-mode-cancel" title="Cancel edit (ESC)">[X] CANCEL</button>
+                        </div>
                         <!-- Drag & Drop overlay -->
                         <div x-show="chatDragOver" x-transition.opacity.duration.150ms
                              class="absolute inset-0 z-20 flex items-center justify-center"
@@ -168,11 +177,12 @@
                                           @input="handleChatInput(tab, $event); autoResizeTextarea($event)"
                                           placeholder="Message_ (/ for commands, drag files here)"
                                           rows="1"
-                                          class="chat-input-area w-full bg-[var(--bg)] border border-[var(--v-dim)] px-3 py-2 text-sm text-[var(--ng2)] tracking-wider resize-none editor"
+                                          class="chat-input-area w-full bg-[var(--bg)] border px-3 py-2 text-sm text-[var(--ng2)] tracking-wider resize-none editor"
+                                          :class="tab._editMode ? 'border-[var(--yellow)]' : 'border-[var(--v-dim)]'"
                                           style="min-height:2.25rem;max-height:200px;overflow-y:hidden"
                                           :disabled="tab.is_streaming"></textarea>
                                 <div class="flex items-center justify-between px-1 mt-0.5">
-                                    <span class="chat-input-hint text-[0.5rem] text-[var(--v3)] tracking-wider">ENTER — send | SHIFT+ENTER — newline</span>
+                                    <span class="chat-input-hint text-[0.5rem] text-[var(--v3)] tracking-wider" x-text="tab._editMode ? 'ENTER — send edited | ESC — cancel' : 'ENTER — send | SHIFT+ENTER — newline'"></span>
                                     <span class="text-[0.5rem] text-[var(--v3)] tabular-nums" x-show="(tab.input_text || '').length > 0" x-text="(tab.input_text || '').length + ' chars'"></span>
                                 </div>
                                 <!-- Slash command menu -->

@@ -105,9 +105,15 @@ window.AppChat = (function() {
                                     tab._catThinking = false;
                                     CatModule.setExpression('neutral');
                                 }
+                                // Remove regenerating placeholder if present
                                 const lastMsg = tab.messages[tab.messages.length - 1];
-                                if (lastMsg && lastMsg.role === 'assistant' && lastMsg.is_streaming) {
-                                    lastMsg.content += text;
+                                if (lastMsg && lastMsg.is_regenerating) {
+                                    tab.messages.pop();
+                                    tab._editMode = null;
+                                }
+                                const newLast = tab.messages[tab.messages.length - 1];
+                                if (newLast && newLast.role === 'assistant' && newLast.is_streaming) {
+                                    newLast.content += text;
                                 } else {
                                     const thinkingContent = tab._thinkingBuffer || '';
                                     tab.messages.push({ role: 'assistant', content: text, thinking: thinkingContent || undefined, is_streaming: true, ts: Date.now() });
@@ -146,10 +152,16 @@ window.AppChat = (function() {
                             console.log('[ws] assistant extracted text:', JSON.stringify(text).slice(0, 200), 'len:', text.length, 'msgs before:', tab.messages.length);
                             if (text) {
                                 tab.is_thinking = false;
+                                // Remove regenerating placeholder if present
                                 const lastMsg = tab.messages[tab.messages.length - 1];
-                                if (lastMsg && lastMsg.role === 'assistant' && lastMsg.is_streaming) {
-                                    lastMsg.content += text;
-                                    if (thinkingText) lastMsg.thinking = (lastMsg.thinking ? lastMsg.thinking + '\n---\n' : '') + thinkingText;
+                                if (lastMsg && lastMsg.is_regenerating) {
+                                    tab.messages.pop();
+                                    tab._editMode = null;
+                                }
+                                const realLast = tab.messages[tab.messages.length - 1];
+                                if (realLast && realLast.role === 'assistant' && realLast.is_streaming) {
+                                    realLast.content += text;
+                                    if (thinkingText) realLast.thinking = (realLast.thinking ? realLast.thinking + '\n---\n' : '') + thinkingText;
                                 } else {
                                     tab.messages.push({ role: 'assistant', content: text, thinking: thinkingText || undefined, is_streaming: true, ts: Date.now() });
                                 }
@@ -226,6 +238,12 @@ window.AppChat = (function() {
                         }
                         _app.chatTick++;
                     } else if (msg.type === 'error') {
+                        // Remove regenerating placeholder on error
+                        const errLast = tab.messages[tab.messages.length - 1];
+                        if (errLast && errLast.is_regenerating) {
+                            tab.messages.pop();
+                            tab._editMode = null;
+                        }
                         tab.messages.push({ role: 'assistant', content: '[ERROR] ' + (msg.message || 'Unknown error'), ts: Date.now() });
                         tab.is_streaming = false;
                         if (window.CatModule && CatModule.isActive()) {
@@ -262,6 +280,7 @@ window.AppChat = (function() {
             if (!tab.input_text?.trim() || tab.is_streaming) return;
             const content = tab.input_text.trim();
             tab.input_text = '';
+            tab._editMode = null; // clear edit mode on send
             this.resizeInputForTab(tab);
             tab.scrolledUp = false;
             tab.messages.push({ role: 'user', content: content, id: 'msg-' + Date.now(), ts: Date.now() });
@@ -358,6 +377,12 @@ window.AppChat = (function() {
                 if (e.key === 'ArrowUp') { e.preventDefault(); this.slashMenu.selected = Math.max(this.slashMenu.selected - 1, 0); return; }
                 if (e.key === 'Tab' || e.key === 'Enter') { e.preventDefault(); this.selectSlashCommand(this.slashMenu.items[this.slashMenu.selected]); return; }
                 if (e.key === 'Escape') { e.preventDefault(); this.slashMenu.show = false; return; }
+            }
+            // ESC cancels edit mode
+            if (e.key === 'Escape' && tab._editMode) {
+                e.preventDefault();
+                this.cancelEditMode(tab.tab_id);
+                return;
             }
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -487,6 +512,19 @@ window.AppChat = (function() {
                         + '</div></div></div>';
                     i++;
                 } else if (msg.role === 'assistant') {
+                    // Regenerating placeholder — special rendering
+                    if (msg.is_regenerating) {
+                        html += '<div class="msg-wrap chat-msg-fadein chat-msg-row">'
+                            + '<div class="chat-avatar chat-avatar-asst">' + avatarAsst + '</div>'
+                            + '<div class="chat-body">'
+                            + '<div class="chat-role chat-role-assistant">CLAUDE_</div>'
+                            + '<div class="chat-bubble-asst msg-regenerating" style="padding:var(--chat-msg-padding,8px 12px)">'
+                            + '<span style="margin-right:6px">&#x21bb;</span> Regenerating response...'
+                            + '<span class="streaming-cursor"></span>'
+                            + '</div></div></div>';
+                        i++;
+                        continue;
+                    }
                     const cursorHtml = msg.is_streaming ? '<span class="streaming-cursor"></span>' : '';
                     const contentHtml = msg.is_streaming
                         ? '<div class="md">' + this.linkFilePaths(this.renderMarkdown(msg.content)) + cursorHtml + '</div>'
@@ -836,6 +874,12 @@ window.AppChat = (function() {
             const msg = tab.messages[msgIdx];
             if (!msg || msg.role !== 'user') return;
             const content = msg.content || '';
+            // Save original messages for cancel
+            tab._editMode = {
+                msgIdx: msgIdx,
+                originalMessages: tab.messages.slice(),
+                originalContent: content,
+            };
             tab.messages = tab.messages.slice(0, msgIdx);
             tab.input_text = content;
             this.chatTick++;
@@ -845,6 +889,22 @@ window.AppChat = (function() {
                 this.resizeInputForTab(tab);
             });
         },
+
+        cancelEditMode(tabId) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab || !tab._editMode) return;
+            // Restore original messages
+            tab.messages = tab._editMode.originalMessages;
+            tab.input_text = '';
+            tab._editMode = null;
+            this.chatTick++;
+            this.$nextTick(() => this.resizeInputForTab(tab));
+        },
+
+        isInEditMode(tabId) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            return tab && !!tab._editMode;
+        },
         regenerateResponse(tabId) {
             const tab = this.chatTabs.find(t => t.tab_id === tabId);
             if (!tab || tab.is_streaming) return;
@@ -852,14 +912,33 @@ window.AppChat = (function() {
             for (let j = tab.messages.length - 1; j >= 0; j--) {
                 if (tab.messages[j].role === 'user') { lastUserIdx = j; break; }
             }
-            if (lastUserIdx === -1) return;
+            if (lastUserIdx === -1) {
+                this.showToast('No user message to regenerate from', 'error');
+                return;
+            }
+            // Save for undo
+            tab._editMode = {
+                msgIdx: lastUserIdx,
+                originalMessages: tab.messages.slice(),
+                originalContent: tab.messages[lastUserIdx].content,
+            };
             tab.messages = tab.messages.slice(0, lastUserIdx + 1);
+            // Show regenerating indicator
+            tab.messages.push({ role: 'assistant', content: '_Regenerating..._', ts: Date.now(), is_regenerating: true });
+            tab.is_streaming = true;
             this.chatTick++;
             const ws = this.chatWs[tabId];
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'message', content: tab.messages[lastUserIdx].content }));
+                this.showToast('Regenerating response...', 'success');
+            } else {
+                // Remove regenerating indicator and restore
+                tab.messages = tab._editMode.originalMessages;
+                tab._editMode = null;
+                tab.is_streaming = false;
+                this.chatTick++;
+                this.showToast('Cannot regenerate: session not connected', 'error');
             }
-            this.showToast('Regenerating response...');
         },
         deleteChatMsg(tabId, msgIdx) {
             const tab = this.chatTabs.find(t => t.tab_id === tabId);

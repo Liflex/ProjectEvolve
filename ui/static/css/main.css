@@ -124,8 +124,8 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
 .md .code-block .code-header { display: flex; align-items: center; justify-content: space-between; padding: 4px 10px; background: var(--code-header-bg, rgba(180,74,255,0.06)); border-bottom: 1px solid var(--v-dim); }
 .md .code-block .code-lang { font-size: 0.5625rem; letter-spacing: 0.15em; color: var(--code-lang-color, var(--v3)); text-transform: uppercase; }
 .md .code-block .code-copy { font-size: 0.5625rem; letter-spacing: 0.1em; color: var(--v3); cursor: pointer; padding: 2px 6px; border: 1px solid transparent; transition: all 0.15s; }
-.md .code-block .code-copy:hover { color: var(--v); border-color: var(--v-dim); }
-.md .code-block .code-copy.copied { color: var(--ng); }
+.md .code-block .code-copy:hover { color: var(--v); border-color: var(--v-dim); background: rgba(180,74,255,0.05); }
+.md .code-block .code-copy.copied { color: var(--ng); border-color: rgba(0,229,102,0.3); background: rgba(0,229,102,0.05); }
 .md .code-block pre { margin: 0; border: none; padding: 0.75rem 0.75rem 0.75rem 0; overflow-x: auto; background: var(--code-bg, transparent); counter-reset: line-num; }
 .md .code-block pre code { background: none; padding: 0; color: var(--ng2); display: block; border: none; }
 .md .code-block .code-line { display: block; padding-left: 3.2em; position: relative; min-height: 1.25em; }
@@ -441,6 +441,51 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .msg-actions button.act-fold:hover { color: var(--amber); border-color: rgba(255,170,0,0.3); }
 .msg-actions button.act-del:hover { color: var(--red); border-color: rgba(255,51,102,0.3); }
 
+/* === CHAT EDIT MODE BANNER === */
+.edit-mode-banner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    margin-bottom: 6px;
+    background: rgba(255, 224, 51, 0.06);
+    border: 1px solid rgba(255, 224, 51, 0.25);
+    border-radius: 2px;
+    animation: editBannerPulse 2s ease-in-out infinite;
+}
+@keyframes editBannerPulse {
+    0%, 100% { border-color: rgba(255, 224, 51, 0.25); }
+    50% { border-color: rgba(255, 224, 51, 0.5); }
+}
+.edit-mode-icon { font-size: 0.75rem; }
+.edit-mode-label {
+    font-size: 0.5625rem;
+    color: var(--yellow);
+    letter-spacing: 0.15em;
+    font-weight: bold;
+}
+.edit-mode-hint {
+    font-size: 0.5rem;
+    color: var(--v3);
+    letter-spacing: 0.05em;
+}
+.edit-mode-cancel {
+    margin-left: auto;
+    font-size: 0.5rem;
+    color: var(--v3);
+    background: none;
+    border: 1px solid var(--v-dim);
+    padding: 1px 6px;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    transition: all 0.12s;
+}
+.edit-mode-cancel:hover {
+    color: var(--red);
+    border-color: var(--red);
+    background: rgba(255, 51, 102, 0.05);
+}
+
 /* === CHAT MESSAGE COLLAPSE === */
 .chat-collapsed-preview {
     position: relative;
@@ -574,6 +619,18 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 @keyframes cursor-blink {
     0%, 49% { opacity: 1; }
     50%, 100% { opacity: 0; }
+}
+
+/* === REGENERATING INDICATOR === */
+.msg-regenerating {
+    color: var(--v3);
+    font-style: italic;
+    letter-spacing: 0.1em;
+    animation: regenPulse 1.2s ease-in-out infinite;
+}
+@keyframes regenPulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
 }
 
 /* === TYPING INDICATOR (thinking bubble) === */
