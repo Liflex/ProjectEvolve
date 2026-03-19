@@ -119,14 +119,6 @@
                 <template x-if="!settings.compactSidebar"><span>RUN EXPERIMENT</span></template>
                 <span class="w-2 h-2" :class="runStatus.running ? 'bg-[var(--v)] pulse' : 'bg-[var(--v3)]'"></span>
             </button>
-            <div class="my-2 mx-4 border-t border-[var(--v-dim)]" x-show="!settings.compactSidebar"></div>
-            <button @click="navigate('settings')" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
-                    :class="[settings.compactSidebar ? 'justify-center px-2 sidebar-tooltip' : '', page === 'settings' && 'active']"
-                    data-tip="SETTINGS (Alt+9)">
-                <span class="text-xs">[>]</span>
-                <template x-if="!settings.compactSidebar"><span>SETTINGS</span></template>
-                <template x-if="!settings.compactSidebar"><span class="ml-auto text-[0.5625rem] text-[var(--v-dim)] font-mono">Alt+9</span></template>
-            </button>
         </nav>
 
         <!-- Chat sidebar content (shown in Chat section) -->
@@ -134,6 +126,17 @@
             <div class="text-[0.5625rem] tracking-widest text-[var(--v3)] mb-2" x-show="!settings.compactSidebar">ACTIVE_SESSIONS</div>
             <div class="text-2xl text-[var(--v)] glow-sm" style="font-family:'Press Start 2P',monospace" x-text="String(chatTabs.length).padStart(2,'0')"></div>
             <div class="text-[0.5625rem] text-[var(--v3)] mt-1" x-show="!settings.compactSidebar">/ 5 LIMIT</div>
+        </div>
+
+        <!-- Global Settings (always visible, bottom of sidebar) -->
+        <div class="border-t-2 border-[var(--v-dim)]">
+            <button @click="navigateSection('lab'); $nextTick(() => navigate('settings'))" class="nav-link w-full flex items-center gap-2.5 px-4 py-2 text-sm tracking-wider text-[var(--ng3)]"
+                    :class="[settings.compactSidebar ? 'justify-center px-2 sidebar-tooltip' : '', page === 'settings' && section === 'lab' && 'active']"
+                    data-tip="SETTINGS (Alt+9)">
+                <span class="text-xs">[>]</span>
+                <template x-if="!settings.compactSidebar"><span>SETTINGS</span></template>
+                <template x-if="!settings.compactSidebar"><span class="ml-auto text-[0.5625rem] text-[var(--v-dim)] font-mono">Alt+9</span></template>
+            </button>
         </div>
 
         <!-- Footer -->
