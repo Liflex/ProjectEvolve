@@ -1,4 +1,25 @@
 
+## Experiment 124 — Chat — enhanced sidebar content for chat mode
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **Chat sidebar content** — replaced bare "ACTIVE_SESSIONS / 5 LIMIT" with rich sidebar:
+   - **Aggregate stats grid**: sessions (x/5), total messages, token usage, total cost
+   - **Session cards**: clickable list with status dot, label, message count, last message preview
+   - **Quick actions**: + NEW TAB, RESUME, CLOSE ALL
+2. **Compact mode support** — compact sidebar shows only session count
+3. **`getLastMsgPreview(tab)`** helper — returns "[ROLE] preview..." truncated to 60 chars
+
+### Files Modified
+
+- `ui/static/templates/sidebar.js` — enhanced chat sidebar section
+- `ui/static/js/modules/chat.js` — added `getLastMsgPreview()` helper
+- `ui/static/css/main.css` — added `.csb-*` styles
+
+---
+
 ## Experiment 118 — Chat — fix broken SEND button + notification sound on agent done
 
 **Date:** 2026-03-20
@@ -4978,6 +4999,35 @@ Results
 3. **Per-expression positions** — EYE_GLINT конфиг с центрами глаз для neutral, surprised, angry, thinking
 4. **Blink/sleep suppression** — glint скрыт во время моргания и при idle level 2+ (сон)
 5. **No glint на happy/sleepy** — глаза-линии или закрытые, gl
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 123 — Chat — Ctrl+G Go to Message + enhanced j/k navigation
+
+**Date:** 2026-03-20 02:53:44
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- Target:** chat.js, chat-section.js, app.js, main.css
+- Files Modified:** `ui/static/js/app.js`, `ui/static/js/modules/chat.js`, `ui/static/templates/chat-section.js`, `ui/static/css/main.css`
+
+### Results
+
+Results
+
+**What was done:**
+1. **Ctrl+G Go to Message** — IDE-style диалог для перехода к сообщению по номеру. Поддерживает абсолютные номера (`42`), относительные вперёд (`+5`) и назад (`-3`). Невалидные номера показывают toast с допустимым диапазоном.
+2. **`g` key в nav mode** — нажатие `g` в режиме j/k навигации открывает Go to Message диалог.
+3. **`n`/`m` для прыжка по типу** — в режиме навигации `n` прыгает к следующему user-сообщению, `m` — к следующему assistant-сообщению.
+4. **Cyan pulse
 
 ### Notes for Next
 
