@@ -32,12 +32,28 @@ window.AppUtils = (function() {
         relativeTime(ts) {
             if (!ts) return '';
             const diff = Math.floor((Date.now() - ts) / 1000);
-            if (diff < 10) return 'только что';
-            if (diff < 60) return diff + ' сек назад';
-            if (diff < 3600) { const m = Math.floor(diff / 60); return m + ' мин назад'; }
-            if (diff < 86400) { const h = Math.floor(diff / 3600); return h + ' ч назад'; }
+            if (diff < 10) return 'сейчас';
+            if (diff < 60) return diff + 'с';
+            if (diff < 3600) { const m = Math.floor(diff / 60); return m + 'м'; }
+            if (diff < 86400) { const h = Math.floor(diff / 3600); const m = Math.floor((diff % 3600) / 60); return m > 0 ? h + 'ч ' + m + 'м' : h + 'ч'; }
             const d = new Date(ts);
             return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getFullYear()).slice(2);
+        },
+
+        dateGroupLabel(ts) {
+            if (!ts) return '';
+            const now = new Date();
+            const d = new Date(ts);
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            const diffDays = Math.floor((today - msgDay) / 86400000);
+            if (diffDays === 0) return 'Сегодня';
+            if (diffDays === 1) return 'Вчера';
+            const months = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+            const day = d.getDate();
+            const month = months[d.getMonth()];
+            const year = d.getFullYear() !== now.getFullYear() ? ' ' + d.getFullYear() : '';
+            return day + ' ' + month + year;
         },
 
         formatFileSize(bytes) {

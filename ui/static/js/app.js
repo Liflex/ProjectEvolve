@@ -279,6 +279,10 @@ function _buildAppData() {
                 if (window.CatModule && CatModule.isActive()) {
                     this.catSpeech = CatModule.getSpeech();
                 }
+                // Refresh chat relative time every 30s
+                if (this._clockTick % 30 === 0 && this.activeChatTab) {
+                    this.chatTick++;
+                }
                 if (this.runStatus.running && this.runStatus.started_at) {
                     const diff = Math.floor((Date.now() - new Date(this.runStatus.started_at).getTime()) / 1000);
                     const m = String(Math.floor(diff / 60)).padStart(2, '0');

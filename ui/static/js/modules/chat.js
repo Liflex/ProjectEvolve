@@ -1093,15 +1093,26 @@ window.AppChat = (function() {
             };
 
             // Main render loop with message grouping
+            let _lastDateGroup = '';
             while (i < msgs.length) {
                 const msg = msgs[i];
                 if (msg.role === 'user') {
                     turnCount++;
+                    // Date group separator — new heading when day changes
+                    const dateLabel = this.dateGroupLabel(msg.ts);
+                    if (dateLabel && dateLabel !== _lastDateGroup) {
+                        _lastDateGroup = dateLabel;
+                        html += '<div class="chat-date-sep"><div class="chat-date-sep-line"></div>'
+                            + '<span class="chat-date-sep-label">' + this.escHtml(dateLabel) + '</span>'
+                            + '<div class="chat-date-sep-line"></div></div>';
+                    }
                     // Turn separator before each user message (except the first turn)
                     if (turnCount > 1) {
+                        const uTimeSep = this.fmtTime(msg.ts);
                         const relTime = this.relativeTime(msg.ts);
                         html += '<div class="chat-turn-sep"><div class="chat-turn-sep-line"></div>'
-                            + '<span class="chat-turn-sep-label">' + relTime + '</span>'
+                            + '<span class="chat-turn-sep-time">' + uTimeSep + '</span>'
+                            + (relTime !== uTimeSep ? '<span class="chat-turn-sep-label">' + relTime + '</span>' : '')
                             + '<div class="chat-turn-sep-line"></div></div>';
                     }
                     const uTime = this.fmtTime(msg.ts);
