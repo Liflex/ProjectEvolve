@@ -58,6 +58,7 @@ window.AppChat = (function() {
                 this.activeChatTab = tab.tab_id;
                 this._setupScrollPreservation(tab);
                 this.connectChatWebSocket(tab);
+                this._scheduleChatSave();
                 this.showToast('SESSION STARTED', 'success');
             } catch (e) {
                 console.error('[chat] createChatTab failed:', e);
@@ -88,6 +89,7 @@ window.AppChat = (function() {
             if (window.destroyTerminal) destroyTerminal(tabId);
             try { await this.api('/api/sessions/' + tab.session_id, { method: 'DELETE' }); } catch (e) { }
             this.chatTabs = this.chatTabs.filter(t => t.tab_id !== tabId);
+            this._scheduleChatSave();
             if (this.activeChatTab === tabId) {
                 this.activeChatTab = this.chatTabs.length > 0 ? this.chatTabs[this.chatTabs.length - 1].tab_id : null;
             }
@@ -327,6 +329,7 @@ window.AppChat = (function() {
                             setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2000);
                         }
                         _app.chatTick++;
+                        _app._scheduleChatSave();
                     } else if (msg.type === 'error') {
                         // Remove regenerating placeholder on error
                         const errLast = tab.messages[tab.messages.length - 1];
@@ -367,7 +370,7 @@ window.AppChat = (function() {
             };
         },
 
-        sendChatMessage(tab) {
+        async sendChatMessage(tab) {
             if ((!tab.input_text?.trim() && (!tab._attachments || tab._attachments.length === 0)) || tab.is_streaming) return;
             let content = tab.input_text.trim();
             // Append attached images as markdown
@@ -405,6 +408,7 @@ window.AppChat = (function() {
             this.chatNavClear();
             tab._msgTokens = null;
             this.chatTick++;
+            this._scheduleChatSave();
             // Cat: analyze user message for contextual skill tips
             if (window.CatModule && CatModule.isActive() && CatModule.analyzeChatContext) {
                 CatModule.analyzeChatContext(content);
@@ -416,6 +420,19 @@ window.AppChat = (function() {
             const ws = this.chatWs[tab.tab_id];
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'message', content: content }));
+            } else if (tab._restored) {
+                // Auto-reconnect restored tab before sending
+                this.showToast('RECONNECTING...', 'info');
+                await this.reconnectTab(tab.tab_id);
+                // Retry send after reconnect
+                const newWs = this.chatWs[tab.tab_id];
+                if (newWs && newWs.readyState === WebSocket.OPEN) {
+                    // Re-send: push the user message again (it was already pushed above)
+                    newWs.send(JSON.stringify({ type: 'message', content: content }));
+                } else {
+                    tab.messages.push({ role: 'assistant', content: '[ERROR] Reconnect failed. Click RECONNECT on tab.', ts: Date.now() });
+                    this.chatTick++;
+                }
             } else {
                 tab.messages.push({ role: 'assistant', content: '[ERROR] Not connected. Session may have ended.', ts: Date.now() });
                 this.chatTick++;
@@ -865,7 +882,7 @@ window.AppChat = (function() {
             const projectName = projectPath.split(/[\\/]/).filter(Boolean).pop() || projectPath;
             const sessionId = this.escHtml(tab?.session_id || '').slice(0, 8);
             const connState = tab?.ws_state || 'connecting';
-            const connColor = connState === 'connected' ? 'var(--ng)' : connState === 'connecting' ? 'var(--amber)' : 'var(--red)';
+            const connColor = connState === 'connected' ? 'var(--ng)' : (connState === 'connecting' || connState === 'restored') ? 'var(--amber)' : 'var(--red)';
             const connLabel = connState.toUpperCase();
 
             // Quick actions
@@ -1695,11 +1712,13 @@ window.AppChat = (function() {
                 this.showToast('PINNED');
             }
             this.chatTick++;
+            this._scheduleChatSave();
         },
         unpinMessage(idx) {
             if (idx >= 0 && idx < this.pinnedMessages.length) {
                 this.pinnedMessages.splice(idx, 1);
                 this.chatTick++;
+                this._scheduleChatSave();
             }
         },
         reactToMessage(tabId, msgIdx, reaction) {
@@ -1718,6 +1737,7 @@ window.AppChat = (function() {
                 this._queueReactionFeedback(tab, msgIdx, reaction, msg.content);
             }
             this.chatTick++;
+            this._scheduleChatSave();
         },
         scrollToPin(pin) {
             // Switch to the correct tab first
@@ -1821,6 +1841,7 @@ window.AppChat = (function() {
             if (!tab) return;
             tab.messages = [];
             this.chatTick++;
+            this._scheduleChatSave();
             this.showToast('CHAT_CLEARED');
         },
         exportActiveChat() {
@@ -2198,6 +2219,161 @@ window.AppChat = (function() {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             this.showToast('Экспорт: ' + filename + ' (' + msgs.length + ' msg)');
+        },
+
+        // ========== CHAT: LOCALSTORAGE PERSISTENCE ==========
+        _CHAT_STORAGE_KEY: 'ar-chat-state',
+        _CHAT_STORAGE_VERSION: 1,
+        _chatPersistTimer: null,
+
+        _scheduleChatSave() {
+            if (this._chatPersistTimer) clearTimeout(this._chatPersistTimer);
+            this._chatPersistTimer = setTimeout(() => { this.saveChatState(); }, 1500);
+        },
+
+        saveChatState() {
+            try {
+                const MAX_MSGS_PER_TAB = 150;
+                const MAX_CONTENT_LEN = 20000;
+                const MAX_TABS = 5;
+                const tabs = this.chatTabs.slice(-MAX_TABS).map(tab => {
+                    // Save messages (skip tool messages, strip thinking, truncate content)
+                    const msgs = tab.messages
+                        .filter(m => m.role !== 'tool')
+                        .slice(-MAX_MSGS_PER_TAB)
+                        .map(m => {
+                            const out = {
+                                role: m.role,
+                                content: (m.content || '').slice(0, MAX_CONTENT_LEN),
+                                ts: m.ts,
+                                reaction: m.reaction || null,
+                                duration: m.duration || null,
+                                msgTokens: m.msgTokens ? { input: m.msgTokens.input, output: m.msgTokens.output, cost: m.msgTokens.cost } : null,
+                            };
+                            return out;
+                        });
+                    return {
+                        tab_id: tab.tab_id,
+                        session_id: tab.session_id,
+                        project_path: tab.project_path,
+                        label: tab.label,
+                        created_at: tab.created_at,
+                        tokens: tab.tokens ? { input: tab.tokens.input || 0, output: tab.tokens.output || 0, cost: tab.tokens.cost || 0 } : null,
+                        messages: msgs,
+                    };
+                });
+                const pinned = this.pinnedMessages.map(p => ({
+                    tabId: p.tabId, msgIdx: p.msgIdx, role: p.role,
+                    preview: (p.preview || '').slice(0, 200), ts: p.ts, content: (p.content || '').slice(0, 5000),
+                }));
+                const data = {
+                    v: this._CHAT_STORAGE_VERSION,
+                    ts: Date.now(),
+                    activeTabId: this.activeChatTab,
+                    tabs: tabs,
+                    pinned: pinned,
+                };
+                localStorage.setItem(this._CHAT_STORAGE_KEY, JSON.stringify(data));
+            } catch (e) {
+                // localStorage full or unavailable — silently ignore
+                if (e.name === 'QuotaExceededError') {
+                    console.warn('[chat] localStorage quota exceeded, clearing old chat state');
+                    try { localStorage.removeItem(this._CHAT_STORAGE_KEY); } catch (_) {}
+                }
+            }
+        },
+
+        restoreChatState() {
+            try {
+                const raw = localStorage.getItem(this._CHAT_STORAGE_KEY);
+                if (!raw) return;
+                const data = JSON.parse(raw);
+                if (!data || data.v !== this._CHAT_STORAGE_VERSION) {
+                    localStorage.removeItem(this._CHAT_STORAGE_KEY);
+                    return;
+                }
+                // Don't restore if older than 24 hours
+                if (Date.now() - data.ts > 24 * 60 * 60 * 1000) {
+                    localStorage.removeItem(this._CHAT_STORAGE_KEY);
+                    return;
+                }
+                if (!data.tabs || data.tabs.length === 0) return;
+                // Restore tabs as "restored" (disconnected, messages visible)
+                for (const saved of data.tabs) {
+                    const tab = {
+                        tab_id: saved.tab_id,
+                        session_id: saved.session_id,
+                        project_path: saved.project_path,
+                        label: saved.label || 'Session',
+                        messages: (saved.messages || []).map(m => ({
+                            ...m,
+                            is_streaming: false,
+                        })),
+                        is_active: false,
+                        is_streaming: false,
+                        is_thinking: false,
+                        ws_state: 'restored',
+                        input_text: '',
+                        scrolledUp: false,
+                        created_at: saved.created_at || new Date().toISOString(),
+                        tokens: saved.tokens || { input: 0, output: 0, cost: 0, threshold: 180000 },
+                        _msgHistory: [],
+                        _msgHistoryIdx: -1,
+                        _msgDraft: '',
+                        _attachments: [],
+                        _pendingFeedback: [],
+                        _unread: 0,
+                        _agentDone: false,
+                        _restored: true,
+                        _restoredSessionId: saved.session_id,
+                    };
+                    this.chatTabs.push(tab);
+                }
+                // Restore pinned messages (adjust tabId references)
+                if (data.pinned) {
+                    const tabIds = new Set(this.chatTabs.map(t => t.tab_id));
+                    this.pinnedMessages = data.pinned.filter(p => tabIds.has(p.tabId));
+                }
+                // Activate last active tab or the first restored one
+                if (data.activeTabId && this.chatTabs.find(t => t.tab_id === data.activeTabId)) {
+                    this.activeChatTab = data.activeTabId;
+                } else if (this.chatTabs.length > 0) {
+                    this.activeChatTab = this.chatTabs[this.chatTabs.length - 1].tab_id;
+                }
+                this.showToast('SESSIONS_RESTORED (' + this.chatTabs.length + ')', 'success');
+                console.log('[chat] restored', this.chatTabs.length, 'tabs from localStorage');
+            } catch (e) {
+                console.error('[chat] restoreChatState failed:', e);
+                localStorage.removeItem(this._CHAT_STORAGE_KEY);
+            }
+        },
+
+        async reconnectTab(tabId) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab || !tab._restored) return;
+            const projectPath = tab.project_path;
+            const resumeId = tab._restoredSessionId || tab.session_id;
+            console.log('[chat] reconnecting tab', tabId, 'path:', projectPath, 'resume:', resumeId);
+            try {
+                const res = await this.api('/api/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cwd: projectPath, resume: resumeId || null }),
+                });
+                if (res.warning) this.showToast(res.warning, 'error');
+                if (!res.session_id) { this.showToast('RECONNECT_FAILED', 'error'); return; }
+                // Update tab with new session info
+                tab.session_id = res.session_id;
+                tab.ws_state = 'connecting';
+                tab._restored = false;
+                tab._restoredSessionId = null;
+                this.connectChatWebSocket(tab);
+                this._scheduleChatSave();
+                this.showToast('SESSION_RECONNECTED', 'success');
+            } catch (e) {
+                console.error('[chat] reconnectTab failed:', e);
+                this.showToast('RECONNECT_FAILED: ' + e.message, 'error');
+            }
         },
     };
 })();

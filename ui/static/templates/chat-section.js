@@ -15,7 +15,7 @@
                                 class="flex items-center gap-2 px-3 py-2 text-xs tracking-wider transition-colors tab-btn"
                                 :class="activeChatTab === tab.tab_id ? 'text-[var(--v)] border-b-2 border-[var(--v)] -mb-[2px]' : 'text-[var(--v3)] hover:text-[var(--ng2)]'"
                                 :title="tab._unread > 0 ? tab._unread + ' new message' + (tab._unread > 1 ? 's' : '') + ' — ' + tab.label : tab.label + ' (' + tab.messages.length + ' messages)'">
-                            <span class="w-1.5 h-1.5 rounded-full" :class="tab.is_streaming ? 'bg-[var(--cyan)] animate-pulse' : tab._agentDone && activeChatTab !== tab.tab_id ? 'tab-dot-done' : tab.ws_state === 'connected' ? 'bg-[var(--ng)]' : tab.ws_state === 'connecting' ? 'bg-[var(--amber)] animate-pulse' : 'bg-[var(--v3)]'"></span>
+                            <span class="w-1.5 h-1.5 rounded-full" :class="tab.is_streaming ? 'bg-[var(--cyan)] animate-pulse' : tab._agentDone && activeChatTab !== tab.tab_id ? 'tab-dot-done' : tab._restored ? 'bg-[var(--amber)]' : tab.ws_state === 'connected' ? 'bg-[var(--ng)]' : tab.ws_state === 'connecting' ? 'bg-[var(--amber)] animate-pulse' : 'bg-[var(--v3)]'"></span>
                             <template x-if="_renamingTabId === tab.tab_id">
                                 <input id="tab-rename-input"
                                        x-model="_renameText"
@@ -36,6 +36,12 @@
                         <button @click="closeChatTab(tab.tab_id)"
                                 x-show="_renamingTabId !== tab.tab_id"
                                 class="text-[var(--v3)] hover:text-[var(--red)] text-xs px-1 mr-1 opacity-0 group-hover:opacity-100 transition-opacity">x</button>
+                        <!-- Restored indicator + reconnect button -->
+                        <template x-if="tab._restored && _renamingTabId !== tab.tab_id">
+                            <button @click.stop="reconnectTab(tab.tab_id)"
+                                    class="tab-reconnect-btn"
+                                    title="Reconnect session (resume from where you left off)">&#x21bb; RECONNECT</button>
+                        </template>
                     </div>
                 </template>
                 <!-- Empty state -->
@@ -162,6 +168,12 @@
         <div class="flex-1 overflow-hidden relative">
             <template x-for="tab in chatTabs" :key="tab.tab_id">
                 <div x-show="activeChatTab === tab.tab_id" class="absolute inset-0 flex flex-col">
+                    <!-- Restored session banner -->
+                    <div x-show="tab._restored" class="chat-restored-banner">
+                        <span>&#x1f504; SESSION_RESTORED — messages from previous session</span>
+                        <button @click="reconnectTab(tab.tab_id)" class="chat-restored-reconnect-btn">&#x21bb; RECONNECT</button>
+                        <button @click="tab._restored = false" class="chat-restored-dismiss-btn" title="Dismiss">&#x2715;</button>
+                    </div>
                     <!-- Messages area -->
                     <div class="flex-1 overflow-y-auto p-4 space-y-3" :id="'chat-messages-' + tab.tab_id"
                          x-html="renderChatHTML(tab)"

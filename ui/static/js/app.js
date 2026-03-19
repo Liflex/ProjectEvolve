@@ -446,6 +446,8 @@ function _buildAppData() {
             if (migrated) localStorage.setItem('ar-settings', JSON.stringify(this.settings));
             this.applySettings();
             window._app = this;
+            // Restore chat sessions from localStorage
+            this.restoreChatState();
             if (this.settings.matrixRain && window.MatrixRain) MatrixRain.init();
             await Promise.all([this.loadStats(), this.loadExperiments()]);
             this._lastExpCount = this.stats.total_experiments || 0;
@@ -482,6 +484,8 @@ function _buildAppData() {
 
             // Keyboard shortcuts
             const LAB_PAGES = ['dashboard', 'experiments', 'changes', 'prompt', 'config', 'run', 'settings'];
+            // Save chat state on page unload
+            window.addEventListener('beforeunload', () => { this.saveChatState(); });
             window.addEventListener('keydown', (e) => {
                 if (e.altKey && e.key === '1') { e.preventDefault(); this.navigateSection('lab'); }
                 if (e.altKey && e.key === '2') { e.preventDefault(); this.navigateSection('chat'); }

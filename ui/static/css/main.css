@@ -2400,3 +2400,67 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     border-top: 1px solid var(--v-dim);
     background: var(--bg3);
 }
+
+/* Chat: Restored session banner */
+.chat-restored-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    background: rgba(255, 191, 0, 0.08);
+    border-bottom: 1px solid rgba(255, 191, 0, 0.2);
+    font-size: 0.625rem;
+    color: var(--amber);
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+}
+.chat-restored-reconnect-btn {
+    padding: 2px 8px;
+    font-size: 0.5625rem;
+    color: var(--cyan);
+    background: rgba(0, 255, 255, 0.08);
+    border: 1px solid rgba(0, 255, 255, 0.25);
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    transition: all 0.15s;
+}
+.chat-restored-reconnect-btn:hover {
+    background: rgba(0, 255, 255, 0.15);
+    border-color: var(--cyan);
+}
+.chat-restored-dismiss-btn {
+    margin-left: auto;
+    color: var(--v3);
+    cursor: pointer;
+    font-size: 0.625rem;
+    padding: 2px 4px;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+}
+.chat-restored-dismiss-btn:hover {
+    opacity: 1;
+    color: var(--ng2);
+}
+/* Chat: Reconnect button on tab */
+.tab-reconnect-btn {
+    font-size: 0.5rem;
+    padding: 1px 6px;
+    color: var(--amber);
+    background: rgba(255, 191, 0, 0.1);
+    border: 1px solid rgba(255, 191, 0, 0.25);
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: 0.08em;
+    transition: all 0.15s;
+    white-space: nowrap;
+    animation: tab-reconnect-pulse 2s ease-in-out infinite;
+}
+.tab-reconnect-btn:hover {
+    background: rgba(255, 191, 0, 0.2);
+    border-color: var(--amber);
+}
+@keyframes tab-reconnect-pulse {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
+}
