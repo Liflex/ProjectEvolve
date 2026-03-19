@@ -361,8 +361,12 @@
                                 </div>
                             </div>
                             <button @click="sendChatMessage(tab)" :disabled="tab.is_streaming || (!tab.input_text?.trim() && (!tab._attachments || tab._attachments.length === 0))"
-                                    class="px-4 py-2 border border-[var(--v)] text-[var(--v)] text-xs tracking-wider hover:bg-[rgba(180,74,255,0.1)] disabled:opacity-30 transition-all shrink-0">
+                                    class="px-4 py-2 border border-[var(--v)] text-[var(--v)] text-xs tracking-wider hover:bg-[rgba(180,74,255,0.1)] disabled:opacity-30 transition-all shrink-0 relative"
+                                    :title="tab._pendingFeedback?.length ? tab._pendingFeedback.length + ' reaction(s) queued — will be sent with next message' : 'Send message'">
                                 [> SEND]
+                                <span x-show="tab._pendingFeedback?.length > 0"
+                                      x-text="tab._pendingFeedback.length"
+                                      class="absolute -top-1.5 -right-1.5 bg-[var(--v)] text-[var(--bg)] rounded-full w-4 h-4 flex items-center justify-center text-[0.6rem] font-bold leading-none"></span>
                             </button>
                             <button @click="triggerFileAttach(tab)" :disabled="tab.is_streaming"
                                     class="px-2 py-2 border border-[var(--v-dim)] text-[var(--v3)] text-xs hover:text-[var(--v)] hover:border-[var(--v2)] disabled:opacity-30 transition-all shrink-0" title="Attach file (or paste / drop)">

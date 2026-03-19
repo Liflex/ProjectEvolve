@@ -50,6 +50,7 @@ window.AppChat = (function() {
                     _msgHistoryIdx: -1,
                     _msgDraft: '',
                     _attachments: [],
+                    _pendingFeedback: [],  // queued reaction feedback: [{msgIdx, reaction, snippet}]
                     _unread: 0,
                     _agentDone: false,
                 };
@@ -377,16 +378,21 @@ window.AppChat = (function() {
                 tab._attachments = [];
             }
             if (!content) return;
+            // Push to message history BEFORE adding prefixes (shell-style Up/Down navigation)
+            if (tab._msgHistory.length === 0 || tab._msgHistory[tab._msgHistory.length - 1] !== content) {
+                tab._msgHistory.push(content);
+                if (tab._msgHistory.length > 100) tab._msgHistory.shift();
+            }
+            // Prepend queued reaction feedback (invisible to user, sent to agent)
+            const feedbackPrefix = this._buildFeedbackPrefix(tab);
+            if (feedbackPrefix) {
+                content = feedbackPrefix + content;
+            }
             // Prepend quoted message if present
             if (tab._quotedMsg) {
                 const quotePrefix = '> [' + tab._quotedMsg.role + ']: ' + tab._quotedMsg.text.split('\n').join('\n> ') + '\n\n';
                 content = quotePrefix + content;
                 tab._quotedMsg = null;
-            }
-            // Push to message history (shell-style Up/Down navigation)
-            if (tab._msgHistory.length === 0 || tab._msgHistory[tab._msgHistory.length - 1] !== content) {
-                tab._msgHistory.push(content);
-                if (tab._msgHistory.length > 100) tab._msgHistory.shift();
             }
             tab._msgHistoryIdx = -1;
             tab._msgDraft = '';
@@ -1569,7 +1575,8 @@ window.AppChat = (function() {
             this.chatTick++;
             const ws = this.chatWs[tabId];
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'message', content: tab.messages[lastUserIdx].content }));
+                const regenContent = this._buildFeedbackPrefix(tab) + tab.messages[lastUserIdx].content;
+                ws.send(JSON.stringify({ type: 'message', content: regenContent }));
                 this.showToast('Regenerating response...', 'success');
             } else {
                 // Remove regenerating indicator and restore
@@ -1614,7 +1621,15 @@ window.AppChat = (function() {
             if (!tab || !tab.messages[msgIdx]) return;
             const msg = tab.messages[msgIdx];
             // Toggle: if same reaction, remove it; otherwise set new
-            msg.reaction = (msg.reaction === type) ? '' : type;
+            const wasReaction = msg.reaction;
+            msg.reaction = (wasReaction === type) ? '' : type;
+            // Queue feedback for agent context (only when setting, not clearing)
+            if (msg.reaction && !wasReaction) {
+                this._queueReactionFeedback(tab, msgIdx, msg.reaction, msg.content);
+            } else if (!msg.reaction && wasReaction) {
+                // Remove from pending queue
+                tab._pendingFeedback = tab._pendingFeedback.filter(f => f.msgIdx !== msgIdx);
+            }
             this.chatTick++;
             // Cat reaction to user feedback
             if (window.CatModule && CatModule.isActive()) {
@@ -1628,6 +1643,23 @@ window.AppChat = (function() {
                     setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000);
                 }
             }
+        },
+        _queueReactionFeedback(tab, msgIdx, reaction, content) {
+            if (!tab._pendingFeedback) tab._pendingFeedback = [];
+            // Don't duplicate if same msgIdx already queued
+            if (tab._pendingFeedback.some(f => f.msgIdx === msgIdx)) return;
+            const snippet = (content || '').replace(/\n/g, ' ').slice(0, 80);
+            tab._pendingFeedback.push({ msgIdx, reaction, snippet });
+            this.showToast(reaction === 'up' ? 'FEEDBACK QUEUED: helpful' : 'FEEDBACK QUEUED: not helpful', 'info');
+        },
+        _buildFeedbackPrefix(tab) {
+            if (!tab._pendingFeedback || tab._pendingFeedback.length === 0) return '';
+            const lines = tab._pendingFeedback.map(f => {
+                const label = f.reaction === 'up' ? 'helpful' : 'not helpful — please adjust your approach';
+                return `[User feedback on a previous response (${label})]`;
+            });
+            tab._pendingFeedback = [];
+            return lines.join('\n') + '\n\n';
         },
         toggleMsgCollapse(tabId, msgIdx) {
             const tab = this.chatTabs.find(t => t.tab_id === tabId);
@@ -1674,11 +1706,16 @@ window.AppChat = (function() {
             const tab = this.chatTabs.find(t => t.tab_id === tabId);
             if (!tab || !tab.messages[msgIdx]) return;
             const msg = tab.messages[msgIdx];
+            const wasReaction = msg.reaction;
             // Toggle: if same reaction, clear it
-            if (msg.reaction === reaction) {
+            if (wasReaction === reaction) {
                 msg.reaction = null;
+                // Remove from pending queue
+                tab._pendingFeedback = tab._pendingFeedback.filter(f => f.msgIdx !== msgIdx);
             } else {
                 msg.reaction = reaction;
+                // Queue feedback for agent context
+                this._queueReactionFeedback(tab, msgIdx, reaction, msg.content);
             }
             this.chatTick++;
         },
