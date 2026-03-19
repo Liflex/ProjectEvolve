@@ -1036,9 +1036,9 @@ window.AppChat = (function() {
                         + '<div class="chat-role chat-role-user">USER_' + (uTime ? ' <span style="color:var(--v3);font-weight:normal">' + uTime + '</span>' : '') + (uFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + uChars + 'ch · ' + uLines + 'ln</span>' : '') + '</div>'
                         + '<div class="chat-bubble-user" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit;color:var(--ng2)">'
                         + (uCollapsed
-                            ? '<div class="chat-collapsed-preview">' + this.escHtml(msg.content.slice(0, 200)) + '</div>'
+                            ? '<div class="chat-collapsed-preview">' + this.renderUserContent(msg.content.slice(0, 200)) + '</div>'
                               + '<div class="chat-expand-btn" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + i + ')">&#x25BC; EXPAND (' + uChars + ' chars)</div>'
-                            : this.escHtml(msg.content || ''))
+                            : this.renderUserContent(msg.content || ''))
                         + '</div></div></div>';
                     i++;
                 } else if (msg.role === 'assistant' || msg.role === 'tool') {
@@ -1241,6 +1241,32 @@ window.AppChat = (function() {
             });
         },
         // ========== CHAT: SCROLL & CLICK ==========
+        // ========== CHAT: USER CONTENT RENDERING (images) ==========
+        renderUserContent(text) {
+            if (!text) return '';
+            // Escape HTML first
+            const escaped = this.escHtml(text);
+            // Convert image markdown ![name](url) to <img> tags with lightbox
+            return escaped.replace(
+                /!\[([^\]]*)\]\((data:[^)]+|https?:\/\/[^)]+)\)/g,
+                (match, alt, src) => {
+                    const safeSrc = this.escHtml(src);
+                    const safeAlt = this.escHtml(alt || 'image');
+                    return '<div class="chat-embed-img" onclick="event.stopPropagation();window._app.openLightbox(\'' + safeSrc.replace(/'/g, "\\'") + '\',\'' + safeAlt.replace(/'/g, "\\'") + '\')">'
+                        + '<img src="' + safeSrc + '" alt="' + safeAlt + '" class="chat-user-img" loading="lazy">'
+                        + '<div class="chat-img-overlay"><span>&#x1f50d; VIEW</span></div>'
+                        + '</div>';
+                }
+            );
+        },
+
+        openLightbox(src, alt) {
+            this.lightbox = { show: true, src: src || '', alt: alt || '' };
+        },
+        closeLightbox() {
+            this.lightbox = { show: false, src: '', alt: '' };
+        },
+
         onChatClick(event) {
             if (event.target.tagName === 'A') { event.target.target = '_blank'; }
         },

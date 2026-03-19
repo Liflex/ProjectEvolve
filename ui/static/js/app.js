@@ -89,6 +89,9 @@ function _buildAppData() {
         // Context menu
         ctxMenu: { show: false, items: [], x: 0, y: 0 },
 
+        // Image lightbox
+        lightbox: { show: false, src: '', alt: '' },
+
         // Tab rename
         _renamingTabId: null,
         _renameText: '',
@@ -267,6 +270,7 @@ function _buildAppData() {
                     this.openCmdPalette();
                 }
                 if (e.key === 'Escape' && this.cmdPalette.show) { this.cmdPalette.show = false; }
+                if (e.key === 'Escape' && this.lightbox.show) { this.closeLightbox(); }
                 if ((e.ctrlKey || e.metaKey) && e.key === 'f' && this.section === 'chat' && this.activeTab) {
                     if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
                     e.preventDefault();

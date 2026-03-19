@@ -547,6 +547,22 @@
             </template>
         </div>
 
+        <!-- Image Lightbox -->
+        <div x-show="lightbox.show" x-cloak
+             class="lightbox-overlay"
+             @click.self="closeLightbox()"
+             @keydown.escape.window="closeLightbox()">
+            <div class="lightbox-container">
+                <div class="lightbox-header">
+                    <span class="lightbox-alt" x-text="lightbox.alt"></span>
+                    <button class="lightbox-close" @click="closeLightbox()" title="Close (ESC)">[X]</button>
+                </div>
+                <div class="lightbox-body">
+                    <img :src="lightbox.src" :alt="lightbox.alt" class="lightbox-img">
+                </div>
+            </div>
+        </div>
+
         <!-- Soft limit warning modal -->
         <div x-show="showTabLimitWarning" x-cloak class="fixed inset-0 z-40 flex items-center justify-center bg-black/60" @click.self="showTabLimitWarning = false">
             <div class="bg-[var(--bg2)] border-2 border-[var(--amber)] p-6 max-w-md mx-4">

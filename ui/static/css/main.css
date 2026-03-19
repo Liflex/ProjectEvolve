@@ -1553,3 +1553,111 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     color: var(--red);
     border-color: var(--red);
 }
+
+/* Chat embedded images */
+.chat-embed-img {
+    position: relative;
+    display: inline-block;
+    max-width: 280px;
+    margin: 4px 0;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--v-dim);
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.chat-embed-img:hover {
+    border-color: var(--v2);
+    box-shadow: 0 0 12px rgba(180,74,255,0.12);
+}
+.chat-user-img {
+    display: block;
+    max-width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+    background: var(--bg);
+}
+.chat-img-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s;
+    font-size: 0.625rem;
+    color: #fff;
+    letter-spacing: 0.12em;
+    pointer-events: none;
+}
+.chat-embed-img:hover .chat-img-overlay {
+    opacity: 1;
+}
+
+/* Lightbox */
+.lightbox-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+}
+.lightbox-container {
+    max-width: 92vw;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    cursor: default;
+}
+.lightbox-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    background: var(--bg2);
+    border: 1px solid var(--v-dim);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+}
+.lightbox-alt {
+    font-size: 0.625rem;
+    color: var(--v3);
+    letter-spacing: 0.1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 60vw;
+}
+.lightbox-close {
+    font-size: 0.625rem;
+    color: var(--v3);
+    letter-spacing: 0.1em;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 2px 8px;
+    transition: color 0.15s;
+}
+.lightbox-close:hover {
+    color: var(--red);
+}
+.lightbox-body {
+    background: var(--bg);
+    border: 1px solid var(--v-dim);
+    border-radius: 0 0 6px 6px;
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-height: calc(92vh - 36px);
+}
+.lightbox-img {
+    max-width: 90vw;
+    max-height: calc(92vh - 48px);
+    object-fit: contain;
+}
