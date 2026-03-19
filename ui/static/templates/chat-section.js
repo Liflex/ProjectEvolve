@@ -310,7 +310,26 @@
                             <span class="edit-mode-icon">&#x270f;</span>
                             <span class="edit-mode-label">EDITING MESSAGE</span>
                             <span class="edit-mode-hint">— subsequent messages will be discarded. ESC to cancel.</span>
+                            <template x-if="editDiffStats(tab)?.changed">
+                                <button @click="toggleEditDiff(tab.tab_id)" class="edit-mode-diff-toggle" :title="tab._editDiffOpen ? 'Hide diff' : 'Show diff'">
+                                    &#x25BC; DIFF
+                                    <span class="edit-diff-badge-del" x-text="'-' + editDiffStats(tab).removed"></span>
+                                    <span class="edit-diff-badge-ins" x-text="'+' + editDiffStats(tab).added"></span>
+                                </button>
+                            </template>
+                            <template x-if="!editDiffStats(tab)?.changed">
+                                <span class="edit-diff-unchanged" title="No changes">&#x2713; UNCHANGED</span>
+                            </template>
                             <button @click="cancelEditMode(tab.tab_id)" class="edit-mode-cancel" title="Cancel edit (ESC)">[X] CANCEL</button>
+                        </div>
+                        <!-- Edit diff preview panel -->
+                        <div x-show="tab._editMode && tab._editDiffOpen && editDiffStats(tab)?.changed" x-cloak x-transition.duration.150ms
+                             class="edit-diff-panel">
+                            <div class="edit-diff-panel-header">
+                                <span class="edit-diff-panel-title">ORIGINAL &#x2192; EDITED</span>
+                                <button @click="toggleEditDiff(tab.tab_id)" class="edit-diff-panel-close" title="Close diff">[X]</button>
+                            </div>
+                            <div class="edit-diff-panel-body" x-html="renderEditDiff(tab)"></div>
                         </div>
                         <!-- Quote panel -->
                         <div x-show="tab._quotedMsg" x-transition.duration.150ms

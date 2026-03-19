@@ -57,6 +57,7 @@ window.AppChat = (function() {
                     _catCtxWarned: false,
                     _catCostMilestone: 0,
                     _catStreamPatienceTimer: null,
+                    _editDiffOpen: false,
                 };
                 this.chatTabs.push(tab);
                 this.activeChatTab = tab.tab_id;
@@ -1917,6 +1918,32 @@ window.AppChat = (function() {
             const tab = this.chatTabs.find(t => t.tab_id === tabId);
             return tab && !!tab._editMode;
         },
+        toggleEditDiff(tabId) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (tab) tab._editDiffOpen = !tab._editDiffOpen;
+        },
+        renderEditDiff(tab) {
+            if (!tab || !tab._editMode) return '';
+            const original = tab._editMode.originalContent || '';
+            const current = tab.input_text || '';
+            if (original === current) return '';
+            return this.renderInlineDiff(original, current);
+        },
+        editDiffStats(tab) {
+            if (!tab || !tab._editMode) return null;
+            const original = tab._editMode.originalContent || '';
+            const current = tab.input_text || '';
+            if (original === current) return { added: 0, removed: 0, changed: false };
+            const oldLines = original.split('\n');
+            const newLines = current.split('\n');
+            const diff = this.simpleLineDiff(oldLines, newLines);
+            let added = 0, removed = 0;
+            for (const d of diff) {
+                if (d.type === 'ins') added++;
+                if (d.type === 'del') removed++;
+            }
+            return { added, removed, changed: true };
+        },
         regenerateResponse(tabId) {
             const tab = this.chatTabs.find(t => t.tab_id === tabId);
             if (!tab || tab.is_streaming) return;
@@ -2795,6 +2822,7 @@ window.AppChat = (function() {
                         _agentDone: false,
                         _restored: true,
                         _restoredSessionId: saved.session_id,
+                        _editDiffOpen: false,
                     };
                     this.chatTabs.push(tab);
                 }
