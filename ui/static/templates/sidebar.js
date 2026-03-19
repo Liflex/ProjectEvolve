@@ -30,8 +30,12 @@
 
         <!-- Cat Companion -->
         <div x-show="settings.catCompanion" class="py-3 border-b-2 border-[var(--v-dim)] flex flex-col items-center">
-            <div class="cat-frame">
-                <canvas id="cat-canvas" width="180" height="148"></canvas>
+            <div class="cat-frame" :class="{'cat-frame-hover': _catHovering}">
+                <canvas id="cat-canvas" width="180" height="148"
+                        style="cursor:pointer"
+                        @click="onCatClick()"
+                        @mouseenter="_catHovering = true; if(window.CatModule && CatModule.setHovering) CatModule.setHovering(true)"
+                        @mouseleave="_catHovering = false; if(window.CatModule && CatModule.setHovering) CatModule.setHovering(false)"></canvas>
             </div>
             <div class="mt-1.5 text-center" x-show="!settings.compactSidebar">
                 <div class="text-[0.5rem] tracking-widest text-[var(--v)]" style="font-family:'Press Start 2P',monospace">COMPANION</div>

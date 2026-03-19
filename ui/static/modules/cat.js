@@ -450,6 +450,49 @@
     let _purrrTicks = 0;                  // remaining ticks for purr body vibration
     let _expHistory = [];                 // recent experiment results for streak/milestone detection
     let _lastMilestone = 0;               // last milestone triggered (prevent spam)
+    let _isHovering = false;               // mouse is over cat canvas
+    let _clickCount = 0;                   // rapid-click counter for petting detection
+    let _lastClickTime = 0;               // timestamp of last click
+    let _lastInteractionTime = Date.now(); // last user interaction (click/hover/API)
+    let _idleLevel = 0;                   // 0=active, 1=restless, 2=sleepy, 3=deep-sleep
+    let _hoverReactionCooldown = 0;        // prevent hover reaction spam
+
+    // ================================================================
+    //  CLICK & PETTING REACTIONS
+    // ================================================================
+
+    const CLICK_REACTIONS = [
+        { expr: 'surprised', speech: 'Мяу?! *подпрыгнул*', anim: 'earTwitch' },
+        { expr: 'happy', speech: '*мурр* =^_^=', anim: 'pawWave' },
+        { expr: 'happy', speech: 'Мур-мур-мур!', anim: 'purr' },
+        { expr: 'thinking', speech: '*прищурился* Чего надо?', anim: 'earTwitch' },
+        { expr: 'surprised', speech: 'Не трогай! *шипение*', anim: 'earTwitch' },
+        { expr: 'happy', speech: 'Ещё! Ещё! =^._.^=', anim: 'pawWave' },
+        { expr: 'neutral', speech: 'Мяу~', anim: 'earTwitch' },
+        { expr: 'thinking', speech: '*наклонил голову*...', anim: null },
+    ];
+
+    const PETTING_REACTIONS = [
+        '*мурррр...* =^_^=',
+        'Ещё чешешь! Мурр!',
+        '*довольно жмурится*',
+        '*мурлычет* Мяу~',
+        'Не останавливайся! =^_^=',
+        '*трётся о руку* Мурр...',
+    ];
+
+    const HOVER_GREETINGS = [
+        '*настороженно смотрит*',
+        'Чего?..',
+        '*уши навострились*',
+        '*внимание*',
+    ];
+
+    const IDLE_SPEECH = {
+        1: ['*скучает*...', 'Хмм...', 'Мяу...'],
+        2: ['*зевает*... Мяу...', '*сонно моргает*', 'Скучно...'],
+        3: ['*храпит*... zzz', '*свернулся клубком*', 'Мурр... *храпит*'],
+    };
 
     // ================================================================
     //  RENDER
@@ -620,6 +663,54 @@
             _purrrTicks--;
         }
 
+        // Hover reaction cooldown
+        if (_hoverReactionCooldown > 0) _hoverReactionCooldown--;
+
+        // Idle escalation: track inactivity and change behavior
+        const idleSec = Math.floor((Date.now() - _lastInteractionTime) / 1000);
+        let newIdleLevel = 0;
+        if (idleSec > 180) newIdleLevel = 3;       // 3+ min: deep sleep
+        else if (idleSec > 90) newIdleLevel = 2;   // 1.5+ min: sleepy
+        else if (idleSec > 45) newIdleLevel = 1;   // 45s+: restless
+
+        if (newIdleLevel !== _idleLevel) {
+            const prevLevel = _idleLevel;
+            _idleLevel = newIdleLevel;
+            // Don't override non-neutral expressions set by external events
+            if (expression === 'neutral' || expression === 'sleepy') {
+                if (newIdleLevel === 2 && prevLevel < 2) {
+                    setExpression('sleepy');
+                    _tailSpeed = 4; // slow erratic
+                    triggerStretch();
+                } else if (newIdleLevel === 3 && prevLevel < 3) {
+                    setExpression('sleepy');
+                    _tailSpeed = 4;
+                    setSpeechText(pickRandom(IDLE_SPEECH[3]), 6000);
+                } else if (newIdleLevel === 1 && prevLevel < 1) {
+                    // Just restless — subtle hint
+                    if (!currentSpeech) setSpeechText(pickRandom(IDLE_SPEECH[1]), 5000);
+                } else if (newIdleLevel === 0 && prevLevel > 0) {
+                    // Woke up from idle
+                    setExpression('neutral');
+                    _tailSpeed = 2;
+                }
+            }
+        }
+
+        // Occasional idle speech (only when no other speech active)
+        if (_idleLevel >= 1 && !currentSpeech && _tickCount % 80 === 0) {
+            const pool = IDLE_SPEECH[_idleLevel];
+            if (pool) setSpeechText(pickRandom(pool), 5000);
+        }
+
+        // Hover ear twitch (increased frequency when mouse is over cat)
+        if (_isHovering && _hoverReactionCooldown === 0 && expression === 'neutral' && _earTwitchTicks === 0) {
+            if (Math.random() < 0.04) {
+                triggerEarTwitch();
+                _hoverReactionCooldown = 15; // ~1.8s cooldown
+            }
+        }
+
         render();
     }
 
@@ -723,6 +814,8 @@
 
         /** Change expression (e.g. 'happy', 'sleepy', 'surprised', 'angry', 'thinking'). */
         setExpression(expr) {
+            _lastInteractionTime = Date.now();
+            if (expr !== 'sleepy') _idleLevel = 0;
             expression = expr;
             eyeFrame = 0;
             _tailAccum = 0;
@@ -739,6 +832,7 @@
 
         /** Trigger a speech bubble. */
         say(type) {
+            _lastInteractionTime = Date.now();
             setSpeech(type);
         },
 
@@ -749,6 +843,7 @@
 
         /** Set speech text directly (for external page-aware tips). */
         setSpeechText(text, durationMs) {
+            _lastInteractionTime = Date.now();
             currentSpeech = text || '';
             if (speechTimer) clearTimeout(speechTimer);
             if (durationMs && text) {
@@ -870,6 +965,7 @@
          */
         analyzeChatContext(message) {
             if (!message || !animating) return false;
+            _lastInteractionTime = Date.now();
             const lower = message.toLowerCase();
             // Check each keyword category
             for (const [keyword, tips] of Object.entries(CHAT_SKILL_TIPS)) {
@@ -893,6 +989,7 @@
          */
         analyzeAgentResponse(content) {
             if (!content || !animating) return;
+            _lastInteractionTime = Date.now();
             const hasCode = (content.match(/```[\s\S]*?```/g) || []).length;
             const hasTable = content.includes('|---|') || content.includes('| --- |');
             const isLong = content.length > 1500;
@@ -943,6 +1040,100 @@
         /** Is animation running? */
         isActive() {
             return animating;
+        },
+
+        /**
+         * Handle click on cat canvas.
+         * Single click: random reaction. Rapid clicks (3+): petting mode with purr.
+         */
+        onClick() {
+            if (!animating) return;
+            const now = Date.now();
+            _lastInteractionTime = now;
+
+            // Wake up from idle
+            if (_idleLevel > 0) {
+                _idleLevel = 0;
+                _tailSpeed = 2;
+                if (expression === 'sleepy') {
+                    setExpression('surprised');
+                    triggerEarTwitch();
+                    setSpeechText('*проснулся!* Мяу?!', 3000);
+                    setTimeout(() => { if (animating) setExpression('neutral'); }, 3000);
+                    _clickCount = 0;
+                    return;
+                }
+            }
+
+            // Detect rapid clicks (petting)
+            if (now - _lastClickTime < 600) {
+                _clickCount++;
+            } else {
+                _clickCount = 1;
+            }
+            _lastClickTime = now;
+
+            // Petting mode (3+ rapid clicks)
+            if (_clickCount >= 3) {
+                setExpression('happy');
+                setSpeechText(pickRandom(PETTING_REACTIONS), 4000);
+                _purrrTicks = 25;
+                _tailSpeed = 1; // fast happy tail
+                return;
+            }
+
+            // Normal single/double click reaction
+            const reaction = pickRandom(CLICK_REACTIONS);
+            setExpression(reaction.expr);
+            setSpeechText(reaction.speech, 4000);
+
+            if (reaction.anim === 'earTwitch') triggerEarTwitch();
+            else if (reaction.anim === 'pawWave') triggerPawWave();
+            else if (reaction.anim === 'purr') _purrrTicks = 15;
+
+            // Return to neutral after delay
+            setTimeout(() => {
+                if (animating && (expression === reaction.expr) && _idleLevel === 0) {
+                    setExpression('neutral');
+                }
+            }, 4000);
+        },
+
+        /**
+         * Set hover state when mouse enters/leaves cat canvas.
+         * @param {boolean} isHovering
+         */
+        setHovering(isHovering) {
+            _isHovering = isHovering;
+            if (isHovering) {
+                _lastInteractionTime = Date.now();
+                // Wake from deep sleep
+                if (_idleLevel >= 3) {
+                    _idleLevel = 1;
+                    setExpression('neutral');
+                    _tailSpeed = 2;
+                    setSpeechText('*проснулся* Мяу?', 3000);
+                    triggerEarTwitch();
+                    return;
+                }
+                // Occasional greeting on first hover
+                if (Math.random() < 0.25 && !currentSpeech && _hoverReactionCooldown === 0) {
+                    setSpeechText(pickRandom(HOVER_GREETINGS), 3000);
+                    _hoverReactionCooldown = 30; // ~3.6s cooldown
+                }
+            }
+        },
+
+        /**
+         * Reset idle timer (called on any external interaction).
+         */
+        resetIdle() {
+            _lastInteractionTime = Date.now();
+            if (_idleLevel > 0) {
+                _idleLevel = 0;
+                _tailSpeed = 2;
+                if (expression === 'sleepy') setExpression('neutral');
+            }
         },
 
     };

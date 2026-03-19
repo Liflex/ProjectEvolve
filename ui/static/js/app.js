@@ -57,6 +57,7 @@ function _buildAppData() {
         runElapsed: '',
         settings: JSON.parse(localStorage.getItem('ar-settings') || '{"matrixRain":true,"crtEffect":true,"catCompanion":true,"theme":"synthwave","fontSize":16,"chatDensity":"comfortable","compactSidebar":false,"showThinking":false}'),
         _matrixRainStopped: false,
+        _catHovering: false,
 
         // Chat state
         chatTabs: [],
@@ -287,9 +288,17 @@ function _buildAppData() {
             if (section === 'lab' && !this.page) this.page = 'dashboard';
             if (section === 'chat') this.page = '';
             if (window.CatModule && CatModule.isActive()) {
+                if (CatModule.resetIdle) CatModule.resetIdle();
                 if (CatModule.triggerEarTwitch) CatModule.triggerEarTwitch();
                 if (section === 'lab') CatModule.setSpeechText('Research mode_ *прищурился*', 3000);
                 else { CatModule.setSpeechText('Chat mode! *мурлычет*', 3000); CatModule.setPage('chat'); }
+            }
+        },
+
+        // ========== CAT INTERACTION ==========
+        onCatClick() {
+            if (window.CatModule && CatModule.isActive() && CatModule.onClick) {
+                CatModule.onClick();
             }
         },
 
@@ -304,6 +313,7 @@ function _buildAppData() {
             if (page !== 'run') this.disconnectResearchWs();
             if (window.CatModule && CatModule.isActive() && CatModule.setPage) { CatModule.setPage(page); }
             if (window.CatModule && CatModule.isActive()) {
+                if (CatModule.resetIdle) CatModule.resetIdle();
                 const tips = {
                     dashboard: ['Наблюдаю за метриками_', '*осматривается*', 'Всё под контролем!'],
                     experiments: ['Хмм, что тут интересного...', 'Ищешь баги?', 'Полезные были эти хаки!'],

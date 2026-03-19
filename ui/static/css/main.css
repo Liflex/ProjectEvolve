@@ -520,7 +520,9 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
 }
 
 /* === CAT CANVAS === */
-.cat-frame { border: 2px solid var(--v-dim); image-rendering: pixelated; overflow: visible; box-shadow: 0 0 12px rgba(180,74,255,0.08); }
+.cat-frame { border: 2px solid var(--v-dim); image-rendering: pixelated; overflow: visible; box-shadow: 0 0 12px rgba(180,74,255,0.08); transition: border-color 0.3s, box-shadow 0.3s; }
+.cat-frame-hover { border-color: var(--v); box-shadow: 0 0 20px rgba(180,74,255,0.2); }
+.cat-frame-hover #cat-canvas { filter: brightness(1.08); }
 
 /* === ORGANISM === */
 .organism-frame { border: 1px solid var(--v-dim); image-rendering: auto; box-shadow: 0 0 8px rgba(0,229,255,0.05); }
