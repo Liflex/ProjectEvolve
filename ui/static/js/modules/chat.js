@@ -2028,12 +2028,28 @@ window.AppChat = (function() {
                 pct: Math.round((count / toolMax) * 100),
             }));
             // Response times
-            const responseTimes = msgs.filter(m => m.role === 'assistant' && m.duration && m.duration > 0).map(m => m.duration);
-            const avgResponse = responseTimes.length > 0 ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length : 0;
-            const maxResponse = responseTimes.length > 0 ? Math.max(...responseTimes) : 0;
-            const minResponse = responseTimes.length > 0 ? Math.min(...responseTimes) : 0;
+            const responseTimesArr = msgs.filter(m => m.role === 'assistant' && m.duration && m.duration > 0).map(m => m.duration);
+            const avgResponse = responseTimesArr.length > 0 ? responseTimesArr.reduce((a, b) => a + b, 0) / responseTimesArr.length : 0;
+            const maxResponse = responseTimesArr.length > 0 ? Math.max(...responseTimesArr) : 0;
+            const minResponse = responseTimesArr.length > 0 ? Math.min(...responseTimesArr) : 0;
             // Token usage
             const totalOutput = msgs.filter(m => m.msgTokens?.output).reduce((s, m) => s + m.msgTokens.output, 0);
+            // Per-turn data for sparklines (up to last 20 turns)
+            const turnData = [];
+            let turnIdx = 0;
+            for (const m of msgs) {
+                if (m.role === 'user') turnIdx++;
+                if (m.role === 'assistant' && (m.duration || m.msgTokens)) {
+                    turnData.push({
+                        turn: turnIdx,
+                        duration: m.duration || 0,
+                        tokIn: m.msgTokens?.input || 0,
+                        tokOut: m.msgTokens?.output || 0,
+                        cost: m.msgTokens?.cost || 0,
+                    });
+                }
+            }
+            const recentTurns = turnData.slice(-20);
             // Errors
             const errorCount = msgs.filter(m => m.role === 'assistant' && m.content?.startsWith('[ERROR]')).length;
             // Pinned
@@ -2053,13 +2069,80 @@ window.AppChat = (function() {
                 total: msgs.length,
                 userCount, asstCount, toolCount, turns,
                 toolEntries,
-                avgResponse, maxResponse, minResponse, responseTimes: responseTimes.length,
+                avgResponse, maxResponse, minResponse, responseTimes: responseTimesArr.length,
                 tokens: { input: tab.tokens?.input || 0, output: tab.tokens?.output || 0, cost: tab.tokens?.cost || 0, threshold: tab.tokens?.threshold || 180000 },
                 totalOutputTokens: totalOutput,
                 errorCount, pinnedCount, upCount, downCount,
                 duration: this.getSessionDuration(tab),
                 avgUserLen, avgAsstLen, sessionStartStr,
+                recentTurns, totalTurns: turnData.length,
             };
+        },
+
+        // ========== CHAT: SPARKLINE & MINI-CHARTS ==========
+        renderResponseSparkline(turns, w, h) {
+            if (!turns || turns.length < 2) return '';
+            const dur = turns.map(t => t.duration).filter(d => d > 0);
+            if (dur.length < 2) return '';
+            const maxD = Math.max(...dur);
+            const minD = Math.min(...dur);
+            const range = maxD - minD || 1;
+            const step = w / (dur.length - 1);
+            const pad = 2;
+            const innerH = h - pad * 2;
+            const points = dur.map((d, i) => {
+                const x = i * step;
+                const y = pad + innerH - ((d - minD) / range) * innerH;
+                return x + ',' + y;
+            }).join(' ');
+            // Area fill
+            const areaPoints = '0,' + h + ' ' + points + ' ' + w + ',' + h;
+            // Average line
+            const avg = dur.reduce((a, b) => a + b, 0) / dur.length;
+            const avgY = pad + innerH - ((avg - minD) / range) * innerH;
+            return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" class="sparkline-svg">'
+                + '<polygon points="' + areaPoints + '" fill="rgba(0,255,255,0.08)" />'
+                + '<polyline points="' + points + '" fill="none" stroke="var(--cyan)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />'
+                + '<line x1="0" y1="' + avgY + '" x2="' + w + '" y2="' + avgY + '" stroke="var(--amber)" stroke-width="0.5" stroke-dasharray="3,3" opacity="0.6" />'
+                + '</svg>';
+        },
+        renderTokenMiniBars(turns) {
+            if (!turns || turns.length === 0) return '';
+            const maxTok = Math.max(1, ...turns.map(t => Math.max(t.tokIn, t.tokOut)));
+            const barH = 6;
+            const gap = 3;
+            let html = '<div class="token-mini-chart">';
+            for (const t of turns) {
+                const inW = Math.max(2, (t.tokIn / maxTok) * 100);
+                const outW = Math.max(2, (t.tokOut / maxTok) * 100);
+                html += '<div class="token-mini-turn" title="Turn ' + t.turn + ': ' + (t.tokIn / 1000).toFixed(1) + 'K in / ' + (t.tokOut / 1000).toFixed(1) + 'K out">';
+                html += '<div class="token-mini-bar token-mini-in" style="height:' + barH + 'px;width:' + inW + '%"></div>';
+                html += '<div class="token-mini-bar token-mini-out" style="height:' + barH + 'px;width:' + outW + '%"></div>';
+                html += '</div>';
+            }
+            html += '</div>';
+            return html;
+        },
+        renderCostSparkline(turns, w, h) {
+            if (!turns || turns.length < 2) return '';
+            const costs = turns.map(t => t.cost).filter(c => c > 0);
+            if (costs.length < 2) return '';
+            const maxC = Math.max(...costs);
+            const minC = Math.min(...costs);
+            const range = maxC - minC || 0.0001;
+            const step = w / (costs.length - 1);
+            const pad = 2;
+            const innerH = h - pad * 2;
+            const points = costs.map((c, i) => {
+                const x = i * step;
+                const y = pad + innerH - ((c - minC) / range) * innerH;
+                return x + ',' + y;
+            }).join(' ');
+            const areaPoints = '0,' + h + ' ' + points + ' ' + w + ',' + h;
+            return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" class="sparkline-svg">'
+                + '<polygon points="' + areaPoints + '" fill="rgba(255,255,0,0.06)" />'
+                + '<polyline points="' + points + '" fill="none" stroke="var(--yellow)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />'
+                + '</svg>';
         },
 
         // ========== CHAT: EXPORT ==========

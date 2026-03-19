@@ -504,6 +504,80 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     letter-spacing: 0.08em;
 }
 
+/* === STATS SPARKLINE === */
+.sparkline-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+.stats-sparkline-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0 2px;
+}
+.stats-sparkline-label {
+    font-size: 0.5rem;
+    letter-spacing: 0.1em;
+    color: var(--v3);
+    white-space: nowrap;
+}
+.stats-sparkline-hint {
+    font-size: 0.45rem;
+    letter-spacing: 0.05em;
+    color: var(--v-dim);
+    white-space: nowrap;
+    margin-left: auto;
+}
+
+/* === TOKEN MINI BARS === */
+.token-mini-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0;
+    max-height: 160px;
+    overflow-y: auto;
+}
+.token-mini-turn {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+.token-mini-bar {
+    border-radius: 1px;
+    transition: width 0.3s ease;
+    min-width: 2px;
+}
+.token-mini-in {
+    background: var(--cyan);
+    opacity: 0.6;
+}
+.token-mini-out {
+    background: var(--ng2);
+    opacity: 0.6;
+}
+.token-mini-legend {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 4px;
+    font-size: 0.45rem;
+    letter-spacing: 0.08em;
+    color: var(--v3);
+}
+.token-mini-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.token-mini-legend-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 1px;
+    display: inline-block;
+}
+
 /* === CONTEXT MENU (right-click) === */
 .ctx-menu {
     position: fixed;

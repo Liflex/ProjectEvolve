@@ -559,6 +559,30 @@
                                     <span class="stats-timing-value" x-text="getSessionStats(activeTab).responseTimes"></span>
                                 </div>
                             </div>
+                            <!-- Response time sparkline -->
+                            <div x-show="getSessionStats(activeTab).recentTurns.length >= 2" class="stats-sparkline-wrap">
+                                <span class="stats-sparkline-label">LATENCY_TREND</span>
+                                <span class="stats-sparkline-hint" x-text="'last ' + getSessionStats(activeTab).recentTurns.length + ' of ' + getSessionStats(activeTab).totalTurns + ' turns'"></span>
+                                <div x-html="renderResponseSparkline(getSessionStats(activeTab).recentTurns, 260, 32)"></div>
+                            </div>
+                        </div>
+                        <!-- Token per-turn visualization -->
+                        <div class="stats-section" x-show="getSessionStats(activeTab).recentTurns.length > 0">
+                            <div class="stats-section-title">TOKEN_PER_TURN</div>
+                            <div x-html="renderTokenMiniBars(getSessionStats(activeTab).recentTurns)"></div>
+                            <div class="token-mini-legend">
+                                <span class="token-mini-legend-item"><span class="token-mini-legend-dot" style="background:var(--cyan)"></span>INPUT</span>
+                                <span class="token-mini-legend-item"><span class="token-mini-legend-dot" style="background:var(--ng2)"></span>OUTPUT</span>
+                            </div>
+                        </div>
+                        <!-- Cost trend sparkline -->
+                        <div class="stats-section" x-show="getSessionStats(activeTab).recentTurns.length >= 2 && getSessionStats(activeTab).tokens.cost > 0">
+                            <div class="stats-section-title">COST_TREND</div>
+                            <div class="stats-sparkline-wrap">
+                                <span class="stats-sparkline-label">CUMULATIVE_COST</span>
+                                <span class="stats-sparkline-hint" x-text="'$' + getSessionStats(activeTab).tokens.cost.toFixed(4) + ' total'"></span>
+                                <div x-html="renderCostSparkline(getSessionStats(activeTab).recentTurns, 260, 32)"></div>
+                            </div>
                         </div>
                         <!-- Footer stats -->
                         <div class="stats-footer">
