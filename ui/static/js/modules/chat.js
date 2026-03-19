@@ -1976,6 +1976,30 @@ window.AppChat = (function() {
             if (!tab || !tab.messages) return 0;
             return tab.messages.filter(m => m.role === 'tool').length;
         },
+        /** Live elapsed time while agent is streaming (updates via _clockTick). */
+        getStreamingElapsed(tab) {
+            if (!tab || !tab._msgStartTime) return '';
+            const ms = Date.now() - tab._msgStartTime;
+            return this.fmtDuration(ms);
+        },
+        /** Format token info for a single message. */
+        getMsgTokenMeta(msg) {
+            if (!msg || !msg.msgTokens) return '';
+            const t = msg.msgTokens;
+            let parts = [];
+            if (t.output > 0) parts.push((t.output / 1000).toFixed(1) + 'K out');
+            if (t.cost > 0) parts.push('$' + t.cost.toFixed(4));
+            return parts.join(' · ');
+        },
+        /** Turns per minute throughput for a tab. */
+        getThroughput(tab) {
+            if (!tab || !tab.created_at) return '0 t/min';
+            const ms = Date.now() - new Date(tab.created_at).getTime();
+            const minutes = ms / 60000;
+            if (minutes < 0.5) return '— t/min';
+            const turns = (tab.messages || []).filter(m => m.role === 'user').length;
+            return turns > 0 ? (turns / minutes).toFixed(1) + ' t/min' : '0 t/min';
+        },
 
         // ========== CHAT: SESSION STATS PANEL ==========
         getSessionStats(tab) {
@@ -2017,6 +2041,14 @@ window.AppChat = (function() {
             // Reactions
             const upCount = msgs.filter(m => m.reaction === 'up').length;
             const downCount = msgs.filter(m => m.reaction === 'down').length;
+            // Avg message length (user vs assistant)
+            const userMsgs = msgs.filter(m => m.role === 'user');
+            const asstMsgs = msgs.filter(m => m.role === 'assistant');
+            const avgUserLen = userMsgs.length > 0 ? Math.round(userMsgs.reduce((s, m) => s + (m.content?.length || 0), 0) / userMsgs.length) : 0;
+            const avgAsstLen = asstMsgs.length > 0 ? Math.round(asstMsgs.reduce((s, m) => s + (m.content?.length || 0), 0) / asstMsgs.length) : 0;
+            // Session start time
+            const sessionStart = tab.created_at ? new Date(tab.created_at) : null;
+            const sessionStartStr = sessionStart ? String(sessionStart.getHours()).padStart(2, '0') + ':' + String(sessionStart.getMinutes()).padStart(2, '0') : '';
             return {
                 total: msgs.length,
                 userCount, asstCount, toolCount, turns,
@@ -2026,6 +2058,7 @@ window.AppChat = (function() {
                 totalOutputTokens: totalOutput,
                 errorCount, pinnedCount, upCount, downCount,
                 duration: this.getSessionDuration(tab),
+                avgUserLen, avgAsstLen, sessionStartStr,
             };
         },
 

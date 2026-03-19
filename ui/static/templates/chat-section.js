@@ -105,6 +105,12 @@
             </div>
             <div class="chat-toolbar-sep"></div>
             <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider" x-show="activeTab" x-text="(activeTab?.messages?.length || 0) + ' MSGS'"></span>
+            <!-- Streaming elapsed timer -->
+            <span x-show="activeTab && activeTab.is_streaming && activeTab._msgStartTime"
+                  class="text-[0.5625rem] text-[var(--cyan)] tracking-wider tabular-nums"
+                  x-text="(_clockTick, 'ELAPSED ' + getStreamingElapsed(activeTab))"></span>
+            <span x-show="activeTab && activeTab.is_streaming && activeTab._msgStartTime"
+                  class="w-1.5 h-1.5 rounded-full bg-[var(--cyan)] animate-pulse ml-1"></span>
             <span class="text-[0.5rem] text-[var(--v)] tracking-wider blink" x-show="_chatNavIdx >= 0" x-text="'NAV ' + (_chatNavIdx + 1) + ' [c q e f p d]'"></span>
             <div class="flex-1"></div>
             <div class="relative">
@@ -331,7 +337,7 @@
                                           x-text="tab._editMode ? 'ENTER — send edited | ESC — cancel'
                                                : tab._msgHistoryIdx >= 0 ? 'HISTORY ' + (tab._msgHistoryIdx + 1) + '/' + tab._msgHistory.length + ' — UP/DOWN navigate | ESC — exit | ENTER — send'
                                                : 'ENTER — send | SHIFT+ENTER — newline | UP/DOWN — history | CTRL+SHIFT+B/I/K/C — format'"></span>
-                                    <span class="text-[0.5rem] text-[var(--v3)] tabular-nums" x-show="(tab.input_text || '').length > 0" x-text="(tab.input_text || '').length + ' chars'"></span>
+                                    <span class="text-[0.5rem] text-[var(--v3)] tabular-nums" x-show="(tab.input_text || '').length > 0" x-text="(tab.input_text || '').length + 'ch · ' + (tab.input_text || '').trim().split(/\s+/).filter(Boolean).length + 'w'"></span>
                                 </div>
                                 <!-- Slash command menu -->
                                 <div x-show="slashMenu.show && slashMenu._tabId === tab.tab_id"
@@ -566,6 +572,28 @@
                                 <span x-show="getSessionStats(activeTab).upCount > 0" style="color:var(--ng)">&#x1f44d;<span x-text="getSessionStats(activeTab).upCount"></span></span>
                                 <span x-show="getSessionStats(activeTab).downCount > 0" style="color:var(--red);margin-left:4px">&#x1f44e;<span x-text="getSessionStats(activeTab).downCount"></span></span>
                             </span>
+                        </div>
+                        <!-- Message length & session info -->
+                        <div class="stats-section">
+                            <div class="stats-section-title">CONTENT_METRICS</div>
+                            <div class="stats-timing-grid">
+                                <div class="stats-timing-item">
+                                    <span class="stats-timing-label">AVG USER</span>
+                                    <span class="stats-timing-value" style="color:var(--v)" x-text="getSessionStats(activeTab).avgUserLen + 'ch'"></span>
+                                </div>
+                                <div class="stats-timing-item">
+                                    <span class="stats-timing-label">AVG CLAUDE</span>
+                                    <span class="stats-timing-value" style="color:var(--cyan)" x-text="getSessionStats(activeTab).avgAsstLen + 'ch'"></span>
+                                </div>
+                                <div class="stats-timing-item">
+                                    <span class="stats-timing-label">SESSION START</span>
+                                    <span class="stats-timing-value" style="color:var(--v3)" x-text="getSessionStats(activeTab).sessionStartStr"></span>
+                                </div>
+                                <div class="stats-timing-item">
+                                    <span class="stats-timing-label">THROUGHPUT</span>
+                                    <span class="stats-timing-value" x-text="getThroughput(activeTab)"></span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </template>
