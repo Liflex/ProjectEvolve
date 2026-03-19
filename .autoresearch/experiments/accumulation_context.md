@@ -1,3 +1,22 @@
+## Experiment 114 — Chat — code block INSERT and RUN action buttons
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **[INSERT] button** on all code blocks — inserts code into chat input for easy reference/modification
+2. **[RUN] button** on bash/shell code blocks — sends command to agent for execution
+3. **Visual feedback** — [INSERTED]/[SENT] confirmation, cat reactions
+4. **Shortcuts panel** — documented new buttons
+
+### Files Modified
+
+- `ui/static/js/modules/renderer.js` — INSERT/RUN buttons in code block header
+- `ui/static/js/app.js` — `_insertCode()` and `_runCode()` handlers
+- `ui/static/css/main.css` — `.code-action-*` styles
+
+---
+
 ## Experiment 113 — Chat — project file search panel (Ctrl+Shift+F)
 
 **Date:** 2026-03-20
@@ -4573,6 +4592,33 @@ Results
 2. **Regenerated response tracking** — `regenerateResponse()` устанавливает `tab._regenerating = true`, обработчик WebSocket помечает следующий ответ ассистента флагом `regenerated: true`
 3. **"(edited)" бейдж** — жёлтый italic индикатор на отредактированных пользовательских сообщениях
 4. **"(regen)" бейдж** — cyan ital
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 113 — Chat — project file search panel (Ctrl+Shift+F)
+
+**Date:** 2026-03-20 02:04:13
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- Target:** Backend (server.py) + Frontend (chat.js, chat-section.js, main.css, app.js)
+- Files Modified:** `ui/server.py`, `ui/static/js/modules/chat.js`, `ui/static/templates/chat-section.js`, `ui/static/css/main.css`, `ui/static/js/app.js`
+
+### Results
+
+Results
+
+**What was done:**
+1. **`/api/fs/search` backend endpoint** — text-based grep search через `os.walk()`. Поддерживает 30+ текстовых расширений (.py, .js, .ts, .md, .json, .yaml, .html, .css, .sh, .rs, .go, .java, .c и др.). Пропускает `.git`, `node_modules`, `__pycache__`, `vendor`, `dist` и т.д. Лимит: 30 результатов, макс. размер файла 512KB. Path traversal protection через `allowed_bases`.
+2. **File Search Panel** — collapsible панель в chat toolbar (кнопка FILES или Ctrl+Shift+F). De
 
 ### Notes for Next
 

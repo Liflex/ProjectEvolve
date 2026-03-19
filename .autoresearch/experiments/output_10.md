@@ -1,0 +1,1 @@
+Experiment 10 complete. Switching between **SYNTHWAVE** (neon purple/green) and **DRACULA** (JetBrains-inspired purple/green on dark slate) now works from Settings page (Alt+9). Both themes persist across sessions via localStorage.
