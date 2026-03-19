@@ -259,6 +259,23 @@
                         </div>
                         <div class="flex gap-2 items-end">
                             <div class="flex-1 relative">
+                                <!-- Prompt template chips -->
+                                <div x-show="_showPromptTemplates" x-transition.duration.150ms class="prompt-templates-bar">
+                                    <div class="flex items-center gap-1 flex-wrap">
+                                        <template x-for="tpl in promptTemplates" :key="tpl.id">
+                                            <button class="prompt-chip"
+                                                    @mousedown.prevent="insertPromptTemplate(tab, tpl)"
+                                                    :title="tpl.text">
+                                                <span class="prompt-chip-icon" x-text="tpl.icon"></span>
+                                                <span x-text="tpl.label"></span>
+                                            </button>
+                                        </template>
+                                        <button class="prompt-chip-toggle" @click.stop="_showPromptTemplates = false" title="Hide templates">&laquo;</button>
+                                    </div>
+                                </div>
+                                <div x-show="!_showPromptTemplates" class="prompt-templates-hidden">
+                                    <button class="prompt-chip-toggle" @click.stop="_showPromptTemplates = true" title="Show prompt templates">&#x2726; TEMPLATES</button>
+                                </div>
                                 <!-- Markdown format toolbar -->
                                 <div class="md-format-bar">
                                     <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '**', '**')" title="Bold (Ctrl+B)">B</button>

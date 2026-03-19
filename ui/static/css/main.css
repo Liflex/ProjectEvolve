@@ -1165,6 +1165,60 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .chat-input-area:focus ~ .flex .chat-input-hint,
 .chat-input-area:not(:placeholder-shown) ~ .flex .chat-input-hint { opacity: 0.6; }
 
+/* === CHAT PROMPT TEMPLATES === */
+.prompt-templates-bar {
+    padding: 4px 4px 2px;
+    border-bottom: 1px solid var(--v-dim);
+}
+.prompt-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    font-size: 0.5625rem;
+    letter-spacing: 0.08em;
+    color: var(--v3);
+    background: var(--bg);
+    border: 1px solid var(--v-dim);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    font-family: inherit;
+}
+.prompt-chip:hover {
+    color: var(--v);
+    border-color: var(--v2);
+    background: rgba(180, 74, 255, 0.06);
+}
+.prompt-chip:active {
+    transform: scale(0.96);
+}
+.prompt-chip-icon {
+    font-weight: bold;
+    color: var(--cyan);
+    font-size: 0.625rem;
+}
+.prompt-chip-toggle {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    font-size: 0.5rem;
+    letter-spacing: 0.12em;
+    color: var(--v3);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: color 0.15s;
+    font-family: inherit;
+}
+.prompt-chip-toggle:hover {
+    color: var(--v);
+}
+.prompt-templates-hidden {
+    padding: 2px 4px 0;
+}
+
 /* === CHAT FORMAT TOOLBAR === */
 .md-format-bar {
     display: flex;

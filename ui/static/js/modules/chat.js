@@ -700,6 +700,18 @@ window.AppChat = (function() {
             if (tab) { tab._attachments = []; this.chatTick++; }
         },
 
+        // ========== CHAT: PROMPT TEMPLATES ==========
+        insertPromptTemplate(tab, template) {
+            if (!tab) return;
+            const prefix = template.text;
+            tab.input_text = tab.input_text ? tab.input_text + '\n' + prefix : prefix;
+            this.chatTick++;
+            this.$nextTick(() => {
+                const ta = document.querySelector('#chat-messages-' + tab.tab_id)?.closest('.flex.flex-col')?.querySelector('textarea');
+                if (ta) { ta.focus(); this.autoResizeTextarea({ target: ta }); }
+            });
+        },
+
         // ========== CHAT: INLINE DIFF ==========
         /**
          * Simple line-level diff: returns array of {type:'eq'|'del'|'ins', text}

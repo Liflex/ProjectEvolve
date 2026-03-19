@@ -212,6 +212,19 @@ function _buildAppData() {
         slashMenu: { show: false, items: [], filter: '', selected: 0, _tabId: null },
         chatDragOver: false,
 
+        // Prompt templates
+        _showPromptTemplates: true,
+        promptTemplates: [
+            { id: 'explain', label: 'Explain', icon: '?', text: 'Explain this code step by step:' },
+            { id: 'fix', label: 'Fix bugs', icon: '!', text: 'Find and fix any bugs in this code:' },
+            { id: 'test', label: 'Tests', icon: 'T', text: 'Write unit tests for this code:' },
+            { id: 'optimize', label: 'Optimize', icon: '>', text: 'Optimize this code for performance:' },
+            { id: 'refactor', label: 'Refactor', icon: 'R', text: 'Refactor this code to be cleaner:' },
+            { id: 'docs', label: 'Docs', icon: '#', text: 'Add documentation and comments to this code:' },
+            { id: 'review', label: 'Review', icon: '*', text: 'Review this code and suggest improvements:' },
+            { id: 'security', label: 'Security', icon: 'S', text: 'Perform a security audit on this code:' },
+        ],
+
         // Chat Search (Ctrl+F)
         chatSearch: { show: false, query: '', total: 0, current: 0, _elements: [] },
 
