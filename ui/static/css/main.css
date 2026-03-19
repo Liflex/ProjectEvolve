@@ -1444,3 +1444,112 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 #live-log-container > div:last-child:not(.sticky) {
     animation: log-slide-in 0.15s ease-out;
 }
+
+/* === CHAT ATTACHMENTS === */
+.attachment-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    border: 1px solid var(--v-dim);
+    background: rgba(0,0,0,0.15);
+    overflow-x: auto;
+    flex-wrap: nowrap;
+}
+.attachment-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border: 1px solid var(--v-dim);
+    background: var(--bg);
+    flex-shrink: 0;
+    position: relative;
+    max-width: 220px;
+}
+.attachment-thumb {
+    width: 40px;
+    height: 40px;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 1px solid var(--v-dim);
+}
+.attachment-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.attachment-meta {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+}
+.attachment-info {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    overflow: hidden;
+}
+.attachment-icon {
+    font-size: 0.75rem;
+    flex-shrink: 0;
+}
+.attachment-name {
+    font-size: 0.5625rem;
+    color: var(--ng2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 120px;
+    letter-spacing: 0.02em;
+}
+.attachment-size {
+    font-size: 0.5rem;
+    color: var(--v3);
+    flex-shrink: 0;
+    letter-spacing: 0.04em;
+}
+.attachment-remove {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg2);
+    border: 1px solid var(--v-dim);
+    color: var(--v3);
+    font-size: 0.5rem;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+    padding: 0;
+    line-height: 1;
+}
+.attachment-item:hover .attachment-remove {
+    opacity: 1;
+}
+.attachment-remove:hover {
+    color: var(--red);
+    border-color: var(--red);
+}
+.attachment-clear-all {
+    font-size: 0.5rem;
+    color: var(--v3);
+    letter-spacing: 0.08em;
+    padding: 2px 6px;
+    border: 1px solid var(--v-dim);
+    background: transparent;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 0.15s, border-color 0.15s;
+}
+.attachment-clear-all:hover {
+    color: var(--red);
+    border-color: var(--red);
+}

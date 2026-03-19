@@ -231,6 +231,30 @@
                                 <div class="text-[0.625rem] text-[var(--v3)] mt-2 tracking-wider">&#x0424;&#x0430;&#x0439;&#x043B; &#x0431;&#x0443;&#x0434;&#x0435;&#x0442; &#x0432;&#x0441;&#x0442;&#x0430;&#x0432;&#x043B;&#x0435;&#x043D; &#x0432; &#x043F;&#x043E;&#x043B;&#x0435; &#x0432;&#x0432;&#x043E;&#x0434;&#x0430;</div>
                             </div>
                         </div>
+                        <!-- Hidden file input -->
+                        <input id="chat-file-input" type="file" multiple class="hidden" @change="handleFileInput($event)">
+                        <!-- Attachment preview bar -->
+                        <div x-show="tab._attachments && tab._attachments.length > 0" x-cloak x-transition.duration.150ms
+                             class="attachment-bar">
+                            <template x-for="(att, aidx) in (tab._attachments || [])" :key="aidx">
+                                <div class="attachment-item">
+                                    <div class="attachment-thumb" x-show="att.type?.startsWith('image/')">
+                                        <img :src="att.dataUrl" :alt="att.name" class="attachment-img">
+                                    </div>
+                                    <div class="attachment-info" x-show="!att.type?.startsWith('image/')">
+                                        <span class="attachment-icon">&#x1f4ce;</span>
+                                        <span class="attachment-name" x-text="att.name"></span>
+                                        <span class="attachment-size" x-text="formatFileSize(att.size)"></span>
+                                    </div>
+                                    <div class="attachment-meta" x-show="att.type?.startsWith('image/')">
+                                        <span class="attachment-name" x-text="att.name"></span>
+                                        <span class="attachment-size" x-text="formatFileSize(att.size)"></span>
+                                    </div>
+                                    <button class="attachment-remove" @click.stop="removeAttachment(tab.tab_id, aidx)" title="Remove">&#x2715;</button>
+                                </div>
+                            </template>
+                            <button class="attachment-clear-all" @click.stop="clearAttachments(tab.tab_id)" title="Remove all">&#x2715; CLEAR ALL</button>
+                        </div>
                         <div class="flex gap-2 items-end">
                             <div class="flex-1 relative">
                                 <!-- Markdown format toolbar -->
@@ -251,7 +275,8 @@
                                 <textarea x-model="tab.input_text"
                                           @keydown="handleChatKeydown(tab, $event)"
                                           @input="handleChatInput(tab, $event); autoResizeTextarea($event)"
-                                          placeholder="Message_ (/ for commands, drag files here)"
+                                          @paste="handleChatPaste(tab, $event)"
+                                          placeholder="Message_ (/ for commands, paste images, drag files)"
                                           rows="1"
                                           class="chat-input-area w-full bg-[var(--bg)] border px-3 py-2 text-sm text-[var(--ng2)] tracking-wider resize-none editor"
                                           :class="tab._editMode ? 'border-[var(--yellow)]' : 'border-[var(--v-dim)]'"
@@ -291,9 +316,13 @@
                                     </template>
                                 </div>
                             </div>
-                            <button @click="sendChatMessage(tab)" :disabled="tab.is_streaming || !tab.input_text?.trim()"
+                            <button @click="sendChatMessage(tab)" :disabled="tab.is_streaming || (!tab.input_text?.trim() && (!tab._attachments || tab._attachments.length === 0))"
                                     class="px-4 py-2 border border-[var(--v)] text-[var(--v)] text-xs tracking-wider hover:bg-[rgba(180,74,255,0.1)] disabled:opacity-30 transition-all shrink-0">
                                 [> SEND]
+                            </button>
+                            <button @click="triggerFileAttach(tab)" :disabled="tab.is_streaming"
+                                    class="px-2 py-2 border border-[var(--v-dim)] text-[var(--v3)] text-xs hover:text-[var(--v)] hover:border-[var(--v2)] disabled:opacity-30 transition-all shrink-0" title="Attach file (or paste / drop)">
+                                &#x1f4ce;
                             </button>
                             <button @click="cancelChatStream(tab)" x-show="tab.is_streaming"
                                     class="px-3 py-2 border border-[var(--red)] text-[var(--red)] text-xs tracking-wider hover:bg-[rgba(255,51,51,0.1)] transition-all shrink-0">

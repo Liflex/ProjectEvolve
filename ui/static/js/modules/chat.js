@@ -49,6 +49,7 @@ window.AppChat = (function() {
                     _msgHistory: [],
                     _msgHistoryIdx: -1,
                     _msgDraft: '',
+                    _attachments: [],
                 };
                 this.chatTabs.push(tab);
                 this.activeChatTab = tab.tab_id;
@@ -339,8 +340,16 @@ window.AppChat = (function() {
         },
 
         sendChatMessage(tab) {
-            if (!tab.input_text?.trim() || tab.is_streaming) return;
+            if ((!tab.input_text?.trim() && (!tab._attachments || tab._attachments.length === 0)) || tab.is_streaming) return;
             let content = tab.input_text.trim();
+            // Append attached images as markdown
+            if (tab._attachments && tab._attachments.length > 0) {
+                for (const att of tab._attachments) {
+                    content += (content ? '\n\n' : '') + '![' + att.name + '](' + att.dataUrl + ')';
+                }
+                tab._attachments = [];
+            }
+            if (!content) return;
             // Prepend quoted message if present
             if (tab._quotedMsg) {
                 const quotePrefix = '> [' + tab._quotedMsg.role + ']: ' + tab._quotedMsg.text.split('\n').join('\n> ') + '\n\n';
@@ -600,28 +609,92 @@ window.AppChat = (function() {
             this.chatDragOver = false;
             const files = e.dataTransfer?.files;
             if (!files || files.length === 0) return;
-            for (const file of files) {
-                if (file.size > 500 * 1024) {
-                    this.showToast('FILE TOO LARGE: ' + file.name + ' (max 500KB)', 'error');
+            await this._attachFiles(tab, files);
+        },
+
+        // ========== CHAT: PASTE IMAGE ==========
+        async handleChatPaste(tab, e) {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            const files = [];
+            for (const item of items) {
+                if (item.kind === 'file') {
+                    const file = item.getAsFile();
+                    if (file) files.push(file);
+                }
+            }
+            if (files.length === 0) return; // text paste — do nothing
+            e.preventDefault();
+            await this._attachFiles(tab, files);
+        },
+
+        // ========== CHAT: FILE ATTACHMENT BUTTON ==========
+        triggerFileAttach(tab) {
+            const input = document.getElementById('chat-file-input');
+            if (input) {
+                input._tabId = tab.tab_id;
+                input.click();
+            }
+        },
+        async handleFileInput(e) {
+            const input = e.target;
+            const tabId = input._tabId;
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab || !input.files || input.files.length === 0) return;
+            await this._attachFiles(tab, input.files);
+            input.value = ''; // reset for re-use
+        },
+
+        // ========== CHAT: ATTACHMENTS ==========
+        async _attachFiles(tab, fileList) {
+            if (!tab) return;
+            for (const file of fileList) {
+                if (file.size > 5 * 1024 * 1024) {
+                    this.showToast('FILE TOO LARGE: ' + file.name + ' (max 5MB)', 'error');
                     continue;
                 }
+                const isImage = file.type.startsWith('image/');
                 try {
-                    const text = await file.text();
-                    const ext = file.name.split('.').pop().toLowerCase();
-                    const langMap = { py: 'python', js: 'javascript', ts: 'typescript', jsx: 'jsx', tsx: 'tsx', sh: 'bash', json: 'json', yaml: 'yaml', yml: 'yaml', md: 'markdown', html: 'html', css: 'css', sql: 'sql', rs: 'rust', go: 'go', java: 'java', cpp: 'cpp', c: 'c', rb: 'ruby', php: 'php' };
-                    const lang = langMap[ext] || '';
-                    const header = '**' + file.name + '** (' + this.formatFileSize(file.size) + '):\n';
-                    const codeBlock = '```' + lang + '\n' + text + '\n```\n';
-                    tab.input_text += (tab.input_text ? '\n' : '') + header + codeBlock;
+                    if (isImage) {
+                        // Convert image to base64 data URL
+                        const dataUrl = await new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                        });
+                        if (!tab._attachments) tab._attachments = [];
+                        tab._attachments.push({ name: file.name, size: file.size, type: file.type, dataUrl });
+                    } else {
+                        // Read text content and insert directly into input
+                        const text = await file.text();
+                        const ext = file.name.split('.').pop().toLowerCase();
+                        const langMap = { py: 'python', js: 'javascript', ts: 'typescript', jsx: 'jsx', tsx: 'tsx', sh: 'bash', json: 'json', yaml: 'yaml', yml: 'yaml', md: 'markdown', html: 'html', css: 'css', sql: 'sql', rs: 'rust', go: 'go', java: 'java', cpp: 'cpp', c: 'c', rb: 'ruby', php: 'php' };
+                        const lang = langMap[ext] || '';
+                        const header = '**' + file.name + '** (' + this.formatFileSize(file.size) + '):\n';
+                        const codeBlock = '```' + lang + '\n' + text + '\n```\n';
+                        tab.input_text += (tab.input_text ? '\n' : '') + header + codeBlock;
+                    }
                 } catch (err) {
                     this.showToast('FAILED TO READ: ' + file.name, 'error');
                 }
             }
+            this.chatTick++;
             this.$nextTick(() => {
                 const ta = document.querySelector('#chat-messages-' + tab.tab_id)?.closest('.flex.flex-col')?.querySelector('textarea');
                 if (ta) ta.focus();
                 this.resizeInputForTab(tab);
             });
+        },
+        removeAttachment(tabId, idx) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab || !tab._attachments) return;
+            tab._attachments.splice(idx, 1);
+            this.chatTick++;
+        },
+        clearAttachments(tabId) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (tab) { tab._attachments = []; this.chatTick++; }
         },
 
         // ========== CHAT: INLINE DIFF ==========
