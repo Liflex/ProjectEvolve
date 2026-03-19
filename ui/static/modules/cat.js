@@ -211,6 +211,15 @@
         thinking:  { frames: EYES_THINKING,  x: 9 + OX,  y: 10 + OY, color: '#88aaff', blinkSpeed: 0 },
     };
 
+    // Eye glint centers for cursor tracking — [leftEyeCenter, rightEyeCenter] relative to EYE_CFG position
+    // Only expressions with open eyes get glints (not happy/sleepy)
+    const EYE_GLINT = {
+        neutral:   { left: [3, 2], right: [12, 2] },
+        surprised: { left: [3, 2], right: [12, 2] },
+        angry:     { left: [2, 1], right: [12, 1] },
+        thinking:  { left: [3, 2], right: [12, 2] },
+    };
+
     // Paw sprite for wave animation (3×4)
     const PAW_OUTLINE = decode([0x07, 0x05, 0x07], 3, 4);
     const PAW_FILL = decode([0x07, 0x07, 0x07], 3, 4);
@@ -624,6 +633,15 @@
     let _speechAction = null;              // { type: 'insert', value: '/commit ' } — actionable speech
     let _particles = [];                   // floating particles (Zzz, hearts, sparkles)
     let _whiskerWobble = 0;                // whisker wobble phase
+    let _mouseX = 0, _mouseY = 0;         // global cursor position for eye tracking
+    let _glintX = 0, _glintY = 0;         // smoothed glint offset (-1..1)
+    let _mouseTracking = false;            // is mousemove listener active
+
+    // Mouse move handler for eye tracking
+    function _onMouseMove(e) {
+        _mouseX = e.clientX;
+        _mouseY = e.clientY;
+    }
 
     // ================================================================
     //  PARTICLES (Zzz, hearts, sparkles)
@@ -850,6 +868,42 @@
         const frames = cfg.frames;
         if (frames && frames.length > 0 && frames[eyeFrame]) {
             drawGrid(frames[eyeFrame], cfg.x + _headOffX, cfg.y + _headOffY + headExtraY, eyeColor);
+        }
+
+        // Cursor-tracking eye glints (bright pixel that follows mouse)
+        const glintCfg = EYE_GLINT[expression];
+        if (glintCfg && _mouseTracking && _idleLevel < 2) {
+            // Skip during blink frames
+            const isBlinking = expression === 'neutral' && eyeFrame === 1;
+            const isSleepyBlink = expression === 'sleepy' && (eyeFrame === 2 || eyeFrame === 0);
+            if (!isBlinking && !isSleepyBlink) {
+                const rect = canvas.getBoundingClientRect();
+                const catScreenX = rect.left + rect.width / 2;
+                const catScreenY = rect.top + rect.height * 0.4; // eyes are in upper portion
+                const dx = _mouseX - catScreenX;
+                const dy = _mouseY - catScreenY;
+                const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                // Target offset: max ±1 pixel in each direction
+                const targetX = (dx / dist);
+                const targetY = (dy / dist);
+                // Smooth interpolation
+                _glintX += (targetX - _glintX) * 0.12;
+                _glintY += (targetY - _glintY) * 0.12;
+                const gx = Math.round(_glintX);
+                const gy = Math.round(_glintY);
+                // Draw glint on each eye
+                const eox = _headOffX;
+                const eoy = _headOffY + headExtraY;
+                ctx.fillStyle = '#ffffff';
+                // Left eye glint
+                const lx = cfg.x + glintCfg.left[0] + gx + eox;
+                const ly = cfg.y + glintCfg.left[1] + gy + eoy;
+                ctx.fillRect(lx * ps, ly * ps, ps, ps);
+                // Right eye glint
+                const rx = cfg.x + glintCfg.right[0] + gx + eox;
+                const ry = cfg.y + glintCfg.right[1] + gy + eoy;
+                ctx.fillRect(rx * ps, ry * ps, ps, ps);
+            }
         }
 
         // Head position for whiskers/mouth (follows head offset)
@@ -1139,7 +1193,11 @@
             tailFrame = 0;
             eyeFrame = 0;
             _tickCount = 0;
+            _glintX = 0;
+            _glintY = 0;
             animating = true;
+            _mouseTracking = true;
+            document.addEventListener('mousemove', _onMouseMove);
 
             render();
             animTimer = setInterval(tick, 120);
@@ -1153,6 +1211,8 @@
             if (animTimer) { clearInterval(animTimer); animTimer = null; }
             stopTips();
             _particles = [];
+            _mouseTracking = false;
+            document.removeEventListener('mousemove', _onMouseMove);
             canvas = null;
             ctx = null;
         },
