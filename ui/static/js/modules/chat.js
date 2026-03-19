@@ -890,8 +890,44 @@ window.AppChat = (function() {
         },
 
         /**
+         * Compute word-level highlighting for a pair of changed lines.
+         * Uses common prefix/suffix approach — fast and clean.
+         * Returns { oldHtml, newHtml } with changed segments wrapped in highlight spans.
+         */
+        _highlightWordDiff(oldLine, newLine) {
+            if (!oldLine && !newLine) return { oldHtml: '', newHtml: '' };
+            if (!oldLine) return { oldHtml: '', newHtml: this.escHtml(newLine) };
+            if (!newLine) return { oldHtml: this.escHtml(oldLine), newHtml: '' };
+            // Find common prefix
+            let prefixLen = 0;
+            const minLen = Math.min(oldLine.length, newLine.length);
+            while (prefixLen < minLen && oldLine[prefixLen] === newLine[prefixLen]) prefixLen++;
+            // Find common suffix (not overlapping with prefix)
+            let suffixLen = 0;
+            const maxSuffix = minLen - prefixLen;
+            while (suffixLen < maxSuffix &&
+                   oldLine[oldLine.length - 1 - suffixLen] === newLine[newLine.length - 1 - suffixLen]) {
+                suffixLen++;
+            }
+            const oldEnd = oldLine.length - suffixLen;
+            const newEnd = newLine.length - suffixLen;
+            const oldMiddle = oldLine.slice(prefixLen, oldEnd);
+            const newMiddle = newLine.slice(prefixLen, newEnd);
+            // If middle parts are identical, no highlighting needed
+            if (oldMiddle === newMiddle) {
+                return { oldHtml: this.escHtml(oldLine), newHtml: this.escHtml(newLine) };
+            }
+            const prefix = this.escHtml(oldLine.slice(0, prefixLen));
+            const suffix = suffixLen > 0 ? this.escHtml(oldLine.slice(oldEnd)) : '';
+            const oldHtml = prefix + '<span class="diff-hl-del">' + this.escHtml(oldMiddle) + '</span>' + suffix;
+            const newHtml = prefix + '<span class="diff-hl-ins">' + this.escHtml(newMiddle) + '</span>' + suffix;
+            return { oldHtml, newHtml };
+        },
+
+        /**
          * Render inline diff HTML for edit tool messages.
-         * Shows old_string (red) → new_string (green) with line numbers.
+         * Shows old_string (red) → new_string (green) with word-level highlighting
+         * for paired changed lines.
          */
         renderInlineDiff(oldStr, newStr) {
             if (!oldStr && !newStr) return '';
@@ -915,15 +951,50 @@ window.AppChat = (function() {
             html += '<span class="diff-stats-ins">+' + added + '</span>';
             html += '<span style="color:var(--v3);margin-left:auto;font-size:0.5rem">INLINE_DIFF</span>';
             html += '</div>';
-            // Lines
-            for (const d of displayDiff) {
+            // Render lines with word-level highlighting for paired del/ins
+            let pendingDel = [];
+            let i = 0;
+            while (i < displayDiff.length) {
+                const d = displayDiff[i];
                 if (d.type === 'del') {
-                    html += '<div class="diff-del diff-line diff-line-del"><span class="diff-line-sign" style="color:var(--red)">-</span>' + this.escHtml(d.text) + '</div>';
+                    pendingDel.push(d);
+                    i++;
                 } else if (d.type === 'ins') {
-                    html += '<div class="diff-add diff-line diff-line-ins"><span class="diff-line-sign" style="color:var(--ng)">+</span>' + this.escHtml(d.text) + '</div>';
+                    // Collect consecutive ins lines
+                    const insLines = [];
+                    while (i < displayDiff.length && displayDiff[i].type === 'ins') {
+                        insLines.push(displayDiff[i]);
+                        i++;
+                    }
+                    // Pair with pending deletions by index
+                    const pairCount = Math.min(pendingDel.length, insLines.length);
+                    for (let p = 0; p < pairCount; p++) {
+                        const wd = this._highlightWordDiff(pendingDel[p].text, insLines[p].text);
+                        html += '<div class="diff-del diff-line diff-line-del"><span class="diff-line-sign" style="color:var(--red)">-</span>' + wd.oldHtml + '</div>';
+                        html += '<div class="diff-add diff-line diff-line-ins"><span class="diff-line-sign" style="color:var(--ng)">+</span>' + wd.newHtml + '</div>';
+                    }
+                    // Unpaired deletions
+                    for (let p = pairCount; p < pendingDel.length; p++) {
+                        html += '<div class="diff-del diff-line diff-line-del"><span class="diff-line-sign" style="color:var(--red)">-</span>' + this.escHtml(pendingDel[p].text) + '</div>';
+                    }
+                    // Unpaired insertions
+                    for (let p = pairCount; p < insLines.length; p++) {
+                        html += '<div class="diff-add diff-line diff-line-ins"><span class="diff-line-sign" style="color:var(--ng)">+</span>' + this.escHtml(insLines[p].text) + '</div>';
+                    }
+                    pendingDel = [];
                 } else {
+                    // Flush any pending deletions before equal line
+                    for (const pd of pendingDel) {
+                        html += '<div class="diff-del diff-line diff-line-del"><span class="diff-line-sign" style="color:var(--red)">-</span>' + this.escHtml(pd.text) + '</div>';
+                    }
+                    pendingDel = [];
                     html += '<div class="diff-line diff-line-eq"><span class="diff-line-sign"> </span>' + this.escHtml(d.text) + '</div>';
+                    i++;
                 }
+            }
+            // Flush remaining pending deletions
+            for (const pd of pendingDel) {
+                html += '<div class="diff-del diff-line diff-line-del"><span class="diff-line-sign" style="color:var(--red)">-</span>' + this.escHtml(pd.text) + '</div>';
             }
             if (truncated) {
                 html += '<div class="diff-truncated">... ' + (diff.length - MAX_LINES) + ' more lines</div>';
