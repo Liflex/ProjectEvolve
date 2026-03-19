@@ -1211,6 +1211,177 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .msg-reaction-btn.active-up { color: var(--ng); border-color: rgba(0,229,128,0.3); background: rgba(0,229,128,0.06); }
 .msg-reaction-btn.active-down { color: var(--red); border-color: rgba(255,51,102,0.3); background: rgba(255,51,102,0.06); }
 
+/* === CHAT WELCOME SCREEN === */
+.welcome-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 2rem;
+    text-align: center;
+    animation: wsFadeIn 0.4s ease-out;
+}
+@keyframes wsFadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.ws-header {
+    margin-bottom: 1.5rem;
+}
+.ws-logo {
+    color: var(--v);
+    margin-bottom: 0.75rem;
+    filter: drop-shadow(0 0 8px rgba(180,74,255,0.3));
+}
+.ws-title {
+    font-size: 0.75rem;
+    letter-spacing: 0.25em;
+    color: var(--v);
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+.ws-project {
+    font-size: 0.875rem;
+    color: var(--ng2);
+    font-weight: bold;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.ws-project-icon {
+    font-size: 0.875rem;
+    opacity: 0.7;
+}
+.ws-path {
+    font-size: 0.5625rem;
+    color: var(--v3);
+    font-family: monospace;
+    letter-spacing: 0.05em;
+    margin-top: 0.25rem;
+    max-width: 400px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ws-meta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 0.5rem;
+}
+.ws-conn {
+    font-size: 0.5625rem;
+    letter-spacing: 0.12em;
+    font-weight: bold;
+}
+.ws-session-id {
+    font-size: 0.5rem;
+    color: var(--v3);
+    letter-spacing: 0.08em;
+    font-family: monospace;
+}
+/* Quick actions grid */
+.ws-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-bottom: 1.25rem;
+    max-width: 360px;
+    width: 100%;
+}
+.ws-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 10px 8px;
+    border: 1px solid var(--v-dim);
+    border-radius: 6px;
+    background: var(--bg2);
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--ng3);
+}
+.ws-action-btn:hover {
+    border-color: var(--v2);
+    background: rgba(180,74,255,0.06);
+    color: var(--ng2);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.ws-action-icon {
+    font-size: 1rem;
+    line-height: 1;
+}
+.ws-action-label {
+    font-size: 0.5rem;
+    letter-spacing: 0.12em;
+    font-weight: bold;
+    color: var(--v3);
+}
+.ws-action-btn:hover .ws-action-label {
+    color: var(--v);
+}
+/* Tip section */
+.ws-tip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border: 1px solid var(--v-dim);
+    border-radius: 6px;
+    background: var(--bg2);
+    max-width: 420px;
+    margin-bottom: 1rem;
+}
+.ws-tip-icon {
+    font-size: 0.75rem;
+    flex-shrink: 0;
+}
+.ws-tip-text {
+    font-size: 0.625rem;
+    color: var(--v3);
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+}
+.ws-tip-text kbd {
+    display: inline-block;
+    padding: 0 4px;
+    border: 1px solid var(--v-dim);
+    border-radius: 3px;
+    background: var(--bg);
+    font-family: monospace;
+    font-size: 0.5625rem;
+    color: var(--v);
+    vertical-align: baseline;
+}
+/* Feature hints bar */
+.ws-features {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.ws-feature {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.5rem;
+    color: var(--v3);
+    letter-spacing: 0.08em;
+}
+.ws-feature-icon {
+    font-size: 0.5625rem;
+    opacity: 0.7;
+}
+
 /* === THINKING STREAMING INDICATOR === */
 .thinking-streaming-indicator {
     display: flex;

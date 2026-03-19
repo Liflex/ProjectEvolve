@@ -808,16 +808,102 @@ window.AppChat = (function() {
             return html;
         },
 
+        // ========== CHAT: WELCOME SCREEN ==========
+        _renderWelcomeScreen(tab) {
+            const projectPath = this.escHtml(tab?.project_path || '.');
+            const projectName = projectPath.split(/[\\/]/).filter(Boolean).pop() || projectPath;
+            const sessionId = this.escHtml(tab?.session_id || '').slice(0, 8);
+            const connState = tab?.ws_state || 'connecting';
+            const connColor = connState === 'connected' ? 'var(--ng)' : connState === 'connecting' ? 'var(--amber)' : 'var(--red)';
+            const connLabel = connState.toUpperCase();
+
+            // Quick actions
+            const actions = [
+                { label: 'FOCUS INPUT', icon: '&#x270d;', hint: 'Начать ввод', action: "window._app.focusChatInput('" + tab.tab_id + "')" },
+                { label: '/ COMMANDS', icon: '&#x2699;', hint: 'Slash меню', action: "window._app.focusChatInput('" + tab.tab_id + "', '/')" },
+                { label: 'CTRL+K', icon: '&#x2318;', hint: 'Command Palette', action: "window._app.openCmdPalette()" },
+                { label: 'CTRL+F', icon: '&#x1f50d;', hint: 'Поиск', action: "window._app.openChatSearch()" },
+                { label: 'RESUME', icon: '&#x21bb;', hint: 'Предыдущая сессия', action: "window._app.showSessionPicker()" },
+                { label: '? KEYS', icon: '&#x2328;', hint: 'Горячие клавиши', action: "window._app.openShortcuts()" },
+            ];
+
+            // Tips — rotate based on time
+            const tips = [
+                'Введите <kbd>/</kbd> для автодополнения команд и скиллов Claude Code',
+                'Вставьте изображение из буфера обмена прямо в поле ввода',
+                'Перетащите файлы в чат для вложений (drag & drop)',
+                'Используйте <kbd>Ctrl+K</kbd> для быстрого доступа ко всем командам',
+                'Нажмите <kbd>?</kbd> чтобы увидеть все горячие клавиши',
+                'Правый клик по сообщению — контекстное меню с действиями',
+                'Зажмите и выделите текст — цитирование ответа агента',
+                'PIN — закрепите важные сообщения для быстрого доступа',
+            ];
+            const tipIdx = Math.floor(Date.now() / 30000) % tips.length;
+
+            let html = '<div class="welcome-screen">'
+                // Header
+                + '<div class="ws-header">'
+                + '<div class="ws-logo">'
+                + '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>'
+                + '</div>'
+                + '<div class="ws-title">CLAUDE_CODE_SESSION</div>'
+                + '<div class="ws-project"><span class="ws-project-icon">&#x1f4c1;</span> ' + projectName + '</div>'
+                + '<div class="ws-path">' + projectPath + '</div>'
+                + '<div class="ws-meta">'
+                + '<span class="ws-conn" style="color:' + connColor + '">&#x25cf; ' + connLabel + '</span>'
+                + (sessionId ? '<span class="ws-session-id">ID: ' + sessionId + '</span>' : '')
+                + '</div>'
+                + '</div>'
+
+                // Quick actions grid
+                + '<div class="ws-actions">'
+                + actions.map(a =>
+                    '<button class="ws-action-btn" onclick="event.stopPropagation();(' + a.action + ')()" title="' + a.hint + '">'
+                    + '<span class="ws-action-icon">' + a.icon + '</span>'
+                    + '<span class="ws-action-label">' + a.label + '</span>'
+                    + '</button>'
+                ).join('')
+                + '</div>'
+
+                // Tip of the session
+                + '<div class="ws-tip">'
+                + '<span class="ws-tip-icon">&#x1f4a1;</span>'
+                + '<span class="ws-tip-text">' + tips[tipIdx] + '</span>'
+                + '</div>'
+
+                // Feature hints
+                + '<div class="ws-features">'
+                + '<div class="ws-feature"><span class="ws-feature-icon">&#x1f4f7;</span> Paste images</div>'
+                + '<div class="ws-feature"><span class="ws-feature-icon">&#x1f4ce;</span> Drag files</div>'
+                + '<div class="ws-feature"><span class="ws-feature-icon">&#x1f4cc;</span> Pin messages</div>'
+                + '<div class="ws-feature"><span class="ws-feature-icon">&#x1f504;</span> Regen response</div>'
+                + '</div>'
+
+                + '</div>';
+            return html;
+        },
+
+        // Focus chat input for this tab, optionally prepend text
+        focusChatInput(tabId, prefix) {
+            if (this.activeChatTab !== tabId) this.activateChatTab(tabId);
+            this.$nextTick(() => {
+                const container = document.querySelector('#chat-messages-' + tabId)?.closest('.flex.flex-col');
+                if (!container) return;
+                const ta = container.querySelector('textarea');
+                if (!ta) return;
+                ta.focus();
+                if (prefix) {
+                    ta.value = prefix;
+                    ta.dispatchEvent(new Event('input'));
+                }
+            });
+        },
+
         // ========== CHAT: RENDER ==========
         renderChatHTML(tab) {
             const _ = this.chatTick;
             if (!tab || !tab.messages || tab.messages.length === 0) {
-                return '<div style="display:flex;align-items:center;justify-content:center;height:100%;text-align:center">'
-                    + '<div>'
-                    + '<div style="font-size:0.625rem;letter-spacing:0.2em;color:var(--v3);margin-bottom:8px">CLAUDE_CODE_SESSION</div>'
-                    + '<div style="font-size:0.75rem;color:var(--v3)">Target: ' + this.escHtml(tab?.project_path || '') + '</div>'
-                    + '<div style="font-size:0.5625rem;color:var(--v3);margin-top:4px">Type a message to start_</div>'
-                    + '</div></div>';
+                return this._renderWelcomeScreen(tab);
             }
             let html = '';
             const icons = { read: '&#x1f4d6;', edit: '&#x270f;', write: '&#x1f4be;', bash: '&#x2328;', search: '&#x1f50d;', other: '&#x2699;' };
