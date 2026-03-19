@@ -1943,5 +1943,60 @@ window.AppChat = (function() {
                 duration: this.getSessionDuration(tab),
             };
         },
+
+        // ========== CHAT: EXPORT ==========
+        exportChatSession(mode) {
+            const tab = this.activeTab;
+            if (!tab || !tab.messages || tab.messages.length === 0) {
+                this.showToast('Нет сообщений для экспорта', 'error');
+                return;
+            }
+            let msgs;
+            if (mode === 'pinned') {
+                const pinned = this.pinnedMessages.filter(p => p.tabId === tab.tab_id).sort((a, b) => a.msgIdx - b.msgIdx);
+                msgs = pinned.map(p => tab.messages[p.msgIdx]).filter(Boolean);
+                if (msgs.length === 0) { this.showToast('Нет закреплённых сообщений', 'error'); return; }
+            } else if (mode === 'last10') {
+                msgs = tab.messages.slice(-10);
+            } else {
+                msgs = tab.messages;
+            }
+            const stats = this.getSessionStats(tab);
+            const now = new Date();
+            const dateStr = now.toISOString().slice(0, 10);
+            const timeStr = now.toTimeString().slice(0, 8);
+            let md = '# Chat Export: ' + (tab.label || 'Session') + '\n\n';
+            md += '- **Date:** ' + dateStr + ' ' + timeStr + '\n';
+            md += '- **Project:** `' + (tab.project_path || 'N/A') + '`\n';
+            if (stats) {
+                md += '- **Messages:** ' + stats.total + ' (' + stats.userCount + ' user, ' + stats.asstCount + ' assistant)\n';
+                md += '- **Duration:** ' + (stats.duration || 'N/A') + '\n';
+                if (stats.tokens?.input > 0) {
+                    md += '- **Tokens:** ' + (stats.tokens.input / 1000).toFixed(1) + 'K in / ' + (stats.tokens.output / 1000).toFixed(1) + 'K out';
+                    if (stats.tokens.cost > 0) md += ' ($' + stats.tokens.cost.toFixed(4) + ')';
+                    md += '\n';
+                }
+            }
+            md += '- **Mode:** ' + ({ full: 'Full Session', pinned: 'Pinned Only', last10: 'Last 10 Messages' }[mode] || mode) + '\n\n---\n\n';
+            for (const msg of msgs) {
+                if (msg.role === 'tool') continue;
+                const role = msg.role === 'user' ? '**User**' : '**Claude**';
+                const ts = msg.ts ? new Date(msg.ts).toLocaleString('ru-RU') : '';
+                md += '### ' + role;
+                if (ts) md += ' _' + ts + '_';
+                if (msg.reaction) md += ' ' + (msg.reaction === 'up' ? ':thumbsup:' : ':thumbsdown:');
+                md += '\n\n';
+                md += (msg.content || '').trim() + '\n\n';
+            }
+            const filename = 'chat-' + (tab.label || 'session') + '-' + dateStr + '.md';
+            const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            this.showToast('Экспорт: ' + filename + ' (' + msgs.length + ' msg)');
+        },
     };
 })();

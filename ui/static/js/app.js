@@ -236,6 +236,7 @@ function _buildAppData() {
         pinnedMessages: [], // [{tabId, msgIdx, role, preview, ts, content}]
         showPinsPanel: false,
         showStatsPanel: false,
+        showExportMenu: false,
 
         // Context menu
         ctxMenu: { show: false, items: [], x: 0, y: 0 },

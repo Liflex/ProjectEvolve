@@ -103,6 +103,25 @@
             <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider" x-show="activeTab" x-text="(activeTab?.messages?.length || 0) + ' MSGS'"></span>
             <span class="text-[0.5rem] text-[var(--v)] tracking-wider blink" x-show="_chatNavIdx >= 0" x-text="'NAV ' + (_chatNavIdx + 1) + ' [c q e f p d]'"></span>
             <div class="flex-1"></div>
+            <div class="relative">
+                <button class="chat-toolbar-btn" :class="showExportMenu && 'active'" @click.stop="showExportMenu = !showExportMenu" title="Export session to Markdown">&#x1f4e4; EXPORT</button>
+                <div x-show="showExportMenu" x-cloak x-transition.duration.150ms
+                     @click.outside="showExportMenu = false"
+                     class="export-menu">
+                    <div class="export-menu-header"><span>&#x1f4e4; EXPORT_SESSION</span></div>
+                    <button class="export-menu-item" @click.stop="showExportMenu = false; exportChatSession('full')">
+                        <span class="export-menu-icon">&#x1f4c4;</span> Full Session
+                        <span class="export-menu-desc" x-text="'(' + (activeTab?.messages?.length || 0) + ' messages)'"></span>
+                    </button>
+                    <button class="export-menu-item" @click.stop="showExportMenu = false; exportChatSession('pinned')">
+                        <span class="export-menu-icon">&#x1f4cc;</span> Pinned Only
+                        <span class="export-menu-desc" x-text="'(' + pinnedMessages.filter(p => p.tabId === activeChatTab).length + ' pinned)'"></span>
+                    </button>
+                    <button class="export-menu-item" @click.stop="showExportMenu = false; exportChatSession('last10')">
+                        <span class="export-menu-icon">&#x1f4dd;</span> Last 10 Messages
+                    </button>
+                </div>
+            </div>
             <button class="chat-toolbar-btn" :class="showStatsPanel && 'active'" @click="showStatsPanel = !showStatsPanel" title="Session statistics">&#x1f4ca; STATS</button>
             <button class="chat-toolbar-btn" @click="openChatSearch()" title="Search in chat (Ctrl+F)">&#x1f50d;</button>
             <button class="chat-toolbar-btn" @click="openCmdPalette()" title="Command Palette (Ctrl+K)" style="font-size:0.5rem;letter-spacing:0.1em">CTRL+K</button>
@@ -282,7 +301,7 @@
                                     <button class="md-format-btn" style="font-style:italic;font-weight:normal" @mousedown.prevent="insertMarkdown(tab, '*', '*')" title="Italic (Ctrl+I)">I</button>
                                     <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '`', '`')" title="Inline code"><span class="fmt-icon">&lt;/&gt;</span></button>
                                     <div class="md-format-sep"></div>
-                                    <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '\`\`\`\n', '\n\`\`\`')" title="Code block"><span class="fmt-icon">{ }</span></button>
+                                    <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '${'```'}\n', '\n${'```'}')" title="Code block"><span class="fmt-icon">{ }</span></button>
                                     <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '[', '](url)')" title="Link"><span class="fmt-icon">&#x1f517;</span></button>
                                     <div class="md-format-sep"></div>
                                     <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '- ', '')" title="Unordered list"><span class="fmt-icon">&#x2022;</span></button>

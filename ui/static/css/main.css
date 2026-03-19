@@ -935,6 +935,38 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     max-width: 100%;
 }
 
+/* === CHAT EXPORT MENU === */
+.export-menu {
+    position: absolute; top: 100%; right: 0; z-index: 30;
+    width: 240px;
+    background: var(--bg2); border: 1px solid var(--v-dim);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    display: flex; flex-direction: column;
+    border-radius: 3px; overflow: hidden;
+}
+.export-menu-header {
+    padding: 6px 10px; border-bottom: 1px solid var(--v-dim);
+    font-size: 0.5625rem; letter-spacing: 0.1em; color: var(--v);
+    background: rgba(0,0,0,0.15);
+}
+.export-menu-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; font-size: 0.625rem; color: var(--ng3);
+    background: none; border: none; cursor: pointer;
+    transition: all 0.12s; text-align: left; width: 100%;
+    letter-spacing: 0.04em;
+}
+.export-menu-item:hover {
+    background: rgba(180,74,255,0.08); color: var(--v);
+}
+.export-menu-icon {
+    font-size: 0.75rem; width: 20px; text-align: center; flex-shrink: 0;
+}
+.export-menu-desc {
+    margin-left: auto; font-size: 0.5rem; color: var(--v3);
+    letter-spacing: 0.06em;
+}
+
 /* === CHAT EDIT MODE BANNER === */
 .edit-mode-banner {
     display: flex;
