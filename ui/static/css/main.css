@@ -1063,6 +1063,85 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 }
 .msg-wrap:hover .msg-actions { opacity: 1; pointer-events: auto; }
 
+/* === MESSAGE TOC (OUTLINE) === */
+.msg-toc {
+    border: 1px solid var(--v-dim);
+    background: var(--bg);
+    margin-bottom: 8px;
+    font-size: 0.6875rem;
+}
+.msg-toc-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+    user-select: none;
+    color: var(--v3);
+    border-bottom: 1px solid var(--v-dim);
+    letter-spacing: 0.1em;
+    transition: background 0.15s;
+}
+.msg-toc-header:hover {
+    background: var(--bg3);
+}
+.msg-toc-arrow {
+    font-size: 0.5rem;
+    color: var(--v3);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+}
+.msg-toc.open .msg-toc-arrow {
+    transform: rotate(90deg);
+}
+.msg-toc-icon {
+    font-size: 0.75rem;
+    color: var(--v);
+}
+.msg-toc-label {
+    font-weight: bold;
+    color: var(--v);
+}
+.msg-toc-count {
+    color: var(--v3);
+    font-size: 0.5625rem;
+    opacity: 0.7;
+}
+.msg-toc-body {
+    display: none;
+    padding: 4px 0;
+    max-height: 180px;
+    overflow-y: auto;
+}
+.msg-toc.open .msg-toc-body {
+    display: block;
+}
+.msg-toc-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 8px;
+    cursor: pointer;
+    color: var(--ng3);
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.msg-toc-item:hover {
+    background: var(--bg3);
+    color: var(--v);
+}
+.msg-toc-bullet {
+    font-size: 0.375rem;
+    flex-shrink: 0;
+    color: var(--v2);
+}
+.msg-toc-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* === CHAT MESSAGE KEYBOARD NAVIGATION FOCUS === */
 .msg-focused {
     border-left: 2px solid var(--v) !important;

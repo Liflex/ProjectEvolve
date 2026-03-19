@@ -1119,6 +1119,51 @@ window.AppChat = (function() {
             });
         },
 
+        // ========== CHAT: MESSAGE OUTLINE ==========
+        _buildMessageTOC(content, msgId) {
+            if (!content) return '';
+            const headingRegex = /^(#{2,4})\s+(.+)$/gm;
+            const headings = [];
+            let match;
+            while ((match = headingRegex.exec(content)) !== null) {
+                const level = match[1].length;
+                const text = match[2].trim();
+                const before = content.slice(0, match.index);
+                const codeBlockCount = (before.match(/```/g) || []).length;
+                if (codeBlockCount % 2 === 0) {
+                    headings.push({ level, text, id: msgId + '-h' + headings.length });
+                }
+            }
+            if (headings.length < 3) return '';
+            let html = '<div class="msg-toc open">'
+                + '<div class="msg-toc-header" onclick="event.stopPropagation();this.parentElement.classList.toggle(\'open\')">'
+                + '<span class="msg-toc-arrow">&#x25B6;</span>'
+                + '<span class="msg-toc-icon">&#x2630;</span>'
+                + '<span class="msg-toc-label">OUTLINE</span>'
+                + '<span class="msg-toc-count">' + headings.length + ' sections</span>'
+                + '</div>'
+                + '<div class="msg-toc-body">';
+            for (const h of headings) {
+                const indent = (h.level - 2) * 12;
+                const escaped = this.escHtml(h.text);
+                html += '<div class="msg-toc-item" style="padding-left:' + (8 + indent) + 'px" onclick="event.stopPropagation();var el=document.getElementById(\'' + h.id + '\');if(el){el.scrollIntoView({behavior:\'smooth\',block:\'start\'})}">'
+                    + '<span class="msg-toc-bullet">' + (h.level === 2 ? '&#x25CF;' : '&#x25CB;') + '</span>'
+                    + '<span class="msg-toc-text">' + escaped + '</span>'
+                    + '</div>';
+            }
+            html += '</div></div>';
+            return html;
+        },
+        _addHeadingIds(html, prefix) {
+            if (!html) return html;
+            let hIdx = 0;
+            return html.replace(/<(h[2-4])(\s[^>]*)?>/g, (match, tag, attrs) => {
+                if (attrs && /id\s*=/i.test(attrs)) return match;
+                const id = prefix + '-h' + hIdx++;
+                return '<' + tag + (attrs || '') + ' id="' + id + '">';
+            });
+        },
+
         // ========== CHAT: RENDER ==========
         renderChatHTML(tab) {
             const _ = this.chatTick;
@@ -1148,10 +1193,14 @@ window.AppChat = (function() {
                         + '<span class="streaming-cursor"></span>'
                         + '</div></div></div>';
                 }
+                const msgId = tab.tab_id + '-' + idx;
                 const cursorHtml = msg.is_streaming ? '<span class="streaming-cursor"></span>' : '';
+                const rawMdHtml = this.renderMarkdown(msg.content);
+                const headedHtml = this._addHeadingIds(rawMdHtml, msgId);
+                const tocHtml = !msg.is_streaming ? this._buildMessageTOC(msg.content, msgId) : '';
                 const contentHtml = msg.is_streaming
-                    ? '<div class="md">' + this.linkFilePaths(this.renderMarkdown(msg.content)) + cursorHtml + '</div>'
-                    : '<div class="md">' + this.linkFilePaths(this.renderMarkdown(msg.content)) + '</div>';
+                    ? '<div class="md">' + this.linkFilePaths(headedHtml) + cursorHtml + '</div>'
+                    : '<div class="md">' + tocHtml + this.linkFilePaths(headedHtml) + '</div>';
                 const aTime = this.fmtTime(msg.ts);
                 const aFullTime = this.fmtFullTime(msg.ts);
                 const aTimeHtml = aTime ? ' <span class="msg-ts" title="' + this.escHtml(aFullTime) + '" style="color:var(--v3);font-weight:normal;cursor:help">' + aTime + '</span>' : '';
