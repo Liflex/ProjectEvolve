@@ -481,7 +481,16 @@ window.AppLab = (function() {
                 }
                 this.connectResearchWs();
                 await this.pollRunStatus();
-            } catch (e) { console.error('[startRun] FAILED:', e); this.showToast('LAUNCH FAILED', 'error'); }
+            } catch (e) {
+                console.error('[startRun] FAILED:', e);
+                const msg = (e.message || '').toLowerCase();
+                if (msg.includes('not configured') || msg.includes('configure')) {
+                    this.showToast('PROJECT NOT CONFIGURED — use SETUP WIZARD', 'error');
+                    this.showSetupWizard();
+                } else {
+                    this.showToast('LAUNCH FAILED', 'error');
+                }
+            }
         },
         async stopRun() {
             try {
@@ -553,6 +562,76 @@ window.AppLab = (function() {
                 this._preflightResult = { ready: false, checks: [], error: e.message };
                 return this._preflightResult;
             }
+        },
+
+        // ========== RUN: SETUP WIZARD ==========
+        _showSetupWizard: false,
+        _setupStep: 0,
+        _setupSaving: false,
+        _setupData: { name: '', description: '', goals: '', tech_stack: '', focus_areas: '', constraints: '' },
+
+        _setupSteps: [
+            { key: 'name', label: 'PROJECT_INFO', icon: '>' },
+            { key: 'goals', label: 'GOALS', icon: '>>' },
+            { key: 'tech', label: 'STACK_&_FOCUS', icon: '>>>' },
+            { key: 'constraints', label: 'CONSTRAINTS', icon: '>>>>' },
+        ],
+
+        showSetupWizard() {
+            // Pre-fill from existing preflight data if available
+            this._setupStep = 0;
+            this._setupSaving = false;
+            this._setupData = { name: '', description: '', goals: '', tech_stack: '', focus_areas: '', constraints: '' };
+            // Try to load existing config for pre-fill
+            const path = this.runConfig.project || '.';
+            this.api('/api/config?project=' + encodeURIComponent(path)).then(data => {
+                if (data && data.name) this._setupData.name = data.name;
+                if (data && data.description) this._setupData.description = data.description;
+                if (data && data.goals && data.goals.length) this._setupData.goals = data.goals.join('\n');
+                if (data && data.tech_stack && data.tech_stack.length) this._setupData.tech_stack = data.tech_stack.join(', ');
+                if (data && data.focus_areas && data.focus_areas.length) this._setupData.focus_areas = data.focus_areas.join(', ');
+                if (data && data.constraints && data.constraints.length) this._setupData.constraints = data.constraints.join('\n');
+            }).catch(() => {});
+            this._showSetupWizard = true;
+        },
+        closeSetupWizard() { this._showSetupWizard = false; },
+        nextSetupStep() { if (this._setupStep < this._setupSteps.length - 1) this._setupStep++; },
+        prevSetupStep() { if (this._setupStep > 0) this._setupStep--; },
+        _setupCanProceed() {
+            if (this._setupStep === 0) return this._setupData.name.trim().length > 0;
+            if (this._setupStep === 1) return this._setupData.goals.trim().split('\n').filter(l => l.trim()).length > 0;
+            return true;
+        },
+        async saveSetup() {
+            this._setupSaving = true;
+            try {
+                const goals = this._setupData.goals.split('\n').map(l => l.trim()).filter(Boolean);
+                const techStack = this._setupData.tech_stack.split(',').map(s => s.trim()).filter(Boolean);
+                const focusAreas = this._setupData.focus_areas.split(',').map(s => s.trim()).filter(Boolean);
+                const constraints = this._setupData.constraints.split('\n').map(l => l.trim()).filter(Boolean);
+                await this.api('/api/setup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        project: this.runConfig.project || '.',
+                        name: this._setupData.name.trim(),
+                        description: this._setupData.description.trim(),
+                        goals, tech_stack: techStack, focus_areas: focusAreas, constraints,
+                    }),
+                });
+                this.showToast('PROJECT CONFIGURED', 'success');
+                this._showSetupWizard = false;
+                if (window.CatModule) {
+                    CatModule.setExpression('happy');
+                    CatModule.setSpeechText('Настройка завершена! Готов к работе! =^._.^=', 4000);
+                    setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000);
+                }
+                // Re-run preflight
+                this.runPreflight(this.runConfig.project);
+            } catch (e) {
+                console.error('[saveSetup] FAILED:', e);
+                this.showToast('SETUP FAILED: ' + e.message, 'error');
+            } finally { this._setupSaving = false; }
         },
     };
 })();

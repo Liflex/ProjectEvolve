@@ -2202,3 +2202,24 @@ Results
 6. **Cat reac
 
 
+## Experiment 116 — Chat — live diff preview in message edit mode
+
+**Time:** 2026-03-20 02:16:19
+
+**Files:** Target:** chat.js, chat-section.js, main.css, `ui/static/js/modules/chat.js` — методы `toggleEditDiff`, `renderEditDiff`, `editDiffStats`; состояние `_editDiffOpen`, `ui/static/templates/chat-section.js` — diff toggle button, UNCHANGED badge, diff panel с x-html, `ui/static/css/main.css` — стили `.edit-mode-diff-toggle`, `.edit-diff-panel*`, `.edit-diff-badge-*`
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **Кнопка DIFF в edit mode banner** — показывает счётчики `-N/+M` (удалено/добавлено строк), реагирует в реальном времени на изменение input
+2. **Раскрывающаяся diff panel** — при клике на DIFF открывается панель с inline diff (оригинал → текущий текст) с word-level highlighting
+3. **UNCHANGED indicator** — когда текст совпадает с оригиналом, вместо кнопки DIFF показывается зелёный `✓ UNCHANGED`
+4. **Переиспользование существующего кода** — `renderInlineDiff`, `simp
+
+

@@ -636,8 +636,14 @@ async def update_prompt(data: PromptUpdate):
 
 
 @app.get("/api/config")
-async def get_config():
-    config_file = get_project_dir() / ".autoresearch.json"
+async def get_config(project: str = ""):
+    if project:
+        target = Path(project).resolve()
+        if ".." in Path(project).parts:
+            raise HTTPException(status_code=400, detail="Path traversal detected")
+        config_file = target / ".autoresearch.json"
+    else:
+        config_file = get_project_dir() / ".autoresearch.json"
     if not config_file.exists():
         return {"name": "", "description": "", "goals": [], "completed_goals": [],
                 "constraints": [], "tech_stack": [], "focus_areas": []}
@@ -683,6 +689,61 @@ async def update_config(data: ConfigUpdate):
     with open(config_file, "w", encoding="utf-8") as f:
         json.dump(existing, f, indent=2, ensure_ascii=False)
     return {"status": "ok"}
+
+
+class SetupRequest(BaseModel):
+    model_config = {"extra": "ignore"}
+
+    project: str = "."
+    name: str = ""
+    description: str = ""
+    goals: List[str] = []
+    constraints: List[str] = []
+    tech_stack: List[str] = []
+    focus_areas: List[str] = []
+
+
+@app.post("/api/setup")
+async def setup_project(data: SetupRequest):
+    """Create or update .autoresearch.json for a given project path."""
+    project_dir = Path(data.project).resolve()
+    if ".." in Path(data.project).parts:
+        raise HTTPException(status_code=400, detail="Path traversal detected")
+    if not project_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Directory not found: {data.project}")
+    if not project_dir.is_dir():
+        raise HTTPException(status_code=400, detail="Not a directory")
+
+    config_file = project_dir / ".autoresearch.json"
+
+    # Load existing config to preserve completed_goals and other fields
+    existing = {}
+    if config_file.exists():
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                existing = json.load(f)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass  # Start fresh
+
+    existing.update({
+        "name": data.name,
+        "description": data.description,
+        "goals": data.goals,
+        "constraints": data.constraints,
+        "tech_stack": data.tech_stack,
+        "focus_areas": data.focus_areas,
+    })
+    if "completed_goals" not in existing:
+        existing["completed_goals"] = []
+
+    with open(config_file, "w", encoding="utf-8") as f:
+        json.dump(existing, f, indent=2, ensure_ascii=False)
+
+    # Also create .autoresearch/experiments dir
+    exp_dir = project_dir / ".autoresearch" / "experiments"
+    exp_dir.mkdir(parents=True, exist_ok=True)
+
+    return {"status": "ok", "config": existing, "path": str(project_dir)}
 
 
 class RunRequest(BaseModel):

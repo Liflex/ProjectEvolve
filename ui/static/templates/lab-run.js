@@ -94,7 +94,13 @@
                         <span class="text-[0.5625rem] tracking-widest" :class="_preflightResult && _preflightResult.ready ? 'text-[var(--ng)]' : 'text-[var(--amber)]'"
                               x-text="_preflightResult && _preflightResult.ready ? 'READY_TO_LAUNCH' : 'PREFLIGHT_WARNINGS_'"></span>
                         <span class="text-[0.5rem] text-[var(--v3)] ml-1 truncate" style="font-family:var(--code-font,monospace)" x-text="_preflightResult && _preflightResult.path"></span>
-                        <button @click="_preflightResult = null" class="ml-auto text-[0.5625rem] text-[var(--v3)] hover:text-[var(--red)] tracking-wider">[X]</button>
+                        <button x-show="_preflightResult && !_preflightResult.ready"
+                                @click="showSetupWizard()"
+                                class="ml-auto mr-2 px-2 py-0.5 text-[0.5625rem] tracking-wider border border-[var(--v)] text-[var(--v)] hover:bg-[rgba(180,74,255,0.1)] transition-all"
+                                title="Open setup wizard to configure project">
+                            &#x2699; SETUP
+                        </button>
+                        <button @click="_preflightResult = null" class="text-[0.5625rem] text-[var(--v3)] hover:text-[var(--red)] tracking-wider">[X]</button>
                     </div>
                     <div class="p-2">
                         <template x-for="(check, ci) in (_preflightResult ? _preflightResult.checks : [])" :key="ci">
@@ -110,6 +116,133 @@
                 <!-- Launch button -->
                 <div class="mt-3 flex gap-2">
                     <button @click="startRun()" class="border border-[var(--v)] text-[var(--v)] text-xs tracking-wider px-5 py-2 hover:bg-[rgba(180,74,255,0.1)] transition-all">[> INITIATE]</button>
+                </div>
+            </div>
+
+            <!-- Setup Wizard Modal -->
+            <div x-show="_showSetupWizard" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.6)">
+                <div @click.outside="closeSetupWizard()" class="pixel-border bg-[var(--bg2)] w-full max-w-lg mx-4 shadow-2xl" style="border-color:var(--v2)">
+                    <!-- Header -->
+                    <div class="flex items-center gap-3 px-5 py-3 border-b border-[var(--v-dim)]">
+                        <span class="text-sm">&#x2699;</span>
+                        <span class="text-xs tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">SETUP_WIZARD</span>
+                        <span class="text-[0.5rem] text-[var(--v3)]" x-text="'STEP ' + (_setupStep+1) + '/' + _setupSteps.length"></span>
+                        <button @click="closeSetupWizard()" class="ml-auto text-[var(--v3)] hover:text-[var(--red)] tracking-wider text-xs">[X]</button>
+                    </div>
+                    <!-- Progress bar -->
+                    <div class="flex gap-1 px-5 pt-3">
+                        <template x-for="(s, si) in _setupSteps" :key="si">
+                            <div class="flex-1 h-1 rounded-sm transition-all duration-300"
+                                 :class="si <= _setupStep ? 'bg-[var(--v)]' : 'bg-[var(--v-dim)]'"></div>
+                        </template>
+                    </div>
+                    <!-- Step content -->
+                    <div class="p-5">
+                        <!-- Step 0: Name & Description -->
+                        <div x-show="_setupStep === 0" class="space-y-3">
+                            <div class="text-[0.5625rem] tracking-widest text-[var(--cyan)] mb-2">PROJECT_INFO_</div>
+                            <div>
+                                <label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">PROJECT_NAME <span class="text-[var(--red)]">*</span></label>
+                                <input x-model="_setupData.name" @keydown.enter="if(_setupCanProceed()) nextSetupStep()"
+                                       class="mt-1 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-3 py-2 text-sm text-[var(--ng2)] focus:border-[var(--v2)] outline-none transition-colors"
+                                       placeholder="my-awesome-project">
+                            </div>
+                            <div>
+                                <label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">DESCRIPTION</label>
+                                <textarea x-model="_setupData.description" rows="2"
+                                          class="mt-1 w-full bg-[var(--bg)] border border-[var(--v-dim)] px-3 py-2 text-sm text-[var(--ng2)] focus:border-[var(--v2)] outline-none transition-colors resize-none"
+                                          placeholder="Brief project description..."></textarea>
+                            </div>
+                            <p class="text-[0.5rem] text-[var(--v3)]">* Required fields</p>
+                        </div>
+                        <!-- Step 1: Goals -->
+                        <div x-show="_setupStep === 1" class="space-y-3">
+                            <div class="text-[0.5625rem] tracking-widest text-[var(--cyan)] mb-2">GOALS_ <span class="text-[var(--red)]">*</span></div>
+                            <p class="text-[0.5rem] text-[var(--v3)]">One goal per line. These define what the AI agent will work towards.</p>
+                            <textarea x-model="_setupData.goals" rows="8"
+                                      class="w-full bg-[var(--bg)] border border-[var(--v-dim)] px-3 py-2 text-sm text-[var(--ng2)] focus:border-[var(--v2)] outline-none transition-colors resize-none"
+                                      style="font-family:var(--code-font,monospace)"
+                                      placeholder="Add user authentication&#10;Implement search functionality&#10;Fix performance issues&#10;Improve test coverage"></textarea>
+                            <div class="text-[0.5rem] text-[var(--v3)]">
+                                <span x-text="(_setupData.goals || '').split('\n').filter(l => l.trim()).length"></span> goals defined
+                            </div>
+                        </div>
+                        <!-- Step 2: Tech Stack & Focus -->
+                        <div x-show="_setupStep === 2" class="space-y-3">
+                            <div class="text-[0.5625rem] tracking-widest text-[var(--cyan)] mb-2">STACK_&_FOCUS_</div>
+                            <div>
+                                <label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">TECH_STACK</label>
+                                <p class="text-[0.5rem] text-[var(--v3)] mb-1">Comma-separated. Helps the agent understand the project.</p>
+                                <input x-model="_setupData.tech_stack"
+                                       class="w-full bg-[var(--bg)] border border-[var(--v-dim)] px-3 py-2 text-sm text-[var(--ng2)] focus:border-[var(--v2)] outline-none transition-colors"
+                                       placeholder="Python, FastAPI, PostgreSQL, React">
+                            </div>
+                            <div>
+                                <label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">FOCUS_AREAS</label>
+                                <p class="text-[0.5rem] text-[var(--v3)] mb-1">Comma-separated. Where the agent should focus improvements.</p>
+                                <input x-model="_setupData.focus_areas"
+                                       class="w-full bg-[var(--bg)] border border-[var(--v-dim)] px-3 py-2 text-sm text-[var(--ng2)] focus:border-[var(--v2)] outline-none transition-colors"
+                                       placeholder="API, UI, Performance, Security">
+                            </div>
+                        </div>
+                        <!-- Step 3: Constraints & Review -->
+                        <div x-show="_setupStep === 3" class="space-y-3">
+                            <div class="text-[0.5625rem] tracking-widest text-[var(--cyan)] mb-2">CONSTRAINTS_&_REVIEW</div>
+                            <div>
+                                <label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">CONSTRAINTS <span class="text-[var(--v3)]">(optional)</span></label>
+                                <p class="text-[0.5rem] text-[var(--v3)] mb-1">One per line. Rules the agent must follow.</p>
+                                <textarea x-model="_setupData.constraints" rows="3"
+                                          class="w-full bg-[var(--bg)] border border-[var(--v-dim)] px-3 py-2 text-sm text-[var(--ng2)] focus:border-[var(--v2)] outline-none transition-colors resize-none"
+                                          style="font-family:var(--code-font,monospace)"
+                                          placeholder="No breaking changes&#10;Must maintain backwards compatibility"></textarea>
+                            </div>
+                            <!-- Summary -->
+                            <div class="mt-4 border border-[var(--v-dim)] bg-[var(--bg)] p-3 space-y-1">
+                                <div class="text-[0.5625rem] tracking-widest text-[var(--v)] mb-2">SUMMARY_</div>
+                                <div class="flex gap-2 text-[0.5625rem]">
+                                    <span class="text-[var(--v3)] shrink-0 w-20">NAME:</span>
+                                    <span class="text-[var(--ng2)]" x-text="_setupData.name || '—'"></span>
+                                </div>
+                                <div class="flex gap-2 text-[0.5625rem]" x-show="_setupData.description">
+                                    <span class="text-[var(--v3)] shrink-0 w-20">DESC:</span>
+                                    <span class="text-[var(--ng2)] truncate" x-text="_setupData.description"></span>
+                                </div>
+                                <div class="flex gap-2 text-[0.5625rem]">
+                                    <span class="text-[var(--v3)] shrink-0 w-20">GOALS:</span>
+                                    <span class="text-[var(--cyan)]" x-text="(_setupData.goals || '').split('\n').filter(l => l.trim()).length + ' items'"></span>
+                                </div>
+                                <div class="flex gap-2 text-[0.5625rem]" x-show="_setupData.tech_stack">
+                                    <span class="text-[var(--v3)] shrink-0 w-20">STACK:</span>
+                                    <span class="text-[var(--ng2)]" x-text="_setupData.tech_stack"></span>
+                                </div>
+                                <div class="flex gap-2 text-[0.5625rem]" x-show="_setupData.focus_areas">
+                                    <span class="text-[var(--v3)] shrink-0 w-20">FOCUS:</span>
+                                    <span class="text-[var(--ng2)]" x-text="_setupData.focus_areas"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Footer navigation -->
+                    <div class="flex items-center gap-3 px-5 py-3 border-t border-[var(--v-dim)]">
+                        <button x-show="_setupStep > 0" @click="prevSetupStep()"
+                                class="px-4 py-1.5 text-[0.5625rem] tracking-wider border border-[var(--v-dim)] text-[var(--v3)] hover:text-[var(--v)] hover:border-[var(--v2)] transition-all">
+                            &lt; BACK
+                        </button>
+                        <div class="flex-1"></div>
+                        <button x-show="_setupStep < _setupSteps.length - 1" @click="if(_setupCanProceed()) nextSetupStep()"
+                                class="px-4 py-1.5 text-[0.5625rem] tracking-wider border transition-all"
+                                :class="_setupCanProceed() ? 'border-[var(--v)] text-[var(--v)] hover:bg-[rgba(180,74,255,0.1)]' : 'border-[var(--v-dim)] text-[var(--v-dim)] cursor-not-allowed'"
+                                :disabled="!_setupCanProceed()">
+                            NEXT &gt;
+                        </button>
+                        <button x-show="_setupStep === _setupSteps.length - 1" @click="saveSetup()"
+                                class="px-5 py-1.5 text-[0.5625rem] tracking-wider border border-[var(--v)] text-[var(--v)] hover:bg-[rgba(180,74,255,0.1)] transition-all"
+                                :class="_setupSaving && 'opacity-50 cursor-wait'"
+                                :disabled="_setupSaving">
+                            <span x-show="!_setupSaving">&#x2713; SAVE &amp; CLOSE</span>
+                            <span x-show="_setupSaving">SAVING_...</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
