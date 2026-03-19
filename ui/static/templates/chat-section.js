@@ -75,6 +75,9 @@
             <button class="chat-toolbar-btn" @click="collapseAllMessages()" title="Collapse all long messages">FOLD ALL</button>
             <button class="chat-toolbar-btn" @click="expandAllMessages()" title="Expand all folded messages">UNFOLD</button>
             <div class="chat-toolbar-sep"></div>
+            <button class="chat-toolbar-btn" @click="collapsePrevTurns()" title="Collapse all turns except the last one">&#x25B2; TURNS</button>
+            <button class="chat-toolbar-btn" @click="expandAllTurns()" title="Expand all collapsed turns">&#x25BC; TURNS</button>
+            <div class="chat-toolbar-sep"></div>
             <!-- Message type filters -->
             <button class="chat-filter-btn" :class="chatFilters.user && 'active'" @click="toggleChatFilter('user')" title="Toggle user messages">
                 <span :style="'color:' + (chatFilters.user ? 'var(--v)' : 'var(--v3)')">&#x1f464;</span> USER
@@ -132,7 +135,7 @@
                   x-text="(_clockTick, 'ELAPSED ' + getStreamingElapsed(activeTab))"></span>
             <span x-show="activeTab && activeTab.is_streaming && activeTab._msgStartTime"
                   class="w-1.5 h-1.5 rounded-full bg-[var(--cyan)] animate-pulse ml-1"></span>
-            <span class="text-[0.5rem] text-[var(--v)] tracking-wider blink" x-show="_chatNavIdx >= 0" x-text="'NAV ' + (_chatNavIdx + 1) + ' [c q e f p d]'"></span>
+            <span class="text-[0.5rem] text-[var(--v)] tracking-wider blink" x-show="_chatNavIdx >= 0" x-text="'NAV ' + (_chatNavIdx + 1) + ' [c q e f p d t]'"></span>
             <div class="flex-1"></div>
             <div class="relative">
                 <button class="chat-toolbar-btn" :class="showExportMenu && 'active'" @click.stop="showExportMenu = !showExportMenu" title="Export session to Markdown">&#x1f4e4; EXPORT</button>

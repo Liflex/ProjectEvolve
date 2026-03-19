@@ -1,7 +1,7 @@
 # Last Experiment Summary
 
-**Experiment #118** — Chat — fix broken SEND button + notification sound on agent done
-**Date:** 2026-03-20 02:31:19
+**Experiment #120** — Chat — global search across all sessions (Ctrl+Alt+F)
+**Date:** 2026-03-20 02:37:26
 
 ## What Was Done
 
@@ -9,15 +9,19 @@ N/A
 
 ## Files Modified
 
-- None
+- Target:** chat.js, app.js, chat-section.js, main.css
+- Files Modified:** `ui/static/js/app.js`, `ui/static/js/modules/chat.js`, `ui/static/templates/chat-section.js`, `ui/static/css/main.css`
 
 ## Key Results
 
 Results
 
 **What was done:**
-1. **Исправлен критический баг: сломанная кнопка SEND** — в `chat-section.js:477` отсутствовал открывающий тег `<button @click="sendChatMessage(tab)">`. Атрибуты кнопки (`class`, `:title`) были, но сам тег `<button>` пропал. Кнопка SEND не работала при клике — только Enter отправлял сообщение.
-2. **Звук уведомления при завершении агента** — `playNotificationSound()` в utils.js использует Web Audio API (two-tone chime C5→E5, тихий). Воспроизводится только когда страниц
+1. **Global search panel** — кнопка "ALL" в toolbar открывает dropdown-панель для поиска по всем сессиям/табам одновременно
+2. **Ctrl+Alt+F** — горячая клавиша для быстрого открытия глобального поиска
+3. **Search results** — имя таба, роль сообщения (USER/CLAUDE), относительное время, сниппет контента
+4. **Keyboard navigation** — ArrowUp/Down, Enter для перехода к результату
+5. **Click to navigate** — переключает на нужный таб, скроллит к сообщению с фиолетовой подсве
 
 ## For Next Iteration
 

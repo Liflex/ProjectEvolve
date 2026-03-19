@@ -636,6 +636,7 @@ function _buildAppData() {
                             else if (e.key === 'd') { e.preventDefault(); this.chatNavAction('del'); }
                             else if (e.key === 'p') { e.preventDefault(); this.chatNavAction('pin'); }
                             else if (e.key === 'e') { e.preventDefault(); this.chatNavAction('edit'); }
+                            else if (e.key === 't') { e.preventDefault(); this.chatNavAction('turn'); }
                         }
                     }
                 }

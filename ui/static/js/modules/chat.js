@@ -58,6 +58,7 @@ window.AppChat = (function() {
                     _catCostMilestone: 0,
                     _catStreamPatienceTimer: null,
                     _editDiffOpen: false,
+                    _collapsedTurns: new Set(),
                 };
                 this.chatTabs.push(tab);
                 this.activeChatTab = tab.tab_id;
@@ -1496,13 +1497,39 @@ window.AppChat = (function() {
                     + '</div></div></div>';
             };
 
-            // Main render loop with message grouping
+            // Main render loop with message grouping and turn collapse
+            const collapsedTurns = tab._collapsedTurns || new Set();
             let _lastDateGroup = '';
+            let _skipCollapsed = false;   // flag: skip assistant/tool messages for collapsed turn
+            let _collapsedSummary = null;  // summary data for collapsed turn
+            // Helper: render collapsed turn summary
+            const renderCollapsedSummary = (s) => {
+                const preview = (s.userText || '').replace(/\n/g, ' ').trim();
+                const shortPreview = preview.length > 80 ? preview.slice(0, 80) + '...' : preview;
+                const metaParts = [];
+                metaParts.push(s.msgCount + ' msg' + (s.msgCount > 1 ? 's' : ''));
+                if (s.toolCount > 0) metaParts.push(s.toolCount + ' tool' + (s.toolCount > 1 ? 's' : ''));
+                if (s.responseChars > 0) metaParts.push((s.responseChars / 1000).toFixed(1) + 'K ch');
+                if (s.duration > 0) metaParts.push(this.fmtDuration(s.duration));
+                return '<div class="turn-collapsed-summary" data-turn="' + s.turn + '" onclick="event.stopPropagation();window._app.toggleTurnCollapse(\'' + tab.tab_id + '\',' + s.turn + ')" title="Click to expand">'
+                    + '<span class="turn-collapsed-toggle">&#x25B6;</span>'
+                    + '<span class="turn-collapsed-badge">T' + s.turn + '</span>'
+                    + '<span class="turn-collapsed-preview">' + this.escHtml(shortPreview || '(no text)') + '</span>'
+                    + '<span class="turn-collapsed-meta">' + metaParts.join(' · ') + '</span>'
+                    + '</div>';
+            };
             while (i < msgs.length) {
                 const msg = msgs[i];
                 if (msg.role === 'user') {
+                    // If we were skipping a collapsed turn, render its summary first
+                    if (_skipCollapsed && _collapsedSummary) {
+                        html += renderCollapsedSummary(_collapsedSummary);
+                        _skipCollapsed = false;
+                        _collapsedSummary = null;
+                    }
                     if (!cf.user) { i++; continue; }
                     turnCount++;
+                    const isTurnCollapsed = collapsedTurns.has(turnCount) && !msg.is_streaming;
                     // Date group separator — new heading when day changes
                     const dateLabel = this.dateGroupLabel(msg.ts);
                     if (dateLabel && dateLabel !== _lastDateGroup) {
@@ -1518,9 +1545,17 @@ window.AppChat = (function() {
                         const relTime = this.relativeTime(msg.ts);
                         html += '<div class="chat-turn-sep" data-turn="' + turnCount + '"><div class="chat-turn-sep-line"></div>'
                             + '<span class="chat-turn-badge" onclick="event.stopPropagation();window._app.jumpToTurn(\'' + tab.tab_id + '\',' + turnCount + ')" title="Jump to turn ' + turnCount + ' (Alt+Up/Down)">' + turnCount + '</span>'
+                            + '<span class="turn-collapse-btn" onclick="event.stopPropagation();window._app.toggleTurnCollapse(\'' + tab.tab_id + '\',' + turnCount + ')" title="' + (isTurnCollapsed ? 'Expand turn' : 'Collapse turn') + '">' + (isTurnCollapsed ? '[+]' : '[-]') + '</span>'
                             + '<span class="chat-turn-sep-time msg-ts" title="' + this.escHtml(uFullTimeSep) + '">' + uTimeSep + '</span>'
                             + (relTime !== uTimeSep ? '<span class="chat-turn-sep-label">' + relTime + '</span>' : '')
                             + '<div class="chat-turn-sep-line"></div></div>';
+                    }
+                    if (isTurnCollapsed) {
+                        // Start collecting summary data, skip rendering
+                        _collapsedSummary = { turn: turnCount, userText: msg.content || '', userTs: msg.ts, msgCount: 1, toolCount: 0, responseChars: 0, duration: 0 };
+                        _skipCollapsed = true;
+                        i++;
+                        continue;
                     }
                     const uTime = this.fmtTime(msg.ts);
                     const uFullTime = this.fmtFullTime(msg.ts);
@@ -1540,7 +1575,9 @@ window.AppChat = (function() {
                         + (uFold ? '<button class="act-fold" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + i + ')" title="Fold/Unfold">' + (msg.collapsed ? 'UNFOLD' : 'FOLD') + '</button>' : '')
                         + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Delete">DEL</button>'
                         + '</div>'
-                        + '<div class="chat-role chat-role-user">USER_' + uTimeHtml + uEditedHtml + (uFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + uChars + 'ch · ' + uLines + 'ln</span>' : '') + '</div>'
+                        + '<div class="chat-role chat-role-user">USER_'
+                        + (turnCount === 1 ? '<span class="turn-collapse-btn" onclick="event.stopPropagation();window._app.toggleTurnCollapse(\'' + tab.tab_id + '\',' + turnCount + ')" title="Collapse turn">[-]</span> ' : '')
+                        + uTimeHtml + uEditedHtml + (uFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + uChars + 'ch · ' + uLines + 'ln</span>' : '') + '</div>'
                         + '<div class="chat-bubble-user" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit;color:var(--ng2)">'
                         + (uCollapsed
                             ? '<div class="chat-collapsed-preview">' + this.renderUserContent(msg.content.slice(0, 200)) + '</div>'
@@ -1549,6 +1586,22 @@ window.AppChat = (function() {
                         + '</div></div></div>';
                     i++;
                 } else if (msg.role === 'assistant' || msg.role === 'tool') {
+                    if (_skipCollapsed) {
+                        // Collect summary data instead of rendering
+                        while (i < msgs.length && (msgs[i].role === 'assistant' || msgs[i].role === 'tool')) {
+                            const m = msgs[i];
+                            if (m.role === 'assistant') {
+                                _collapsedSummary.responseChars += (m.content || '').length;
+                                _collapsedSummary.msgCount++;
+                                if (m.duration) _collapsedSummary.duration += m.duration;
+                            } else {
+                                _collapsedSummary.toolCount++;
+                                _collapsedSummary.msgCount++;
+                            }
+                            i++;
+                        }
+                        continue;
+                    }
                     // Collect all consecutive assistant/tool messages into a group
                     const groupStart = i;
                     const groupParts = []; // { type: 'assistant'|'tool', msg, idx, toolGroup? }
@@ -1592,6 +1645,10 @@ window.AppChat = (function() {
                 } else {
                     i++;
                 }
+            }
+            // Render final collapsed summary if loop ended while skipping
+            if (_skipCollapsed && _collapsedSummary) {
+                html += renderCollapsedSummary(_collapsedSummary);
             }
             if (tab.is_streaming) {
                 const lastMsg = msgs[msgs.length - 1];
@@ -1695,6 +1752,18 @@ window.AppChat = (function() {
                 case 'del': this.deleteChatMsg(tabId, idx); break;
                 case 'pin': this.togglePinMessage(tabId, idx); break;
                 case 'edit': this.editUserMsg(tabId, idx); break;
+                case 'turn': {
+                    // Find turn number from the focused message
+                    const container = document.getElementById('chat-messages-' + tabId);
+                    if (container) {
+                        const msgEl = container.querySelectorAll('.msg-wrap')[idx];
+                        if (msgEl) {
+                            const turnNum = parseInt(msgEl.getAttribute('data-turn'), 10);
+                            if (turnNum > 0) this.toggleTurnCollapse(tabId, turnNum);
+                        }
+                    }
+                    break;
+                }
             }
         },
 
@@ -2241,6 +2310,39 @@ window.AppChat = (function() {
             const tab = this.activeTab;
             if (!tab) return;
             for (const msg of tab.messages) { msg.collapsed = false; }
+            this.chatTick++;
+        },
+
+        // ========== CHAT: TURN COLLAPSE ==========
+        toggleTurnCollapse(tabId, turnNum) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab) return;
+            if (!tab._collapsedTurns) tab._collapsedTurns = new Set();
+            if (tab._collapsedTurns.has(turnNum)) {
+                tab._collapsedTurns.delete(turnNum);
+            } else {
+                // Don't collapse the current turn if it's streaming
+                const totalTurns = this.getTotalTurns(tab);
+                if (turnNum === totalTurns && tab.is_streaming) return;
+                tab._collapsedTurns.add(turnNum);
+            }
+            this.chatTick++;
+        },
+        collapsePrevTurns() {
+            const tab = this.activeTab;
+            if (!tab) return;
+            if (!tab._collapsedTurns) tab._collapsedTurns = new Set();
+            const totalTurns = this.getTotalTurns(tab);
+            // Collapse all turns except the last one
+            for (let t = 1; t < totalTurns; t++) {
+                tab._collapsedTurns.add(t);
+            }
+            this.chatTick++;
+        },
+        expandAllTurns() {
+            const tab = this.activeTab;
+            if (!tab) return;
+            tab._collapsedTurns = new Set();
             this.chatTick++;
         },
 
