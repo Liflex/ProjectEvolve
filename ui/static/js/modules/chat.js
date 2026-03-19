@@ -1034,9 +1034,11 @@ window.AppChat = (function() {
                     + (isLastAssistant ? '<button class="act-regen" onclick="event.stopPropagation();window._app.regenerateResponse(\'' + tab.tab_id + '\')" title="Regenerate">REGEN</button>' : '')
                     + '<button class="act-pin' + (isPinned ? ' pinned' : '') + '" onclick="event.stopPropagation();window._app.togglePinMessage(\'' + tab.tab_id + '\',' + idx + ')" title="' + (isPinned ? 'Unpin' : 'Pin') + ' message">' + (isPinned ? 'UNPIN' : 'PIN') + '</button>'
                     + (aFold ? '<button class="act-fold" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + idx + ')" title="Fold/Unfold">' + (msg.collapsed ? 'UNFOLD' : 'FOLD') + '</button>' : '')
+                    + (!msg.is_streaming ? '<button class="act-like' + (msg.reaction === 'up' ? ' reacted' : '') + '" onclick="event.stopPropagation();window._app.reactToMessage(\'' + tab.tab_id + '\',' + idx + ',\'up\')" title="Helpful">&#x1F44D;</button>'
+                    + '<button class="act-dislike' + (msg.reaction === 'down' ? ' reacted' : '') + '" onclick="event.stopPropagation();window._app.reactToMessage(\'' + tab.tab_id + '\',' + idx + ',\'down\')" title="Not helpful">&#x1F44E;</button>' : '')
                     + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + idx + ')" title="Delete">DEL</button>'
                     + '</div>'
-                    + '<div class="chat-role chat-role-assistant">CLAUDE_' + (isPinned ? ' <span class="pin-indicator" title="Pinned message">&#x1F4CC;</span>' : '') + (aTime ? ' <span style="color:var(--v3);font-weight:normal">' + aTime + '</span>' : '') + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + reactionHtml + '</div>'
+                    + '<div class="chat-role chat-role-assistant">CLAUDE_' + (isPinned ? ' <span class="pin-indicator" title="Pinned message">&#x1F4CC;</span>' : '') + (msg.reaction === 'up' ? ' <span style="color:var(--ng);font-size:0.625rem" title="Helpful">&#x1F44D;</span>' : '') + (msg.reaction === 'down' ? ' <span style="color:var(--red);font-size:0.625rem" title="Not helpful">&#x1F44E;</span>' : '') + (aTime ? ' <span style="color:var(--v3);font-weight:normal">' + aTime + '</span>' : '') + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + reactionHtml + '</div>'
                     + thinkingHtml
                     + thinkingIndicatorHtml
                     + '<div class="chat-bubble-asst" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit">'
@@ -1663,6 +1665,18 @@ window.AppChat = (function() {
                 this.chatTick++;
             }
         },
+        reactToMessage(tabId, msgIdx, reaction) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab || !tab.messages[msgIdx]) return;
+            const msg = tab.messages[msgIdx];
+            // Toggle: if same reaction, clear it
+            if (msg.reaction === reaction) {
+                msg.reaction = null;
+            } else {
+                msg.reaction = reaction;
+            }
+            this.chatTick++;
+        },
         scrollToPin(pin) {
             // Switch to the correct tab first
             if (pin.tabId !== this.activeChatTab) {
@@ -1869,6 +1883,10 @@ window.AppChat = (function() {
                 const aFold = !msg.is_streaming && msg.content && msg.content.length > 500;
                 if (aFold) {
                     items.push({ label: msg.collapsed ? 'UNFOLD' : 'FOLD', icon: '&#x25BC;', action: () => this.toggleMsgCollapse(tab.tab_id, msgIdx) });
+                }
+                if (!msg.is_streaming) {
+                    items.push({ label: msg.reaction === 'up' ? 'UNDO HELPFUL' : 'HELPFUL', icon: '&#x1f44d;', action: () => this.reactToMessage(tab.tab_id, msgIdx, 'up') });
+                    items.push({ label: msg.reaction === 'down' ? 'UNDO UNHELPFUL' : 'NOT HELPFUL', icon: '&#x1f44e;', action: () => this.reactToMessage(tab.tab_id, msgIdx, 'down') });
                 }
                 items.push({ sep: true });
                 items.push({ label: 'DELETE', icon: '&#x1f5d1;', action: () => this.deleteChatMsg(tab.tab_id, msgIdx), danger: true });

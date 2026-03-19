@@ -906,6 +906,10 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .msg-actions button.act-quote:hover { color: var(--v); border-color: rgba(180,74,255,0.3); }
 .msg-actions button.act-pin:hover { color: var(--amber); border-color: rgba(255,170,0,0.3); }
 .msg-actions button.act-pin.pinned { color: var(--amber); border-color: rgba(255,170,0,0.3); background: rgba(255,170,0,0.06); }
+.msg-actions button.act-like:hover { color: var(--ng); border-color: rgba(0,255,136,0.3); }
+.msg-actions button.act-like.reacted { color: var(--ng); border-color: rgba(0,255,136,0.4); background: rgba(0,255,136,0.08); }
+.msg-actions button.act-dislike:hover { color: var(--red); border-color: rgba(255,51,102,0.3); }
+.msg-actions button.act-dislike.reacted { color: var(--red); border-color: rgba(255,51,102,0.4); background: rgba(255,51,102,0.08); }
 
 /* === PINNED MESSAGE STYLES === */
 .msg-pinned { border-left: 2px solid var(--amber); padding-left: 6px; }
