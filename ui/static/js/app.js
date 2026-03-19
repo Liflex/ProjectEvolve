@@ -202,6 +202,7 @@ function _buildAppData() {
         _heatmapData: null,     // cached heatmap data, updated when experiments load
         _streakData: null,      // cached streak data
         catSpeech: '',
+        catSpeechAction: null,
         catExpression: 'neutral',
         organismSVG: '',
         organismStage: 'DORMANT',
@@ -462,6 +463,7 @@ function _buildAppData() {
                 if (this.page === 'run') await this.pollRunStatus();
                 if (window.CatModule && CatModule.isActive()) {
                     this.catSpeech = CatModule.getSpeech();
+                    this.catSpeechAction = CatModule.getSpeechAction();
                     this.catExpression = CatModule.getExpression();
                 }
                 // Refresh chat relative time every 30s
@@ -569,6 +571,32 @@ function _buildAppData() {
             if (window.CatModule && CatModule.isActive() && CatModule.onClick) {
                 CatModule.onClick();
             }
+        },
+
+        onCatSpeechClick() {
+            if (!window.CatModule || !CatModule.isActive()) return;
+            const action = CatModule.consumeSpeechAction();
+            if (!action || action.type !== 'insert' || !action.value) return;
+            // Navigate to chat if not there, then insert command
+            if (this.section !== 'chat') {
+                this.navigateSection('chat');
+            }
+            this.$nextTick(() => {
+                const tab = this.activeTab;
+                if (tab) {
+                    tab.input_text = action.value;
+                    this.chatTick++;
+                    this.$nextTick(() => {
+                        const textarea = document.querySelector('#chat-messages-' + tab.tab_id)?.closest('.flex.flex-col')?.querySelector('textarea');
+                        if (textarea) textarea.focus();
+                    });
+                }
+            });
+            // Cat reaction to being clicked
+            CatModule.setExpression('happy');
+            CatModule.setSpeechText('*довольный мурр*', 2000);
+            CatModule.triggerPawWave && CatModule.triggerPawWave();
+            setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 3000);
         },
 
         navigate(page) {

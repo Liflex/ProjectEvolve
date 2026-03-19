@@ -456,6 +456,7 @@
     let _lastInteractionTime = Date.now(); // last user interaction (click/hover/API)
     let _idleLevel = 0;                   // 0=active, 1=restless, 2=sleepy, 3=deep-sleep
     let _hoverReactionCooldown = 0;        // prevent hover reaction spam
+    let _speechAction = null;              // { type: 'insert', value: '/commit ' } — actionable speech
 
     // ================================================================
     //  CLICK & PETTING REACTIONS
@@ -722,11 +723,19 @@
         return arr[Math.floor(Math.random() * arr.length)];
     }
 
+    // Extract slash command from tip text (e.g., "/commit для автокоммита" → "/commit ")
+    function extractSlashAction(text) {
+        if (!text) return null;
+        const match = text.match(/(\/[a-zA-Z.]+(?:\s|$))/);
+        return match ? { type: 'insert', value: match[1] } : null;
+    }
+
     function setSpeech(type) {
         const pool = SPEECH[type] || SPEECH.idle;
         currentSpeech = pickRandom(pool);
+        _speechAction = null;
         if (speechTimer) clearTimeout(speechTimer);
-        speechTimer = setTimeout(() => { currentSpeech = ''; }, 6000);
+        speechTimer = setTimeout(() => { currentSpeech = ''; _speechAction = null; }, 6000);
     }
 
     function startTips() {
@@ -757,8 +766,9 @@
                 }
             }
             currentSpeech = pickRandom(pool);
+            _speechAction = extractSlashAction(currentSpeech);
             if (speechTimer) clearTimeout(speechTimer);
-            speechTimer = setTimeout(() => { currentSpeech = ''; }, 6000);
+            speechTimer = setTimeout(() => { currentSpeech = ''; _speechAction = null; }, 6000);
         };
         // first tip after 8s, then every 15-25s
         tipTimer = setTimeout(() => {
@@ -841,13 +851,26 @@
             return currentSpeech;
         },
 
+        /** Get current speech action (clickable command). */
+        getSpeechAction() {
+            return _speechAction;
+        },
+
+        /** Consume speech action (clear after use). */
+        consumeSpeechAction() {
+            const action = _speechAction;
+            _speechAction = null;
+            return action;
+        },
+
         /** Set speech text directly (for external page-aware tips). */
-        setSpeechText(text, durationMs) {
+        setSpeechText(text, durationMs, action) {
             _lastInteractionTime = Date.now();
             currentSpeech = text || '';
+            _speechAction = action || null;
             if (speechTimer) clearTimeout(speechTimer);
             if (durationMs && text) {
-                speechTimer = setTimeout(() => { currentSpeech = ''; }, durationMs);
+                speechTimer = setTimeout(() => { currentSpeech = ''; _speechAction = null; }, durationMs);
             }
         },
 
@@ -974,7 +997,8 @@
                     if (lower.startsWith('/')) continue;
                     // Only trigger ~40% of the time to avoid spam
                     if (Math.random() < 0.4) {
-                        setSpeechText(pickRandom(tips), 6000);
+                        const tip = pickRandom(tips);
+                        setSpeechText(tip, 6000, extractSlashAction(tip));
                         if (Math.random() < 0.5) triggerEarTwitch();
                         return true;
                     }

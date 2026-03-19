@@ -49,9 +49,13 @@
                  class="cat-speech-bubble"
                  :class="[
                      settings.compactSidebar ? 'cat-bubble-compact' : '',
-                     'cat-mood-' + (catExpression || 'neutral')
+                     'cat-mood-' + (catExpression || 'neutral'),
+                     catSpeechAction ? 'cat-speech-actionable' : ''
                  ]"
-                 x-text="settings.compactSidebar ? (catSpeech.length > 8 ? catSpeech.slice(0,8) + '..' : catSpeech) : catSpeech">
+                 @click="catSpeechAction && onCatSpeechClick()"
+                 :title="catSpeechAction ? 'Click to insert: ' + catSpeechAction.value.trim() : ''">
+                <span x-show="catSpeechAction" class="cat-speech-action-hint">&#x2726;</span>
+                <span x-text="settings.compactSidebar ? (catSpeech.length > 8 ? catSpeech.slice(0,8) + '..' : catSpeech) : catSpeech"></span>
             </div>
         </div>
 
