@@ -1042,6 +1042,16 @@
             return animating;
         },
 
+        /** Get current expression name. */
+        getExpression() {
+            return expression;
+        },
+
+        /** Get current mood name. */
+        getMoodName() {
+            return _mood;
+        },
+
         /**
          * Handle click on cat canvas.
          * Single click: random reaction. Rapid clicks (3+): petting mode with purr.

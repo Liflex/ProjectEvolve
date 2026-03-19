@@ -531,6 +531,82 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
 .cat-frame-hover { border-color: var(--v); box-shadow: 0 0 20px rgba(180,74,255,0.2); }
 .cat-frame-hover #cat-canvas { filter: brightness(1.08); }
 
+/* === CAT SPEECH BUBBLE === */
+.cat-speech-bubble {
+    position: relative;
+    margin-top: 6px;
+    padding: 4px 10px;
+    max-width: 200px;
+    font-size: 0.5625rem;
+    letter-spacing: 0.04em;
+    color: var(--cyan);
+    text-align: center;
+    line-height: 1.5;
+    word-break: break-word;
+    /* Bubble shape */
+    background: rgba(12, 11, 20, 0.95);
+    border: 1px solid var(--v-dim);
+    border-radius: 8px;
+    box-shadow: 0 0 12px rgba(180, 74, 255, 0.12);
+    /* Tail pointing up */
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+}
+.cat-speech-bubble::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 5px solid var(--v-dim);
+}
+.cat-speech-bubble::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 4px solid rgba(12, 11, 20, 0.95);
+}
+.cat-bubble-compact {
+    max-width: 52px;
+    font-size: 0.4375rem;
+    padding: 3px 5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Mood-based bubble colors */
+.cat-mood-neutral { border-color: var(--v-dim); color: var(--cyan); box-shadow: 0 0 12px rgba(180,74,255,0.12); }
+.cat-mood-neutral::before { border-bottom-color: var(--v-dim); }
+.cat-mood-happy { border-color: rgba(57,255,20,0.3); color: var(--ng); box-shadow: 0 0 14px rgba(57,255,20,0.1); }
+.cat-mood-happy::before { border-bottom-color: rgba(57,255,20,0.3); }
+.cat-mood-sleepy { border-color: rgba(100,100,140,0.25); color: var(--v3); box-shadow: 0 0 8px rgba(100,100,140,0.08); }
+.cat-mood-sleepy::before { border-bottom-color: rgba(100,100,140,0.25); }
+.cat-mood-surprised { border-color: rgba(255,170,0,0.35); color: var(--amber); box-shadow: 0 0 16px rgba(255,170,0,0.12); }
+.cat-mood-surprised::before { border-bottom-color: rgba(255,170,0,0.35); }
+.cat-mood-angry { border-color: rgba(255,51,102,0.3); color: var(--red); box-shadow: 0 0 14px rgba(255,51,102,0.1); }
+.cat-mood-angry::before { border-bottom-color: rgba(255,51,102,0.3); }
+.cat-mood-thinking { border-color: rgba(255,224,51,0.25); color: var(--yellow); box-shadow: 0 0 14px rgba(255,224,51,0.08); }
+.cat-mood-thinking::before { border-bottom-color: rgba(255,224,51,0.25); }
+.cat-mood-grumpy { border-color: rgba(255,100,50,0.25); color: #ff8844; box-shadow: 0 0 12px rgba(255,100,50,0.08); }
+.cat-mood-grumpy::before { border-bottom-color: rgba(255,100,50,0.25); }
+.cat-mood-working { border-color: rgba(0,229,255,0.25); color: var(--cyan); box-shadow: 0 0 14px rgba(0,229,255,0.1); }
+.cat-mood-working::before { border-bottom-color: rgba(0,229,255,0.25); }
+
+/* Entrance animation */
+.cat-bubble-enter { transition: all 0.25s ease-out; }
+.cat-bubble-enter-from { opacity: 0; transform: translateY(4px) scale(0.95); }
+.cat-bubble-enter-to { opacity: 1; transform: translateY(0) scale(1); }
+
 /* === ORGANISM === */
 .organism-frame { border: 1px solid var(--v-dim); image-rendering: auto; box-shadow: 0 0 8px rgba(0,229,255,0.05); }
 

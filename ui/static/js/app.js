@@ -182,6 +182,7 @@ function _buildAppData() {
         toast: { show: false, message: '', type: 'success' },
         chartHover: null,
         catSpeech: '',
+        catExpression: 'neutral',
         organismSVG: '',
         organismStage: 'DORMANT',
         runElapsed: '',
@@ -408,6 +409,7 @@ function _buildAppData() {
                 if (this.page === 'run') await this.pollRunStatus();
                 if (window.CatModule && CatModule.isActive()) {
                     this.catSpeech = CatModule.getSpeech();
+                    this.catExpression = CatModule.getExpression();
                 }
                 // Refresh chat relative time every 30s
                 if (this._clockTick % 30 === 0 && this.activeChatTab) {

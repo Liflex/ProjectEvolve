@@ -43,10 +43,16 @@
             </div>
             <!-- Cat speech bubble -->
             <div x-show="catSpeech" x-cloak
-                 class="mt-1 px-2 py-0.5 border border-[var(--v)] text-[0.5625rem] text-[var(--cyan)] tracking-wider max-w-[200px] text-center truncate"
-                 :class="settings.compactSidebar ? 'max-w-[52px] text-[0.4375rem]' : ''"
-                 style="background:rgba(12,11,20,0.95); box-shadow: 0 0 10px rgba(180,74,255,0.15);"
-                 x-text="settings.compactSidebar ? (catSpeech.length > 8 ? catSpeech.slice(0,8) + '..' : catSpeech) : '> ' + catSpeech"></div>
+                 x-transition:enter="cat-bubble-enter"
+                 x-transition:enter-start="cat-bubble-enter-from"
+                 x-transition:enter-end="cat-bubble-enter-to"
+                 class="cat-speech-bubble"
+                 :class="[
+                     settings.compactSidebar ? 'cat-bubble-compact' : '',
+                     'cat-mood-' + (catExpression || 'neutral')
+                 ]"
+                 x-text="settings.compactSidebar ? (catSpeech.length > 8 ? catSpeech.slice(0,8) + '..' : catSpeech) : catSpeech">
+            </div>
         </div>
 
         <!-- === MAIN NAV: Research Lab / Chat === -->
