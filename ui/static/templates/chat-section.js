@@ -12,9 +12,10 @@
                          @contextmenu="showTabContextMenu(tab, $event)">
                         <button @click="activateChatTab(tab.tab_id)"
                                 @dblclick.stop="startRenameTab(tab.tab_id)"
-                                class="flex items-center gap-2 px-3 py-2 text-xs tracking-wider transition-colors"
-                                :class="activeChatTab === tab.tab_id ? 'text-[var(--v)] border-b-2 border-[var(--v)] -mb-[2px]' : 'text-[var(--v3)] hover:text-[var(--ng2)]'">
-                            <span class="w-1.5 h-1.5 rounded-full" :class="tab.is_streaming ? 'bg-[var(--cyan)] animate-pulse' : tab.ws_state === 'connected' ? 'bg-[var(--ng)]' : tab.ws_state === 'connecting' ? 'bg-[var(--amber)] animate-pulse' : 'bg-[var(--v3)]'"></span>
+                                class="flex items-center gap-2 px-3 py-2 text-xs tracking-wider transition-colors tab-btn"
+                                :class="activeChatTab === tab.tab_id ? 'text-[var(--v)] border-b-2 border-[var(--v)] -mb-[2px]' : 'text-[var(--v3)] hover:text-[var(--ng2)]'"
+                                :title="tab._unread > 0 ? tab._unread + ' new message' + (tab._unread > 1 ? 's' : '') + ' — ' + tab.label : tab.label + ' (' + tab.messages.length + ' messages)'">
+                            <span class="w-1.5 h-1.5 rounded-full" :class="tab.is_streaming ? 'bg-[var(--cyan)] animate-pulse' : tab._agentDone && activeChatTab !== tab.tab_id ? 'tab-dot-done' : tab.ws_state === 'connected' ? 'bg-[var(--ng)]' : tab.ws_state === 'connecting' ? 'bg-[var(--amber)] animate-pulse' : 'bg-[var(--v3)]'"></span>
                             <template x-if="_renamingTabId === tab.tab_id">
                                 <input id="tab-rename-input"
                                        x-model="_renameText"
@@ -25,9 +26,12 @@
                                        maxlength="30">
                             </template>
                             <template x-if="_renamingTabId !== tab.tab_id">
-                                <span class="truncate max-w-[100px]" x-text="tab.label"></span>
+                                <span class="truncate max-w-[100px]" :class="tab._unread > 0 && activeChatTab !== tab.tab_id && 'tab-label-unread'" x-text="tab.label"></span>
                             </template>
-                            <span x-show="tab.messages.length > 0 && _renamingTabId !== tab.tab_id" class="text-[0.5rem] tabular-nums px-1 bg-[var(--v-dim)] text-[var(--v3)]" x-text="tab.messages.length"></span>
+                            <!-- Unread badge (shown instead of total count when unread) -->
+                            <span x-show="tab._unread > 0 && activeChatTab !== tab.tab_id && _renamingTabId !== tab.tab_id" class="tab-unread-badge" x-text="tab._unread"></span>
+                            <!-- Total message count (shown when no unread or tab is active) -->
+                            <span x-show="(tab._unread === 0 || activeChatTab === tab.tab_id) && tab.messages.length > 0 && _renamingTabId !== tab.tab_id" class="text-[0.5rem] tabular-nums px-1 bg-[var(--v-dim)] text-[var(--v3)]" x-text="tab.messages.length"></span>
                         </button>
                         <button @click="closeChatTab(tab.tab_id)"
                                 x-show="_renamingTabId !== tab.tab_id"
@@ -299,9 +303,9 @@
                                 <div class="md-format-bar">
                                     <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '**', '**')" title="Bold (Ctrl+B)">B</button>
                                     <button class="md-format-btn" style="font-style:italic;font-weight:normal" @mousedown.prevent="insertMarkdown(tab, '*', '*')" title="Italic (Ctrl+I)">I</button>
-                                    <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '`', '`')" title="Inline code"><span class="fmt-icon">&lt;/&gt;</span></button>
+                                    <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '\`', '\`')" title="Inline code"><span class="fmt-icon">&lt;/&gt;</span></button>
                                     <div class="md-format-sep"></div>
-                                    <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '${'```'}\n', '\n${'```'}')" title="Code block"><span class="fmt-icon">{ }</span></button>
+                                    <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '${'`' + '``\\n'}', '${'\\n' + '```'}')" title="Code block"><span class="fmt-icon">{ }</span></button>
                                     <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '[', '](url)')" title="Link"><span class="fmt-icon">&#x1f517;</span></button>
                                     <div class="md-format-sep"></div>
                                     <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '- ', '')" title="Unordered list"><span class="fmt-icon">&#x2022;</span></button>

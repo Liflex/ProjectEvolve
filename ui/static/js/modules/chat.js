@@ -50,6 +50,8 @@ window.AppChat = (function() {
                     _msgHistoryIdx: -1,
                     _msgDraft: '',
                     _attachments: [],
+                    _unread: 0,
+                    _agentDone: false,
                 };
                 this.chatTabs.push(tab);
                 this.activeChatTab = tab.tab_id;
@@ -65,7 +67,12 @@ window.AppChat = (function() {
         activateChatTab(tabId) {
             this.activeChatTab = tabId;
             const tab = this.chatTabs.find(t => t.tab_id === tabId);
-            if (tab) this.page = '';
+            if (tab) {
+                this.page = '';
+                tab._unread = 0;
+                tab._agentDone = false;
+                this._updateDocTitle();
+            }
             if (window.refitTerminal) refitTerminal(tabId);
             this.resizeInputForTab(tab);
             // Clear keyboard navigation focus when switching tabs
@@ -138,6 +145,17 @@ window.AppChat = (function() {
         },
 
         // ========== CHAT: WEBSOCKET ==========
+        _incrementUnread(tab) {
+            if (this.activeChatTab !== tab.tab_id) {
+                tab._unread = (tab._unread || 0) + 1;
+                this._updateDocTitle();
+            }
+        },
+        _updateDocTitle() {
+            const total = this.chatTabs.reduce((sum, t) => sum + (t._unread || 0), 0);
+            const base = 'AutoResearch';
+            document.title = total > 0 ? '(' + total + ') ' + base : base;
+        },
         connectChatWebSocket(tab) {
             const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
             const url = `${protocol}//${location.host}/ws/chat/${tab.session_id}`;
@@ -176,6 +194,7 @@ window.AppChat = (function() {
                                     const thinkingContent = tab._thinkingBuffer || '';
                                     tab.messages.push({ role: 'assistant', content: text, thinking: thinkingContent || undefined, is_streaming: true, ts: Date.now() });
                                     tab._thinkingBuffer = '';
+                                    _app._incrementUnread(tab);
                                 }
                                 tab.is_streaming = true;
                                 _app.chatTick++;
@@ -222,6 +241,7 @@ window.AppChat = (function() {
                                     if (thinkingText) realLast.thinking = (realLast.thinking ? realLast.thinking + '\n---\n' : '') + thinkingText;
                                 } else {
                                     tab.messages.push({ role: 'assistant', content: text, thinking: thinkingText || undefined, is_streaming: true, ts: Date.now() });
+                                    _app._incrementUnread(tab);
                                 }
                                 tab._thinkingBuffer = '';
                                 tab.is_streaming = true;
@@ -278,6 +298,10 @@ window.AppChat = (function() {
                     } else if (msg.type === 'stream_end') {
                         tab.is_streaming = false;
                         tab._catThinking = false;
+                        // Mark agent done for background tabs
+                        if (_app.activeChatTab !== tab.tab_id) {
+                            tab._agentDone = true;
+                        }
                         const lastMsg = tab.messages[tab.messages.length - 1];
                         if (lastMsg) {
                             lastMsg.is_streaming = false;
@@ -311,6 +335,7 @@ window.AppChat = (function() {
                         }
                         tab.messages.push({ role: 'assistant', content: '[ERROR] ' + (msg.message || 'Unknown error'), ts: Date.now() });
                         tab.is_streaming = false;
+                        _app._incrementUnread(tab);
                         if (window.CatModule && CatModule.isActive()) {
                             CatModule.setExpression('surprised');
                             if (CatModule.triggerEarTwitch) CatModule.triggerEarTwitch();

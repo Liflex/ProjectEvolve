@@ -526,6 +526,38 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     border-radius: 2px;
 }
 
+/* === TAB NOTIFICATION BADGES === */
+.tab-unread-badge {
+    font-size: 0.5625rem;
+    font-family: 'VT323', monospace;
+    min-width: 14px;
+    height: 14px;
+    line-height: 14px;
+    padding: 0 4px;
+    border-radius: 7px;
+    background: var(--v);
+    color: var(--bg);
+    text-align: center;
+    letter-spacing: 0.05em;
+    animation: tab-unread-pulse 2s ease-in-out infinite;
+}
+@keyframes tab-unread-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.1); }
+}
+.tab-label-unread {
+    color: var(--v) !important;
+    font-weight: bold;
+}
+.tab-dot-done {
+    background: var(--ng) !important;
+    animation: tab-dot-done-flash 1s ease-in-out 3;
+}
+@keyframes tab-dot-done-flash {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
 /* === CAT CANVAS === */
 .cat-frame { border: 2px solid var(--v-dim); image-rendering: pixelated; overflow: visible; box-shadow: 0 0 12px rgba(180,74,255,0.08); transition: border-color 0.3s, box-shadow 0.3s; }
 .cat-frame-hover { border-color: var(--v); box-shadow: 0 0 20px rgba(180,74,255,0.2); }
