@@ -457,6 +457,54 @@
     let _idleLevel = 0;                   // 0=active, 1=restless, 2=sleepy, 3=deep-sleep
     let _hoverReactionCooldown = 0;        // prevent hover reaction spam
     let _speechAction = null;              // { type: 'insert', value: '/commit ' } — actionable speech
+    let _particles = [];                   // floating particles (Zzz, hearts, sparkles)
+
+    // ================================================================
+    //  PARTICLES (Zzz, hearts, sparkles)
+    // ================================================================
+
+    function spawnParticle(opts) {
+        _particles.push({
+            x: opts.x, y: opts.y,
+            vx: opts.vx || 0, vy: opts.vy || 0,
+            life: opts.life || 40, maxLife: opts.life || 40,
+            char: opts.char || 'Z',
+            color: opts.color || '#b44aff',
+            fontSize: opts.fontSize || 8,
+            wobble: opts.wobble || 0,       // horizontal wobble amplitude
+            wobbleSpeed: opts.wobbleSpeed || 0.1,
+            age: 0,
+        });
+    }
+
+    function updateParticles() {
+        for (let i = _particles.length - 1; i >= 0; i--) {
+            const p = _particles[i];
+            p.age++;
+            p.x += p.vx + Math.sin(p.age * p.wobbleSpeed) * p.wobble;
+            p.y += p.vy;
+            p.life--;
+            if (p.life <= 0) _particles.splice(i, 1);
+        }
+        // Cap particles to prevent memory issues
+        if (_particles.length > 30) _particles.splice(0, _particles.length - 30);
+    }
+
+    function renderParticles() {
+        if (_particles.length === 0) return;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        for (const p of _particles) {
+            const fadeIn = Math.min(1, p.age / 5);
+            const fadeOut = Math.min(1, p.life / (p.maxLife * 0.3));
+            ctx.globalAlpha = fadeIn * fadeOut;
+            ctx.fillStyle = p.color;
+            ctx.font = p.fontSize + 'px monospace';
+            ctx.fillText(p.char, p.x * ps, p.y * ps);
+        }
+        ctx.restore();
+    }
 
     // ================================================================
     //  CLICK & PETTING REACTIONS
@@ -556,8 +604,20 @@
             bodyOffX += Math.random() < 0.5 ? -1 : 1;
         }
 
-        // Z-order: tail → body → head → paw → eyes
-        drawFilled(TAIL_OUTLINES[tailFrame], TAIL_FILLS[tailFrame], TAIL_POS, outlineColor, fillColor, true);
+        // Z-order: tail → body → head → paw → eyes → particles
+        // Tail position adjustment based on expression/mood
+        let tailOffX = 0, tailOffY = 0;
+        if (expression === 'happy' || _mood === 'happy') {
+            tailOffY = -1; // raised tail
+        } else if (expression === 'angry') {
+            tailOffX = 1; tailOffY = -1; // puffed
+        } else if (expression === 'sleepy' || _idleLevel >= 2) {
+            tailOffX = 2; tailOffY = 1; // curled forward
+        } else if (expression === 'thinking') {
+            tailOffY = 1; // low, contemplative
+        }
+        const tailPos = { x: TAIL_POS.x + tailOffX, y: TAIL_POS.y + tailOffY };
+        drawFilled(TAIL_OUTLINES[tailFrame], TAIL_FILLS[tailFrame], tailPos, outlineColor, fillColor, true);
         drawFilled(BODY.outline, BODY.fill,
             { x: BODY_POS.x + bodyOffX, y: BODY_POS.y + bodyOffY },
             outlineColor, fillColor);
@@ -582,6 +642,9 @@
         if (frames && frames.length > 0 && frames[eyeFrame]) {
             drawGrid(frames[eyeFrame], cfg.x + _headOffX, cfg.y + _headOffY + headExtraY, eyeColor);
         }
+
+        // Floating particles (Zzz, hearts, sparkles) — rendered on top
+        renderParticles();
     }
 
     // ================================================================
@@ -662,7 +725,42 @@
         // Purr vibration: body micro-shake when happy (triggered externally or by mood)
         if (_purrrTicks > 0) {
             _purrrTicks--;
+            // Spawn heart/sparkle particles during purr
+            if (_tickCount % 5 === 0) {
+                spawnParticle({
+                    x: BODY_POS.x + 3 + Math.random() * 12,
+                    y: BODY_POS.y + 2 + Math.random() * 4,
+                    vx: (Math.random() - 0.5) * 0.15,
+                    vy: -0.08 - Math.random() * 0.06,
+                    life: 25 + Math.floor(Math.random() * 15),
+                    char: Math.random() < 0.4 ? '♥' : '✦',
+                    color: Math.random() < 0.4 ? '#ff69b4' : '#ffd700',
+                    fontSize: 6 + Math.floor(Math.random() * 2),
+                    wobble: 0.1,
+                    wobbleSpeed: 0.15,
+                });
+            }
         }
+
+        // Zzz particles during sleep (idle level 2+)
+        if (_idleLevel >= 2 && _tickCount % 35 === 0) {
+            const isBig = Math.random() < 0.3;
+            spawnParticle({
+                x: HEAD_POS.x + 12 + _headOffX + Math.random() * 3,
+                y: HEAD_POS.y - 1 + _headOffY,
+                vx: 0.03 + Math.random() * 0.05,
+                vy: -0.06 - Math.random() * 0.04,
+                life: 50 + Math.floor(Math.random() * 20),
+                char: isBig ? 'Z' : 'z',
+                color: isBig ? '#d98fff' : '#b44aff',
+                fontSize: isBig ? 10 : 7,
+                wobble: 0.05,
+                wobbleSpeed: 0.08,
+            });
+        }
+
+        // Update particles
+        updateParticles();
 
         // Hover reaction cooldown
         if (_hoverReactionCooldown > 0) _hoverReactionCooldown--;
@@ -681,11 +779,11 @@
             if (expression === 'neutral' || expression === 'sleepy') {
                 if (newIdleLevel === 2 && prevLevel < 2) {
                     setExpression('sleepy');
-                    _tailSpeed = 4; // slow erratic
+                    _tailSpeed = 5; // very slow, peaceful
                     triggerStretch();
                 } else if (newIdleLevel === 3 && prevLevel < 3) {
                     setExpression('sleepy');
-                    _tailSpeed = 4;
+                    _tailSpeed = 6; // almost still
                     setSpeechText(pickRandom(IDLE_SPEECH[3]), 6000);
                 } else if (newIdleLevel === 1 && prevLevel < 1) {
                     // Just restless — subtle hint
@@ -818,6 +916,7 @@
             animating = false;
             if (animTimer) { clearInterval(animTimer); animTimer = null; }
             stopTips();
+            _particles = [];
             canvas = null;
             ctx = null;
         },
@@ -831,7 +930,7 @@
             _tailAccum = 0;
             // Adjust tail speed based on expression
             const tailSpeeds = {
-                neutral: 2, happy: 1, sleepy: 4, surprised: 1,
+                neutral: 2, happy: 1, sleepy: 5, surprised: 1,
                 angry: 3, thinking: 3,
             };
             _tailSpeed = tailSpeeds[expr] || 2;
@@ -917,6 +1016,21 @@
                 setExpression('surprised');
                 setSpeechText('Мяу! Эксперимент #' + expNum + '! =^_^=', 5000);
                 triggerPawWave();
+                // Celebration sparkles
+                for (let s = 0; s < 5; s++) {
+                    spawnParticle({
+                        x: BODY_POS.x + 2 + Math.random() * 14,
+                        y: BODY_POS.y - 3 + Math.random() * 6,
+                        vx: (Math.random() - 0.5) * 0.25,
+                        vy: -0.1 - Math.random() * 0.1,
+                        life: 30 + Math.floor(Math.random() * 20),
+                        char: Math.random() < 0.5 ? '✦' : '★',
+                        color: Math.random() < 0.5 ? '#ffd700' : '#b44aff',
+                        fontSize: 6 + Math.floor(Math.random() * 3),
+                        wobble: 0.12,
+                        wobbleSpeed: 0.18,
+                    });
+                }
                 setTimeout(() => { if (animating) setExpression('happy'); }, 2000);
                 setTimeout(() => { if (animating) setExpression('neutral'); }, 5000);
                 return;
@@ -1113,6 +1227,21 @@
                 setSpeechText(pickRandom(PETTING_REACTIONS), 4000);
                 _purrrTicks = 25;
                 _tailSpeed = 1; // fast happy tail
+                // Burst of hearts on pet
+                for (let h = 0; h < 3; h++) {
+                    spawnParticle({
+                        x: HEAD_POS.x + 8 + Math.random() * 10,
+                        y: HEAD_POS.y - 2 + Math.random() * 5,
+                        vx: (Math.random() - 0.5) * 0.3,
+                        vy: -0.12 - Math.random() * 0.08,
+                        life: 20 + Math.floor(Math.random() * 10),
+                        char: '♥',
+                        color: '#ff69b4',
+                        fontSize: 7 + Math.floor(Math.random() * 2),
+                        wobble: 0.15,
+                        wobbleSpeed: 0.2,
+                    });
+                }
                 return;
             }
 
