@@ -2,6 +2,16 @@
 // Loaded before app.js, spread into Alpine data object
 window.AppChat = (function() {
     return {
+        // ========== CHAT: SIDEBAR HELPERS ==========
+        getLastMsgPreview(tab) {
+            if (!tab || !tab.messages || tab.messages.length === 0) return '';
+            const last = tab.messages[tab.messages.length - 1];
+            const role = (last.role || '').toUpperCase();
+            const content = (last.content || '').replace(/<[^>]*>/g, '').replace(/\n/g, ' ').trim();
+            const preview = content.length > 60 ? content.slice(0, 60) + '...' : content;
+            return '[' + role + '] ' + preview;
+        },
+
         // ========== CHAT: SESSIONS ==========
         async openFileBrowserForTab() {
             if (this.chatTabs.length >= 5) { this.showTabLimitWarning = true; return; }

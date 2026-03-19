@@ -1024,6 +1024,96 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .chat-toolbar-btn.active { color: var(--v); border-color: var(--v-dim); background: rgba(180,74,255,0.06); }
 .chat-toolbar-sep { width: 1px; height: 0.875rem; background: var(--v-dim); margin: 0 4px; flex-shrink: 0; }
 
+/* === CHAT SIDEBAR CONTENT === */
+.csb-stat-card {
+    background: var(--bg);
+    border: 1px solid var(--v-dim);
+    padding: 4px 6px;
+    border-radius: 2px;
+}
+.csb-stat-label {
+    font-size: 0.4375rem;
+    letter-spacing: 0.15em;
+    color: var(--v3);
+}
+.csb-stat-value {
+    font-size: 0.875rem;
+    font-family: 'VT323', monospace;
+    color: var(--v);
+    margin-top: 1px;
+}
+.csb-stat-value-sm {
+    font-size: 0.75rem;
+}
+.csb-session-card {
+    padding: 5px 8px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.csb-session-card:hover {
+    background: var(--bg3);
+    border-color: var(--v-dim);
+}
+.csb-session-active {
+    background: rgba(180,74,255,0.06);
+    border-color: var(--v2);
+}
+.csb-session-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.csb-dot-streaming { background: var(--cyan); animation: pulse 1.5s infinite; }
+.csb-dot-connected { background: var(--ng); }
+.csb-dot-connecting { background: var(--amber); animation: pulse 2s infinite; }
+.csb-dot-error { background: var(--red); }
+.csb-session-label {
+    font-size: 0.625rem;
+    color: var(--ng2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+.csb-session-msgs {
+    font-size: 0.5rem;
+    color: var(--v3);
+    flex-shrink: 0;
+    font-family: 'VT323', monospace;
+}
+.csb-session-preview {
+    font-size: 0.5rem;
+    color: var(--v3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 2px;
+    padding-left: 14px;
+    opacity: 0.7;
+}
+.csb-action-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    font-size: 0.5625rem;
+    letter-spacing: 0.12em;
+    color: var(--v3);
+    padding: 4px 8px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    border-radius: 2px;
+}
+.csb-action-btn:hover {
+    color: var(--ng2);
+    background: rgba(255,255,255,0.03);
+}
+
 /* === CHAT MESSAGE TYPE FILTERS === */
 .chat-filter-btn {
     padding: 2px 6px;

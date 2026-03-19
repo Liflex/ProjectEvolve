@@ -122,10 +122,70 @@
         </nav>
 
         <!-- Chat sidebar content (shown in Chat section) -->
-        <div x-show="section === 'chat'" class="flex-1 py-2 flex flex-col items-center justify-center text-center px-4">
-            <div class="text-[0.5625rem] tracking-widest text-[var(--v3)] mb-2" x-show="!settings.compactSidebar">ACTIVE_SESSIONS</div>
-            <div class="text-2xl text-[var(--v)] glow-sm" style="font-family:'Press Start 2P',monospace" x-text="String(chatTabs.length).padStart(2,'0')"></div>
-            <div class="text-[0.5625rem] text-[var(--v3)] mt-1" x-show="!settings.compactSidebar">/ 5 LIMIT</div>
+        <div x-show="section === 'chat'" class="flex-1 py-2 overflow-y-auto">
+            <!-- Compact mode: just session count -->
+            <div x-show="settings.compactSidebar" class="flex flex-col items-center justify-center h-full px-2">
+                <div class="text-lg text-[var(--v)] glow-sm" style="font-family:'Press Start 2P',monospace" x-text="String(chatTabs.length).padStart(2,'0')"></div>
+                <div class="text-[0.5rem] text-[var(--v3)] mt-1">SESSIONS</div>
+            </div>
+            <!-- Full sidebar -->
+            <div x-show="!settings.compactSidebar">
+                <!-- Aggregate stats -->
+                <div class="px-4 mb-3">
+                    <div class="text-[0.5rem] tracking-[0.15em] text-[var(--v3)] mb-2">CHAT_OVERVIEW</div>
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <div class="csb-stat-card">
+                            <div class="csb-stat-label">SESSIONS</div>
+                            <div class="csb-stat-value" x-text="chatTabs.length + '/5'"></div>
+                        </div>
+                        <div class="csb-stat-card">
+                            <div class="csb-stat-label">MESSAGES</div>
+                            <div class="csb-stat-value" style="color:var(--cyan)" x-text="chatTabs.reduce(function(s,t){return s + t.messages.length}, 0)"></div>
+                        </div>
+                        <div class="csb-stat-card">
+                            <div class="csb-stat-label">TOKENS</div>
+                            <div class="csb-stat-value csb-stat-value-sm" style="color:var(--ng2)" x-text="(chatTabs.reduce(function(s,t){return s + (t.tokens ? t.tokens.input : 0)}, 0) / 1000).toFixed(1) + 'K'"></div>
+                        </div>
+                        <div class="csb-stat-card">
+                            <div class="csb-stat-label">COST</div>
+                            <div class="csb-stat-value csb-stat-value-sm" style="color:var(--yellow)" x-text="'$' + chatTabs.reduce(function(s,t){return s + (t.tokens ? t.tokens.cost : 0)}, 0).toFixed(2)"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mx-4 border-t border-[var(--v-dim)]"></div>
+                <!-- Session list -->
+                <div class="px-4 mt-3">
+                    <div class="text-[0.5rem] tracking-[0.15em] text-[var(--v3)] mb-2">ACTIVE_SESSIONS</div>
+                    <div class="space-y-1.5">
+                        <template x-for="tab in chatTabs" :key="tab.tab_id">
+                            <div class="csb-session-card"
+                                 :class="activeChatTab === tab.tab_id && 'csb-session-active'"
+                                 @click="activateChatTab(tab.tab_id)">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="csb-session-dot"
+                                          :class="tab.is_streaming ? 'csb-dot-streaming' : tab.ws_state === 'connected' ? 'csb-dot-connected' : tab.ws_state === 'connecting' ? 'csb-dot-connecting' : 'csb-dot-error'"></span>
+                                    <span class="csb-session-label" x-text="tab.label"></span>
+                                    <span class="csb-session-msgs" x-text="tab.messages.length"></span>
+                                </div>
+                                <div x-show="tab.messages.length > 0"
+                                     class="csb-session-preview"
+                                     x-text="getLastMsgPreview(tab)"></div>
+                            </div>
+                        </template>
+                        <div x-show="chatTabs.length === 0" class="text-center py-3">
+                            <div class="text-[0.5625rem] text-[var(--v3)] tracking-wider">NO_SESSIONS</div>
+                            <div class="text-[0.5rem] text-[var(--v3)] mt-1">+ NEW TAB to start</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mx-4 mt-3 border-t border-[var(--v-dim)]"></div>
+                <!-- Quick actions -->
+                <div class="px-4 mt-3 space-y-1">
+                    <button @click="openFileBrowserForTab()" class="csb-action-btn">+ NEW TAB</button>
+                    <button x-show="chatTabs.length > 0" @click="showSessionPicker()" class="csb-action-btn" style="color:var(--cyan)">RESUME</button>
+                    <button x-show="chatTabs.length > 1" @click="chatTabs.slice().forEach(function(t){closeChatTab(t.tab_id)})" class="csb-action-btn" style="color:var(--red)">CLOSE ALL</button>
+                </div>
+            </div>
         </div>
 
         <!-- Global Settings (always visible, bottom of sidebar) -->
