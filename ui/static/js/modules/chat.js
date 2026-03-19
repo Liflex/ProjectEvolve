@@ -2479,6 +2479,107 @@ window.AppChat = (function() {
             this.showToast('Экспорт: ' + filename + ' (' + msgs.length + ' msg)');
         },
 
+        // ========== CHAT: PROJECT FILE SEARCH ==========
+        _fileSearch: { query: '', results: [], loading: false, error: '', show: false, _timer: null },
+
+        toggleFileSearch() {
+            this._fileSearch.show = !this._fileSearch.show;
+            if (this._fileSearch.show) {
+                // Cat: notice file search
+                if (window.CatModule && CatModule.isActive()) {
+                    CatModule.setExpression('thinking');
+                    const tips = [
+                        'Ищешь файлы? *уши навострил* Мяу!',
+                        'Поиск! *прищурился* Что ищем?',
+                        '*задумался* Копнём в код_ Мяу!',
+                    ];
+                    CatModule.setSpeechText(tips[Math.floor(Math.random() * tips.length)], 3000);
+                    setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 3000);
+                }
+                this.$nextTick(() => {
+                    const inp = document.getElementById('file-search-input');
+                    if (inp) inp.focus();
+                });
+            } else {
+                this._fileSearch.query = '';
+                this._fileSearch.results = [];
+                this._fileSearch.error = '';
+            }
+        },
+
+        closeFileSearch() {
+            this._fileSearch.show = false;
+            this._fileSearch.query = '';
+            this._fileSearch.results = [];
+            this._fileSearch.error = '';
+        },
+
+        onFileSearchInput(tab, event) {
+            const q = event.target.value || '';
+            this._fileSearch.query = q;
+            if (this._fileSearch._timer) clearTimeout(this._fileSearch._timer);
+            if (!q || q.length < 2) {
+                this._fileSearch.results = [];
+                this._fileSearch.error = '';
+                return;
+            }
+            // Debounce 300ms
+            this._fileSearch._timer = setTimeout(() => this.executeFileSearch(tab), 300);
+        },
+
+        onFileSearchKeydown(tab, event) {
+            if (event.key === 'Escape') {
+                this.closeFileSearch();
+                event.preventDefault();
+            } else if (event.key === 'Enter') {
+                if (this._fileSearch._timer) clearTimeout(this._fileSearch._timer);
+                this.executeFileSearch(tab);
+                event.preventDefault();
+            }
+        },
+
+        async executeFileSearch(tab) {
+            const q = this._fileSearch.query;
+            if (!q || q.length < 2 || !tab || !tab.project_path) return;
+            this._fileSearch.loading = true;
+            this._fileSearch.error = '';
+            try {
+                const params = new URLSearchParams({ path: tab.project_path, q: q, max_results: '30' });
+                const res = await fetch('/api/fs/search?' + params);
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.detail || res.statusText);
+                }
+                const data = await res.json();
+                this._fileSearch.results = data.results || [];
+                if (this._fileSearch.results.length === 0) {
+                    this._fileSearch.error = 'Ничего не найдено';
+                }
+            } catch (e) {
+                this._fileSearch.error = e.message || 'Search failed';
+                this._fileSearch.results = [];
+            } finally {
+                this._fileSearch.loading = false;
+            }
+        },
+
+        insertSearchResult(tab, result) {
+            // Insert file reference into chat input: @file:line
+            const ref = '@' + result.file + ':' + result.line;
+            tab.input_text = (tab.input_text || '') + ref + ' ';
+            this.closeFileSearch();
+            this.$nextTick(() => {
+                const textarea = document.querySelector('#chat-messages-' + tab.tab_id)?.closest('.flex.flex-col')?.querySelector('textarea');
+                if (textarea) { textarea.focus(); }
+                this.resizeInputForTab(tab);
+            });
+        },
+
+        copySearchResult(result) {
+            const text = result.file + ':' + result.line + ': ' + result.text;
+            navigator.clipboard.writeText(text).then(() => this.showToast('Скопировано')).catch(() => {});
+        },
+
         // ========== CHAT: LOCALSTORAGE PERSISTENCE ==========
         _CHAT_STORAGE_KEY: 'ar-chat-state',
         _CHAT_STORAGE_VERSION: 1,

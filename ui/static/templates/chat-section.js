@@ -154,6 +154,7 @@
                 </div>
             </div>
             <button class="chat-toolbar-btn" :class="showStatsPanel && 'active'" @click="showStatsPanel = !showStatsPanel" title="Session statistics">&#x1f4ca; STATS</button>
+            <button class="chat-toolbar-btn" :class="_fileSearch.show && 'active'" @click="toggleFileSearch()" title="Search project files">&#x1f4c2; FILES</button>
             <button class="chat-toolbar-btn" @click="openChatSearch()" title="Search in chat (Ctrl+F)">&#x1f50d;</button>
             <button class="chat-toolbar-btn" @click="openCmdPalette()" title="Command Palette (Ctrl+K)" style="font-size:0.5rem;letter-spacing:0.1em">CTRL+K</button>
             <button class="chat-toolbar-btn" @click="openShortcuts()" title="Keyboard Shortcuts (?)">? KEYS</button>
@@ -177,6 +178,47 @@
                 <button @click="navigateChatMatch(1)" class="chat-search-nav-btn" :disabled="chatSearch.total === 0" title="Next (Enter)">&#x25BC;</button>
             </div>
             <button @click="closeChatSearch()" class="chat-search-close" title="Close (Escape)">[X]</button>
+        </div>
+
+        <!-- File Search Panel -->
+        <div x-show="_fileSearch.show && activeTab" x-cloak x-transition.duration.150ms
+             class="file-search-panel" @click.outside="closeFileSearch()">
+            <div class="file-search-header">
+                <span class="file-search-icon">&#x1f4c2;</span>
+                <input id="file-search-input"
+                       :value="_fileSearch.query"
+                       @input="onFileSearchInput(activeTab, $event)"
+                       @keydown="onFileSearchKeydown(activeTab, $event)"
+                       placeholder="Search project files..."
+                       class="file-search-input"
+                       autocomplete="off" spellcheck="false">
+                <span x-show="_fileSearch.loading" class="file-search-loading">&#x23f3;</span>
+                <span x-show="!_fileSearch.loading && _fileSearch.results.length > 0"
+                      class="file-search-count"
+                      x-text="_fileSearch.results.length + ' hits'"></span>
+                <button @click="closeFileSearch()" class="file-search-close" title="Close (Escape)">[X]</button>
+            </div>
+            <div class="file-search-results">
+                <template x-for="(r, idx) in _fileSearch.results" :key="idx">
+                    <div class="file-search-item"
+                         @click="insertSearchResult(activeTab, r)"
+                         @contextmenu.prevent="copySearchResult(r)"
+                         :title="r.file + ':' + r.line + ' — click to insert ref, right-click to copy'">
+                        <div class="file-search-item-path">
+                            <span class="file-search-item-lang" x-text="'[' + (r.lang || '?') + ']'"></span>
+                            <span class="file-search-item-file" x-text="r.file"></span>
+                            <span class="file-search-item-line" x-text="':' + r.line"></span>
+                        </div>
+                        <div class="file-search-item-text" x-text="r.text"></div>
+                    </div>
+                </template>
+                <div x-show="_fileSearch.error && !_fileSearch.loading" class="file-search-empty">
+                    <span x-text="_fileSearch.error"></span>
+                </div>
+                <div x-show="!_fileSearch.loading && !_fileSearch.error && _fileSearch.query.length < 2" class="file-search-empty">
+                    Type 2+ chars to search_
+                </div>
+            </div>
         </div>
 
         <!-- Chat Tab Content -->
@@ -353,7 +395,7 @@
                                           @input="handleChatInput(tab, $event); autoResizeTextarea($event)"
                                           @focus="chatNavClear()"
                                           @paste="handleChatPaste(tab, $event)"
-                                          placeholder="Message_ (/ for commands, paste images, drag files)"
+                                          placeholder="Message_ (/ for commands, paste images, drag files, Ctrl+Shift+F search files)"
                                           rows="1"
                                           class="chat-input-area w-full bg-[var(--bg)] border px-3 py-2 text-sm text-[var(--ng2)] tracking-wider resize-none editor"
                                           :class="tab._editMode ? 'border-[var(--yellow)]' : 'border-[var(--v-dim)]'"

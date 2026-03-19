@@ -321,6 +321,7 @@ function _buildAppData() {
             { id: 'chat-raw-log', label: 'Chat: Toggle Raw Tool Log', category: 'CHAT', action: () => { this.toggleBottomPanel('rawlog'); } },
             { id: 'chat-tools', label: 'Chat: Toggle Tools Summary', category: 'CHAT', action: () => { this.toggleBottomPanel('summary'); } },
             { id: 'chat-search', label: 'Chat: Search in Messages', shortcut: 'Ctrl+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.openChatSearch()); } },
+            { id: 'chat-file-search', label: 'Chat: Search Project Files', shortcut: 'Ctrl+Shift+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.toggleFileSearch()); } },
             // Themes
             { id: 'theme-synthwave', label: 'Theme: Synthwave', category: 'THEME', action: () => { this.settings.theme = 'synthwave'; localStorage.setItem('ar-settings', JSON.stringify(this.settings)); this.applySettings(); this.showToast('Synthwave'); } },
             { id: 'theme-darcula', label: 'Theme: Darcula (JetBrains)', category: 'THEME', action: () => { this.settings.theme = 'darcula'; localStorage.setItem('ar-settings', JSON.stringify(this.settings)); this.applySettings(); this.showToast('Darcula'); } },
@@ -523,7 +524,12 @@ function _buildAppData() {
                     e.preventDefault();
                     this.openChatSearch();
                 }
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F' && this.section === 'chat' && this.activeTab) {
+                    e.preventDefault();
+                    this.toggleFileSearch();
+                }
                 if (e.key === 'Escape' && this.chatSearch.show) { this.closeChatSearch(); }
+                if (e.key === 'Escape' && this._fileSearch.show) { this.closeFileSearch(); }
                 if (e.key === 'Escape' && this.tabCtxMenu.show) { this.tabCtxMenu.show = false; }
                 if (e.key === 'Escape' && this._renamingTabId) { this.cancelRenameTab(); }
                 if (e.key === 'Escape' && this.showShortcuts) { this.closeShortcuts(); }
@@ -543,7 +549,8 @@ function _buildAppData() {
                     const inSlashMenu = this.slashMenu.show;
                     const inCmdPalette = this.cmdPalette.show;
                     const inSearch = this.chatSearch.show;
-                    if (!inInput && !inSlashMenu && !inCmdPalette && !inSearch) {
+                    const inFileSearch = this._fileSearch.show;
+                    if (!inInput && !inSlashMenu && !inCmdPalette && !inSearch && !inFileSearch) {
                         if (e.key === 'j') { e.preventDefault(); this.chatNavFocus(1); }
                         else if (e.key === 'k') { e.preventDefault(); this.chatNavFocus(-1); }
                         else if (e.key === 'Escape' && this._chatNavIdx >= 0) { this.chatNavClear(); }

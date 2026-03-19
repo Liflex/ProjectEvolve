@@ -1135,6 +1135,83 @@ async def list_directory(path: str):
     return {"entries": entries}
 
 
+@app.get("/api/fs/search")
+async def search_files(path: str, q: str, max_results: int = 30):
+    """Search for text in project files (text-based grep)."""
+    if not path or not q:
+        raise HTTPException(status_code=400, detail="path and q parameters required")
+    if len(q) < 2:
+        raise HTTPException(status_code=400, detail="Query must be at least 2 characters")
+    abs_path = Path(path).resolve()
+    allowed_bases = {get_project_dir().resolve(), Path.cwd().resolve()}
+    if not any(str(abs_path).startswith(str(base)) for base in allowed_bases):
+        raise HTTPException(status_code=403, detail="Path traversal blocked")
+    if not abs_path.is_dir():
+        raise HTTPException(status_code=404, detail="Directory not found")
+
+    # Text file extensions to search
+    TEXT_EXTS = {
+        '.py', '.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs',
+        '.md', '.txt', '.rst', '.adoc',
+        '.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf',
+        '.html', '.htm', '.css', '.scss', '.less', '.sass',
+        '.sh', '.bash', '.zsh', '.fish',
+        '.rs', '.go', '.java', '.kt', '.kts', '.swift',
+        '.c', '.h', '.cpp', '.hpp', '.cc', '.cxx',
+        '.rb', '.php', '.lua', '.r', '.R', '.jl',
+        '.sql', '.graphql', '.prisma',
+        '.dockerfile', '.makefile',
+        '.env', '.gitignore', '.editorconfig',
+        '.vue', '.svelte',
+    }
+    SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".idea",
+                 ".vscode", ".autoresearch", "dist", "build", ".next", ".cache",
+                 "target", "vendor", ".mypy_cache", ".pytest_cache", ".tox"}
+    MAX_FILE_SIZE = 512 * 1024  # 512KB
+
+    query_lower = q.lower()
+    results = []
+    try:
+        for root, dirs, files in os.walk(abs_path):
+            # Prune skipped directories
+            dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith('.')]
+            for fname in files:
+                if len(results) >= max_results:
+                    break
+                fpath = Path(root) / fname
+                try:
+                    if fpath.stat().st_size > MAX_FILE_SIZE:
+                        continue
+                    ext = fpath.suffix.lower()
+                    if ext not in TEXT_EXTS and fname.lower() not in {'makefile', 'dockerfile', '.gitignore', '.env', 'license', 'readme'}:
+                        continue
+                    try:
+                        text = fpath.read_text(encoding="utf-8", errors="replace")
+                    except (PermissionError, OSError):
+                        continue
+                    lines = text.split('\n')
+                    for li, line in enumerate(lines):
+                        if query_lower in line.lower():
+                            rel = str(fpath.relative_to(abs_path))
+                            results.append({
+                                "file": rel,
+                                "abs_path": str(fpath),
+                                "line": li + 1,
+                                "text": line.strip()[:200],
+                                "lang": ext.lstrip('.'),
+                            })
+                            if len(results) >= max_results:
+                                break
+                except (PermissionError, OSError):
+                    continue
+            if len(results) >= max_results:
+                break
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    return {"query": q, "results": results, "total": len(results), "truncated": len(results) >= max_results}
+
+
 @app.get("/api/fs/preflight")
 async def preflight_check(path: str):
     """Pre-flight check: verify project has required files for AutoResearch."""
