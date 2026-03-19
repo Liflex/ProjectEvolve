@@ -159,7 +159,65 @@ window._toggleCodeFold = function(btn, preId) {
     btn.textContent = isFolded ? '[UNFOLD]' : '[FOLD]';
     btn.classList.toggle('code-ctrl-active', isFolded);
 };
-;
+
+// Insert code block content into chat input
+window._insertCode = function(btn, preId) {
+    var pre = document.getElementById(preId);
+    if (!pre) return;
+    var text = pre.textContent || pre.innerText;
+    var app = window._app;
+    if (!app || !app.activeTab) return;
+    var tab = app.chatTabs.find(function(t) { return t.tab_id === app.activeChatTab; });
+    if (!tab) return;
+    // Append to input with newline separator if needed
+    var separator = tab.input_text && tab.input_text.trim() ? '\n' : '';
+    tab.input_text = (tab.input_text || '') + separator + text;
+    app.chatTick++;
+    // Focus input
+    app.$nextTick(function() {
+        var input = document.querySelector('#chat-input-' + tab.tab_id);
+        if (input) { input.focus(); input.scrollTop = input.scrollHeight; }
+    });
+    // Visual feedback
+    var origText = btn.textContent;
+    btn.textContent = '[INSERTED]';
+    btn.classList.add('code-action-done');
+    setTimeout(function() { btn.textContent = origText; btn.classList.remove('code-action-done'); }, 1500);
+    // Cat reaction
+    if (window.CatModule && CatModule.isActive()) {
+        CatModule.setExpression('thinking');
+        CatModule.setSpeechText('*вставил код в инпут* Поправь если надо! Мяу!', 3000);
+    }
+    if (app.showToast) app.showToast('Code inserted into input', 'success');
+};
+
+// Send shell code block command to agent for execution
+window._runCode = function(btn, preId) {
+    var pre = document.getElementById(preId);
+    if (!pre) return;
+    var text = (pre.textContent || pre.innerText).trim();
+    var app = window._app;
+    if (!app || !app.activeTab) return;
+    var tab = app.chatTabs.find(function(t) { return t.tab_id === app.activeChatTab; });
+    if (!tab) return;
+    if (tab.is_streaming) { if (app.showToast) app.showToast('Agent is busy', 'error'); return; }
+    // Send as a message asking to run the command
+    tab.input_text = 'Run this command:\n```bash\n' + text + '\n```';
+    app.chatTick++;
+    app.sendChatMessage(tab);
+    // Visual feedback
+    var origText = btn.textContent;
+    btn.textContent = '[SENT]';
+    btn.classList.add('code-action-done');
+    setTimeout(function() { btn.textContent = origText; btn.classList.remove('code-action-done'); }, 1500);
+    // Cat reaction
+    if (window.CatModule && CatModule.isActive()) {
+        CatModule.setExpression('working');
+        CatModule.setSpeechText('Выполняю! *бегает к терминалу*', 3000);
+        setTimeout(function() { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 3000);
+    }
+    if (app.showToast) app.showToast('Command sent to agent', 'success');
+};
 
 function _buildAppData() {
     return {
@@ -371,6 +429,8 @@ function _buildAppData() {
                 { keys: 'Right-click', desc: 'Context menu (Copy, Quote, Edit, Pin, etc.)' },
                 { keys: 'Double-click tab', desc: 'Rename tab' },
                 { keys: 'Hover + actions', desc: 'COPY / QUOTE / EDIT / REGEN / PIN / FOLD / DEL' },
+                { keys: 'Code [INSERT]', desc: 'Insert code block into chat input' },
+                { keys: 'Code [RUN]', desc: 'Send bash command to agent (shell blocks only)' },
             ]},
             { category: 'FILES & MEDIA', items: [
                 { keys: 'Paste image', desc: 'Attach clipboard image to message' },

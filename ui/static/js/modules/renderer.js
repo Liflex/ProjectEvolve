@@ -91,10 +91,16 @@ window.AppRenderer = (function() {
                         const lineCount = lines.length;
                         const numbered = lines.map((l, idx) => '<span class="code-line" data-ln="' + (idx + 1) + '"><span class="code-ln" data-ln="' + (idx + 1) + '">' + (idx + 1) + '</span>' + (l || ' ') + '</span>').join('\n');
                         const accentColor = langAccents[(lang || '').toLowerCase()] || 'var(--md-code-header-accent, var(--v3))';
-                        return '<div class="code-block" data-cb-id="' + id + '"><div class="code-header">'
+                        const isShell = /^(bash|sh|shell|zsh)$/i.test(lang || '');
+                        const runBtn = isShell
+                            ? '<span class="code-action code-action-run" onclick="event.stopPropagation();window._runCode(this,\'' + id + '\')" title="Send command to agent">[RUN]</span>'
+                            : '';
+                        return '<div class="code-block" data-cb-id="' + id + '" data-lang="' + (lang || '') + '"><div class="code-header">'
                             + '<span class="code-lang" style="color:' + accentColor + '">' + label + '</span>'
                             + '<span class="code-lines-count">' + lineCount + ' lines</span>'
                             + '<span class="code-copy-sel" data-cb="' + id + '" style="display:none">[COPY SEL]</span>'
+                            + '<span class="code-action code-action-insert" onclick="event.stopPropagation();window._insertCode(this,\'' + id + '\')" title="Insert code into chat input">[INSERT]</span>'
+                            + runBtn
                             + '<span class="code-ctrl" onclick="event.stopPropagation();window._toggleCodeWrap(this,\'' + id + '\')" title="Toggle word wrap">[WRAP]</span>'
                             + '<span class="code-ctrl" onclick="event.stopPropagation();window._toggleCodeFold(this,\'' + id + '\')" title="Toggle fold">[FOLD]</span>'
                             + '<span class="code-copy" onclick="window._copyCode(this,\'' + id + '\')">[COPY]</span>'
