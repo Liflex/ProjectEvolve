@@ -181,6 +181,9 @@ function _buildAppData() {
         researchWs: null,
         toast: { show: false, message: '', type: 'success' },
         chartHover: null,
+        heatmapTooltip: null,  // { date, count, x, y } for activity heatmap
+        _heatmapData: null,     // cached heatmap data, updated when experiments load
+        _streakData: null,      // cached streak data
         catSpeech: '',
         catExpression: 'neutral',
         organismSVG: '',
@@ -538,7 +541,7 @@ function _buildAppData() {
             if (page === 'changes') this.loadChangesLog();
             if (page === 'prompt') this.loadPrompt();
             if (page === 'config') this.loadConfig();
-            if (page === 'dashboard') this.loadStats();
+            if (page === 'dashboard') { this.loadStats(); this.loadExperiments(); }
             if (page === 'run') { this.pollRunStatus(); if (this.runStatus.running) this.connectResearchWs(); }
             if (page !== 'run') this.disconnectResearchWs();
             if (window.CatModule && CatModule.isActive() && CatModule.setPage) { CatModule.setPage(page); }

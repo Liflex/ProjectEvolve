@@ -75,7 +75,115 @@ window.AppLab = (function() {
             } catch (e) { }
         },
         async loadExperiments() {
-            try { const data = await this.api('/api/experiments'); this.experiments = Array.isArray(data) ? data.filter(e => e && typeof e === 'object' && e.number != null).reverse() : []; } catch (e) { this.experiments = []; }
+            try {
+                const data = await this.api('/api/experiments');
+                this.experiments = Array.isArray(data) ? data.filter(e => e && typeof e === 'object' && e.number != null).reverse() : [];
+                this._heatmapData = this.heatmapData();
+                this._streakData = this.streakData();
+            } catch (e) { this.experiments = []; }
+        },
+
+        // --- Activity heatmap ---
+        heatmapData() {
+            const exps = this.experiments || [];
+            if (!exps.length) return { weeks: [], maxCount: 0, totalDays: 0, todayCount: 0, weekCount: 0 };
+            // Parse experiment dates and count per day
+            const dayCounts = {};
+            const today = new Date(); today.setHours(0,0,0,0);
+            const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
+            let todayCount = 0, weekCount = 0;
+            for (const exp of exps) {
+                if (!exp.date) continue;
+                const d = new Date(exp.date); d.setHours(0,0,0,0);
+                if (isNaN(d.getTime())) continue;
+                const key = d.toISOString().slice(0, 10);
+                dayCounts[key] = (dayCounts[key] || 0) + 1;
+                if (d.getTime() === today.getTime()) todayCount++;
+                if (d >= weekAgo) weekCount++;
+            }
+            // Build 12-week grid (84 days), ending today
+            const totalDays = 84;
+            const startDate = new Date(today); startDate.setDate(startDate.getDate() - totalDays + 1);
+            const weeks = [];
+            let currentWeek = [];
+            let activeDays = 0;
+            for (let i = 0; i < totalDays; i++) {
+                const d = new Date(startDate); d.setDate(d.getDate() + i);
+                const key = d.toISOString().slice(0, 10);
+                const count = dayCounts[key] || 0;
+                if (count > 0) activeDays++;
+                currentWeek.push({ date: key, count, dayOfWeek: d.getDay() });
+                if (currentWeek.length === 7 || i === totalDays - 1) {
+                    weeks.push(currentWeek);
+                    currentWeek = [];
+                }
+            }
+            const maxCount = Math.max(1, ...Object.values(dayCounts));
+            return { weeks, maxCount, totalDays: activeDays, todayCount, weekCount };
+        },
+
+        heatmapLevel(count, maxCount) {
+            if (count === 0) return 0;
+            if (maxCount <= 1) return count > 0 ? 3 : 0;
+            const ratio = count / maxCount;
+            if (ratio <= 0.25) return 1;
+            if (ratio <= 0.5) return 2;
+            if (ratio <= 0.75) return 3;
+            return 4;
+        },
+
+        heatmapColor(level) {
+            const colors = ['var(--bg)', 'rgba(180,74,255,0.15)', 'rgba(180,74,255,0.3)', 'rgba(180,74,255,0.5)', 'rgba(180,74,255,0.75)'];
+            return colors[level] || colors[0];
+        },
+
+        heatmapMonthLabels() {
+            const hm = this.heatmapData();
+            if (!hm.weeks.length) return '';
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            let html = '';
+            let lastMonth = -1;
+            for (let wi = 0; wi < hm.weeks.length; wi++) {
+                const week = hm.weeks[wi];
+                if (!week.length) continue;
+                const firstDay = week[0];
+                const d = new Date(firstDay.date);
+                const m = d.getMonth();
+                if (m !== lastMonth) {
+                    lastMonth = m;
+                    const left = wi * 14; // 11px cell + 3px gap
+                    html += '<span style="position:absolute;left:' + left + 'px;bottom:-16px;font-size:0.5rem;color:var(--v3);white-space:nowrap">' + months[m] + '</span>';
+                }
+            }
+            return html;
+        },
+
+        // --- Streak tracking ---
+        streakData() {
+            const exps = this.experiments || [];
+            if (!exps.length) return { current: 0, best: 0, currentDiscard: 0 };
+            let current = 0, best = 0, streak = 0, currentDiscard = 0, dStreak = 0, bestDiscard = 0;
+            // Walk from newest to oldest
+            for (let i = exps.length - 1; i >= 0; i--) {
+                const d = exps[i].decision;
+                if (d === 'KEEP' || d === 'ACCEPT') {
+                    streak++;
+                    dStreak = 0;
+                    if (streak > best) best = streak;
+                    // Track current only from the end
+                    if (current === 0 && currentDiscard === 0) current = streak;
+                    else if (currentDiscard > 0) break; // streak broken before we started counting
+                } else if (d === 'DISCARD') {
+                    dStreak++;
+                    streak = 0;
+                    if (dStreak > bestDiscard) bestDiscard = dStreak;
+                    if (current === 0 && currentDiscard === 0) currentDiscard = dStreak;
+                    else if (current > 0) break;
+                } else {
+                    streak = 0; dStreak = 0;
+                }
+            }
+            return { current, best, currentDiscard, bestDiscard };
         },
 
         // --- Experiment detail ---

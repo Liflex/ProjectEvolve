@@ -34,6 +34,117 @@
             </div>
         </div>
 
+        <!-- Activity Heatmap + Streaks -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
+            <div class="lg:col-span-2 pixel-border bg-[var(--bg2)] p-4" @mouseleave="heatmapTooltip=null">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="text-[0.5625rem] tracking-widest text-[var(--v3)]">ACTIVITY_HEATMAP_</div>
+                    <div class="flex items-center gap-2 text-[0.5rem] text-[var(--v3)]">
+                        <span>Less</span>
+                        <span class="heatmap-cell" style="background:var(--bg)"></span>
+                        <span class="heatmap-cell" style="background:rgba(180,74,255,0.15)"></span>
+                        <span class="heatmap-cell" style="background:rgba(180,74,255,0.3)"></span>
+                        <span class="heatmap-cell" style="background:rgba(180,74,255,0.5)"></span>
+                        <span class="heatmap-cell" style="background:rgba(180,74,255,0.75)"></span>
+                        <span>More</span>
+                    </div>
+                </div>
+                <div class="relative overflow-x-auto">
+                    <div class="heatmap-grid" style="display:flex;gap:3px">
+                        <template x-for="(week, wi) in (_heatmapData?.weeks || [])" :key="wi">
+                            <div style="display:flex;flex-direction:column;gap:3px">
+                                <template x-for="(day, di) in week" :key="di">
+                                    <div class="heatmap-cell"
+                                         :style="'background:' + heatmapColor(heatmapLevel(day.count, _heatmapData?.maxCount || 1))"
+                                         :title="day.date + ': ' + day.count + ' exp' + (day.count !== 1 ? 's' : '')"
+                                         @mouseenter="heatmapTooltip = { date: day.date, count: day.count, el: $event.currentTarget }"
+                                         @mouseleave="heatmapTooltip = null">
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                    <!-- Day labels -->
+                    <div class="heatmap-day-labels">
+                        <span style="position:absolute;left:-20px;top:0px;line-height:11px">Mon</span>
+                        <span style="position:absolute;left:-20px;top:33px;line-height:11px">Wed</span>
+                        <span style="position:absolute;left:-20px;top:55px;line-height:11px">Fri</span>
+                    </div>
+                    <!-- Month labels -->
+                    <div class="heatmap-month-labels" x-html="heatmapMonthLabels()"></div>
+                    <!-- Tooltip -->
+                    <div x-show="heatmapTooltip" x-transition.opacity.duration.100ms
+                         class="heatmap-tooltip z-30"
+                         :style="'position:fixed;left:' + (heatmapTooltip?.el?.getBoundingClientRect().left + 16) + 'px;top:' + (heatmapTooltip?.el?.getBoundingClientRect().top - 8) + 'px'">
+                        <div class="text-[0.6875rem] text-[var(--ng2)]" x-text="(heatmapTooltip?.count || 0) + ' experiment' + ((heatmapTooltip?.count || 0) !== 1 ? 's' : '')"></div>
+                        <div class="text-[0.5625rem] text-[var(--v3)]" x-text="heatmapTooltip?.date || ''"></div>
+                    </div>
+                    <!-- Summary -->
+                    <div class="flex items-center gap-4 mt-3 text-[0.5625rem] text-[var(--v3)]">
+                        <span><span class="text-[var(--ng2)]" x-text="_heatmapData?.totalDays || 0"></span> active days</span>
+                        <span><span class="text-[var(--cyan)]" x-text="_heatmapData?.weekCount || 0"></span> this week</span>
+                        <span><span class="text-[var(--ng)]" x-text="_heatmapData?.todayCount || 0"></span> today</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Streak Tracker -->
+            <div class="pixel-border bg-[var(--bg2)] p-4">
+                <div class="text-[0.5625rem] tracking-widest text-[var(--v3)] mb-3">STREAK_TRACKER_</div>
+                <div class="space-y-3">
+                    <!-- Current KEEP streak -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider">CURRENT_KEEP</span>
+                            <span class="text-lg text-[var(--ng)] glow-green" style="font-family:'Press Start 2P',monospace" x-text="_streakData?.current || 0"></span>
+                        </div>
+                        <div class="h-1.5 bg-[var(--bg)] overflow-hidden">
+                            <div class="h-full bg-[var(--ng)] transition-all duration-500" :style="'width:' + Math.min(100, ((_streakData?.current || 0) / Math.max(_streakData?.best || 1, 1)) * 100) + '%'"></div>
+                        </div>
+                    </div>
+                    <!-- Best KEEP streak -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider">BEST_KEEP</span>
+                            <span class="text-lg text-[var(--v)] glow-sm" style="font-family:'Press Start 2P',monospace" x-text="_streakData?.best || 0"></span>
+                        </div>
+                        <div class="h-1.5 bg-[var(--bg)] overflow-hidden">
+                            <div class="h-full bg-[var(--v)] transition-all duration-500" :style="'width:' + ((_streakData?.best || 0) > 0 ? '100' : '0') + '%'"></div>
+                        </div>
+                    </div>
+                    <!-- Current DISCARD streak -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider">CURRENT_DISCARD</span>
+                            <span class="text-lg" :class="(_streakData?.currentDiscard || 0) > 0 ? 'text-[var(--red)]' : 'text-[var(--v3)]'" style="font-family:'Press Start 2P',monospace" x-text="_streakData?.currentDiscard || 0"></span>
+                        </div>
+                        <div class="h-1.5 bg-[var(--bg)] overflow-hidden">
+                            <div class="h-full transition-all duration-500" :class="(_streakData?.currentDiscard || 0) > 0 ? 'bg-[var(--red)]' : ''" :style="'width:' + ((_streakData?.currentDiscard || 0) > 0 ? Math.min(100, ((_streakData?.currentDiscard || 0) / Math.max(_streakData?.bestDiscard || 1, 1)) * 100) : 0) + '%'"></div>
+                        </div>
+                    </div>
+                    <!-- Milestone indicator -->
+                    <div class="mt-2 pt-2 border-t border-[var(--v-dim)]">
+                        <div class="text-[0.5rem] text-[var(--v3)] tracking-wider mb-1">NEXT_MILESTONE</div>
+                        <div x-show="(_streakData?.best || 0) < 5">
+                            <span class="text-[0.625rem] text-[var(--amber)]">5 KEEP streak</span>
+                            <span class="text-[0.5rem] text-[var(--v3)] ml-1" x-text="'(' + (5 - (_streakData?.best || 0)) + ' more)'"></span>
+                        </div>
+                        <div x-show="(_streakData?.best || 0) >= 5 &amp;&amp; (_streakData?.best || 0) < 10">
+                            <span class="text-[0.625rem] text-[var(--cyan)]">10 KEEP streak</span>
+                            <span class="text-[0.5rem] text-[var(--v3)] ml-1" x-text="'(' + (10 - (_streakData?.best || 0)) + ' more)'"></span>
+                        </div>
+                        <div x-show="(_streakData?.best || 0) >= 10 &amp;&amp; (_streakData?.best || 0) < 20">
+                            <span class="text-[0.625rem] text-[var(--ng)]">20 KEEP streak</span>
+                            <span class="text-[0.5rem] text-[var(--v3)] ml-1" x-text="'(' + (20 - (_streakData?.best || 0)) + ' more)'"></span>
+                        </div>
+                        <div x-show="(_streakData?.best || 0) >= 20">
+                            <span class="text-[0.625rem] text-[var(--pink)] glow-sm" x-text="'LEGENDARY: ' + (_streakData?.best || 0) + ' streak!'"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Score Chart + Types -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
             <div class="lg:col-span-2 pixel-border bg-[var(--bg2)] p-4" @mouseleave="chartHover=null">
