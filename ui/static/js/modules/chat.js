@@ -53,6 +53,10 @@ window.AppChat = (function() {
                     _pendingFeedback: [],  // queued reaction feedback: [{msgIdx, reaction, snippet}]
                     _unread: 0,
                     _agentDone: false,
+                    _catCtx80Warned: false,
+                    _catCtxWarned: false,
+                    _catCostMilestone: 0,
+                    _catStreamPatienceTimer: null,
                 };
                 this.chatTabs.push(tab);
                 this.activeChatTab = tab.tab_id;
@@ -60,6 +64,19 @@ window.AppChat = (function() {
                 this.connectChatWebSocket(tab);
                 this._scheduleChatSave();
                 this.showToast('SESSION STARTED', 'success');
+                // Cat: greet new session
+                if (window.CatModule && CatModule.isActive()) {
+                    CatModule.setExpression('happy');
+                    if (CatModule.triggerPawWave) CatModule.triggerPawWave();
+                    const greetings = [
+                        'Новая сессия! *радостно виляет хвостом* Мяу!',
+                        'Привет! Готов к работе! =^_^=',
+                        'Новый чат! *потирает лапки* Спрашивай!',
+                        'О, свежая сессия! Мур-мур!',
+                    ];
+                    CatModule.setSpeechText(greetings[Math.floor(Math.random() * greetings.length)], 4000);
+                    setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000);
+                }
             } catch (e) {
                 console.error('[chat] createChatTab failed:', e);
                 this.showToast('SESSION FAILED: ' + e.message, 'error');
@@ -201,6 +218,26 @@ window.AppChat = (function() {
                                 }
                                 tab.is_streaming = true;
                                 _app.chatTick++;
+                                // Cat: start long-stream patience timer (30s)
+                                if (!tab._catStreamPatienceTimer && window.CatModule && CatModule.isActive()) {
+                                    tab._catStreamPatienceTimer = setTimeout(function checkPatience() {
+                                        tab._catStreamPatienceTimer = null;
+                                        if (tab.is_streaming && window.CatModule && CatModule.isActive()) {
+                                            const tips = [
+                                                'Ещё работает... *ждёт* Мяу_',
+                                                'Долго думает... *концентрируется*',
+                                                'Агент ещё занят_ *вертит головой*',
+                                                '*лёг на лапы* Подождём...',
+                                            ];
+                                            CatModule.setExpression('thinking');
+                                            CatModule.setSpeechText(tips[Math.floor(Math.random() * tips.length)], 5000);
+                                            setTimeout(() => { if (CatModule.isActive() && tab.is_streaming) CatModule.setExpression('neutral'); }, 5000);
+                                            if (tab.is_streaming) {
+                                                tab._catStreamPatienceTimer = setTimeout(checkPatience, 25000);
+                                            }
+                                        }
+                                    }, 30000);
+                                }
                             }
                         } else if (etype === 'thinking') {
                             tab.is_thinking = true;
@@ -297,10 +334,54 @@ window.AppChat = (function() {
                             // Store per-message token info for display
                             tab._msgTokens = { input: usage.input_tokens || 0, output: usage.output_tokens || 0, cost: data.total_cost_usd || 0 };
                             _app.chatTick++;
+                            // Cat: context window and cost warnings
+                            if (window.CatModule && CatModule.isActive()) {
+                                const ctxPct = tab.tokens.input / tab.tokens.threshold;
+                                if (ctxPct > 0.9 && !tab._catCtxWarned) {
+                                    tab._catCtxWarned = true;
+                                    CatModule.setExpression('angry');
+                                    CatModule.setSpeechText('Контекст на ' + Math.round(ctxPct * 100) + '%! *тревожно* Начни новую сессию!', 5000);
+                                    setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 5000);
+                                } else if (ctxPct > 0.8 && !tab._catCtxWarned) {
+                                    tab._catCtx80Warned = true;
+                                    CatModule.setExpression('thinking');
+                                    CatModule.setSpeechText('Контекст заполнен на ' + Math.round(ctxPct * 100) + '%... *прищурился*', 4000);
+                                    setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000);
+                                }
+                                // Cost milestone reactions
+                                const cost = tab.tokens.cost;
+                                const milestones = [0.05, 0.10, 0.25, 0.50, 1.00, 2.00, 5.00];
+                                const lastMilestone = tab._catCostMilestone || 0;
+                                for (const m of milestones) {
+                                    if (cost >= m && lastMilestone < m) {
+                                        tab._catCostMilestone = m;
+                                        const costTips = {
+                                            0.05: 'Потрачено $0.05! *широко открывает глаза*',
+                                            0.10: 'Уже $0.10! Дорого-то как_ Мяу!',
+                                            0.25: '$0.25... *задумался* Это инвестиции!',
+                                            0.50: 'Пол-доллара! *хлопает глазами*',
+                                            1.00: 'ДОЛЛАР! *удивлённый мурр*',
+                                            2.00: 'Два доллара... *сонно моргает*',
+                                            5.00: '$5.00! *потирает лапки* Кто-то щедрый!',
+                                        };
+                                        if (costTips[m]) {
+                                            CatModule.setExpression('surprised');
+                                            CatModule.setSpeechText(costTips[m], 4000);
+                                            setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000);
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
                         }
                     } else if (msg.type === 'stream_end') {
                         tab.is_streaming = false;
                         tab._catThinking = false;
+                        // Cat: clear patience timer on stream end
+                        if (tab._catStreamPatienceTimer) {
+                            clearTimeout(tab._catStreamPatienceTimer);
+                            tab._catStreamPatienceTimer = null;
+                        }
                         // Mark agent done for background tabs
                         if (_app.activeChatTab !== tab.tab_id) {
                             tab._agentDone = true;
@@ -1546,6 +1627,12 @@ window.AppChat = (function() {
             tab.messages = tab.messages.slice(0, msgIdx);
             tab.input_text = content;
             this.chatTick++;
+            // Cat: notice edit mode
+            if (window.CatModule && CatModule.isActive()) {
+                CatModule.setExpression('thinking');
+                CatModule.setSpeechText('*прищурился* Редактируем? Осторожно_ Мяу!', 3000);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 3000);
+            }
             this.$nextTick(() => {
                 const textarea = document.querySelector('#chat-messages-' + tabId)?.closest('.flex.flex-col')?.querySelector('textarea');
                 if (textarea) { textarea.focus(); textarea.setSelectionRange(content.length, content.length); }
@@ -1561,6 +1648,11 @@ window.AppChat = (function() {
             tab.input_text = '';
             tab._editMode = null;
             this.chatTick++;
+            // Cat: edit cancelled
+            if (window.CatModule && CatModule.isActive()) {
+                CatModule.setExpression('neutral');
+                CatModule.setSpeechText('*успокоился* Хорошо, не меняем_', 2000);
+            }
             this.$nextTick(() => this.resizeInputForTab(tab));
         },
 
