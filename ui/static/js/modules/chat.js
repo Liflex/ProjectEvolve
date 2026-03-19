@@ -68,6 +68,8 @@ window.AppChat = (function() {
             if (tab) this.page = '';
             if (window.refitTerminal) refitTerminal(tabId);
             this.resizeInputForTab(tab);
+            // Clear keyboard navigation focus when switching tabs
+            this.chatNavClear();
         },
 
         async closeChatTab(tabId) {
@@ -369,6 +371,7 @@ window.AppChat = (function() {
             tab.scrolledUp = false;
             tab.messages.push({ role: 'user', content: content, id: 'msg-' + Date.now(), ts: Date.now() });
             tab._msgStartTime = Date.now();
+            this.chatNavClear();
             tab._msgTokens = null;
             this.chatTick++;
             // Cat: analyze user message for contextual skill tips
@@ -1213,6 +1216,68 @@ window.AppChat = (function() {
                 }
             }
             return html;
+        },
+
+        // ========== CHAT: KEYBOARD NAVIGATION (j/k) ==========
+        chatNavFocus(direction) {
+            const tab = this.activeTab;
+            if (!tab) return;
+            const tabId = tab.tab_id;
+            // If switching tabs, reset
+            if (this._chatNavTabId !== tabId) {
+                this._chatNavTabId = tabId;
+                this._chatNavIdx = -1;
+            }
+            const container = document.getElementById('chat-messages-' + tabId);
+            if (!container) return;
+            const msgs = container.querySelectorAll('.msg-wrap');
+            if (msgs.length === 0) return;
+            // Remove current focus
+            if (this._chatNavIdx >= 0 && this._chatNavIdx < msgs.length) {
+                msgs[this._chatNavIdx].classList.remove('msg-focused');
+            }
+            if (direction === 0) {
+                // Clear focus
+                this._chatNavIdx = -1;
+                return;
+            }
+            // Find next/prev
+            let newIdx = this._chatNavIdx + direction;
+            // Clamp
+            if (newIdx < 0) newIdx = 0;
+            if (newIdx >= msgs.length) newIdx = msgs.length - 1;
+            this._chatNavIdx = newIdx;
+            msgs[newIdx].classList.add('msg-focused');
+            msgs[newIdx].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        },
+
+        chatNavClear() {
+            if (this._chatNavIdx >= 0) {
+                const container = document.getElementById('chat-messages-' + this._chatNavTabId);
+                if (container) {
+                    const msgs = container.querySelectorAll('.msg-wrap');
+                    if (this._chatNavIdx < msgs.length) {
+                        msgs[this._chatNavIdx].classList.remove('msg-focused');
+                    }
+                }
+            }
+            this._chatNavIdx = -1;
+        },
+
+        chatNavAction(action) {
+            const idx = this._chatNavIdx;
+            const tabId = this._chatNavTabId;
+            if (idx < 0 || !tabId) return;
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab) return;
+            switch (action) {
+                case 'copy': this.copyChatMsg(tabId, idx); break;
+                case 'quote': this.quoteMessage(tabId, idx); break;
+                case 'fold': this.toggleMsgCollapse(tabId, idx); break;
+                case 'del': this.deleteChatMsg(tabId, idx); break;
+                case 'pin': this.togglePinMessage(tabId, idx); break;
+                case 'edit': this.editUserMsg(tabId, idx); break;
+            }
         },
 
         // ========== CHAT: SEARCH (Ctrl+F) ==========

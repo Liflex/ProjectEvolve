@@ -810,6 +810,24 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     opacity: 0; pointer-events: none; transition: opacity 0.15s; z-index: 5;
 }
 .msg-wrap:hover .msg-actions { opacity: 1; pointer-events: auto; }
+
+/* === CHAT MESSAGE KEYBOARD NAVIGATION FOCUS === */
+.msg-focused {
+    border-left: 2px solid var(--v) !important;
+    background: rgba(180, 74, 255, 0.06) !important;
+    border-radius: 2px;
+    outline: none;
+    animation: msg-focus-pulse 2s ease-in-out infinite;
+}
+.msg-focused .msg-actions {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+@keyframes msg-focus-pulse {
+    0% { border-left-color: var(--v); }
+    50% { border-left-color: var(--cyan); }
+    100% { border-left-color: var(--v); }
+}
 /* For user messages — align actions right */
 .chat-msg-row-user .msg-actions { justify-content: flex-end; }
 .msg-actions button {

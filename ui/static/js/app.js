@@ -212,6 +212,10 @@ function _buildAppData() {
         // Chat Search (Ctrl+F)
         chatSearch: { show: false, query: '', total: 0, current: 0, _elements: [] },
 
+        // Chat message keyboard navigation (j/k)
+        _chatNavIdx: -1,  // focused message index, -1 = none
+        _chatNavTabId: null,
+
         // Pinned messages
         pinnedMessages: [], // [{tabId, msgIdx, role, preview, ts, content}]
         showPinsPanel: false,
@@ -301,6 +305,16 @@ function _buildAppData() {
                 { keys: 'Up / Down', desc: 'Message history (shell-style)' },
                 { keys: 'ESC', desc: 'Cancel edit / exit history / close panels' },
                 { keys: '/', desc: 'Skill autocomplete menu' },
+            ]},
+            { category: 'MESSAGE NAV (j/k)', items: [
+                { keys: 'j / k', desc: 'Navigate messages down / up' },
+                { keys: 'ESC', desc: 'Clear message focus' },
+                { keys: 'c', desc: 'Copy focused message' },
+                { keys: 'q', desc: 'Quote focused message' },
+                { keys: 'e', desc: 'Edit focused message (user only)' },
+                { keys: 'f', desc: 'Fold / unfold focused message' },
+                { keys: 'p', desc: 'Pin / unpin focused message' },
+                { keys: 'd', desc: 'Delete focused message' },
             ]},
             { category: 'INPUT FORMATTING', items: [
                 { keys: 'Ctrl+Shift+B', desc: 'Bold **text**' },
@@ -473,6 +487,27 @@ function _buildAppData() {
                 if (e.key === 'Enter' && this.chatSearch.show && document.activeElement.id === 'chat-search-input') {
                     e.preventDefault();
                     this.navigateChatMatch(e.shiftKey ? -1 : 1);
+                }
+                // Chat message keyboard navigation (j/k) — only when in chat section, not in input
+                if (this.section === 'chat' && this.activeTab && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+                    const inSlashMenu = this.slashMenu.show;
+                    const inCmdPalette = this.cmdPalette.show;
+                    const inSearch = this.chatSearch.show;
+                    if (!inInput && !inSlashMenu && !inCmdPalette && !inSearch) {
+                        if (e.key === 'j') { e.preventDefault(); this.chatNavFocus(1); }
+                        else if (e.key === 'k') { e.preventDefault(); this.chatNavFocus(-1); }
+                        else if (e.key === 'Escape' && this._chatNavIdx >= 0) { this.chatNavClear(); }
+                        else if (this._chatNavIdx >= 0) {
+                            // Action shortcuts on focused message
+                            if (e.key === 'c') { e.preventDefault(); this.chatNavAction('copy'); }
+                            else if (e.key === 'q') { e.preventDefault(); this.chatNavAction('quote'); }
+                            else if (e.key === 'f') { e.preventDefault(); this.chatNavAction('fold'); }
+                            else if (e.key === 'd') { e.preventDefault(); this.chatNavAction('del'); }
+                            else if (e.key === 'p') { e.preventDefault(); this.chatNavAction('pin'); }
+                            else if (e.key === 'e') { e.preventDefault(); this.chatNavAction('edit'); }
+                        }
+                    }
                 }
             });
         },

@@ -101,6 +101,7 @@
             </div>
             <div class="chat-toolbar-sep"></div>
             <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider" x-show="activeTab" x-text="(activeTab?.messages?.length || 0) + ' MSGS'"></span>
+            <span class="text-[0.5rem] text-[var(--v)] tracking-wider blink" x-show="_chatNavIdx >= 0" x-text="'NAV ' + (_chatNavIdx + 1) + ' [c q e f p d]'"></span>
             <div class="flex-1"></div>
             <button class="chat-toolbar-btn" :class="showStatsPanel && 'active'" @click="showStatsPanel = !showStatsPanel" title="Session statistics">&#x1f4ca; STATS</button>
             <button class="chat-toolbar-btn" @click="openChatSearch()" title="Search in chat (Ctrl+F)">&#x1f50d;</button>
@@ -276,6 +277,7 @@
                                 <textarea x-model="tab.input_text"
                                           @keydown="handleChatKeydown(tab, $event)"
                                           @input="handleChatInput(tab, $event); autoResizeTextarea($event)"
+                                          @focus="chatNavClear()"
                                           @paste="handleChatPaste(tab, $event)"
                                           placeholder="Message_ (/ for commands, paste images, drag files)"
                                           rows="1"
