@@ -1,30 +1,26 @@
 # Last Experiment Summary
 
-**Experiment #121** — Chat — turn-level collapse/expand with summary preview
-**Date:** 2026-03-20 02:43:17
+**Experiment #122** — Cat companion — cursor-tracking eye glints
+**Date:** 2026-03-20
 
 ## What Was Done
 
-N/A
+1. **Cursor-tracking eye glints** — white pixel "catchlight" on each eye follows mouse cursor position
+2. **Smooth interpolation** — glint moves with 0.12 lerp factor for natural, fluid tracking
+3. **Per-expression glint positions** — EYE_GLINT config defines eye centers for neutral, surprised, angry, thinking
+4. **Blink/sleep suppression** — glint hidden during blink frames and idle level 2+ (sleep)
+5. **No glint on happy/sleepy expressions** — eyes are lines or mostly closed, glint would look wrong
+6. **Global mousemove listener** — tracks cursor across entire page, not just canvas
+7. **Clean lifecycle** — listener added in start(), removed in stop()
 
 ## Files Modified
 
-- Target:** chat.js, app.js, chat-section.js, main.css
-- `ui/static/js/modules/chat.js` — toggleTurnCollapse, collapsePrevTurns, expandAllTurns, renderCollapsedSummary
-- `ui/static/js/app.js` — 't' key handler
-- `ui/static/templates/chat-section.js` — toolbar buttons, nav hint
-- `ui/static/css/main.css` — collapse button + summary styles
+- `ui/static/modules/cat.js` — _mouseX/_mouseY state, _glintX/_glintY smoothed offset, EYE_GLINT config, render() glint drawing, start/stop lifecycle
 
 ## Key Results
 
-Results
-
-**What was done:**
-1. **Turn collapse/expand** — кнопка `[-]`/`[+]` на turn separator сворачивает/разворачивает весь turn (user + assistant + tools)
-2. **Collapsed summary** — однострочный превью: `T3 | "How do I fix the auth bug?" | 4 msgs · 2 tools · 1.2K ch · 12s`
-3. **Turn 1 collapse** — маленькая кнопка `[-]` в заголовке USER_ для первого turn
-4. **Toolbar** — кнопки `TURNS` (свернуть все предыдущие) и `TURNS` (развернуть все) рядом с FOLD ALL/UNFOLD
-5. **Keyboard** — клавиша `t` н
+**Working:** yes
+**Tests:** skipped (UI feature, visual only)
 
 ## For Next Iteration
 
