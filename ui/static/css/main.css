@@ -224,6 +224,26 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     font-weight: normal;
 }
 
+.msg-edited-badge {
+    font-size: 0.4375rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    letter-spacing: 0.08em;
+    color: var(--yellow);
+    opacity: 0.7;
+    font-style: italic;
+    font-weight: normal;
+}
+
+.msg-regen-badge {
+    font-size: 0.4375rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    letter-spacing: 0.08em;
+    color: var(--cyan);
+    opacity: 0.7;
+    font-style: italic;
+    font-weight: normal;
+}
+
 .msg-ts {
     cursor: help;
     border-bottom: 1px dotted transparent;

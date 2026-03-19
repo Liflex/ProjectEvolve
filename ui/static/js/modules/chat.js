@@ -212,7 +212,9 @@ window.AppChat = (function() {
                                     newLast.content += text;
                                 } else {
                                     const thinkingContent = tab._thinkingBuffer || '';
-                                    tab.messages.push({ role: 'assistant', content: text, thinking: thinkingContent || undefined, is_streaming: true, ts: Date.now() });
+                                    const isRegen = tab._regenerating || false;
+                                    tab._regenerating = false;
+                                    tab.messages.push({ role: 'assistant', content: text, thinking: thinkingContent || undefined, is_streaming: true, ts: Date.now(), regenerated: isRegen || undefined });
                                     tab._thinkingBuffer = '';
                                     _app._incrementUnread(tab);
                                 }
@@ -280,7 +282,9 @@ window.AppChat = (function() {
                                     realLast.content += text;
                                     if (thinkingText) realLast.thinking = (realLast.thinking ? realLast.thinking + '\n---\n' : '') + thinkingText;
                                 } else {
-                                    tab.messages.push({ role: 'assistant', content: text, thinking: thinkingText || undefined, is_streaming: true, ts: Date.now() });
+                                    const isRegen2 = tab._regenerating || false;
+                                    tab._regenerating = false;
+                                    tab.messages.push({ role: 'assistant', content: text, thinking: thinkingText || undefined, is_streaming: true, ts: Date.now(), regenerated: isRegen2 || undefined });
                                     _app._incrementUnread(tab);
                                 }
                                 tab._thinkingBuffer = '';
@@ -377,6 +381,7 @@ window.AppChat = (function() {
                     } else if (msg.type === 'stream_end') {
                         tab.is_streaming = false;
                         tab._catThinking = false;
+                        tab._regenerating = false;
                         // Cat: clear patience timer on stream end
                         if (tab._catStreamPatienceTimer) {
                             clearTimeout(tab._catStreamPatienceTimer);
@@ -420,6 +425,7 @@ window.AppChat = (function() {
                         }
                         tab.messages.push({ role: 'assistant', content: '[ERROR] ' + (msg.message || 'Unknown error'), ts: Date.now() });
                         tab.is_streaming = false;
+                        tab._regenerating = false;
                         _app._incrementUnread(tab);
                         if (window.CatModule && CatModule.isActive()) {
                             CatModule.setExpression('surprised');
@@ -481,10 +487,11 @@ window.AppChat = (function() {
             tab._msgHistoryIdx = -1;
             tab._msgDraft = '';
             tab.input_text = '';
+            const wasEditing = !!tab._editMode;
             tab._editMode = null; // clear edit mode on send
             this.resizeInputForTab(tab);
             tab.scrolledUp = false;
-            tab.messages.push({ role: 'user', content: content, id: 'msg-' + Date.now(), ts: Date.now() });
+            tab.messages.push({ role: 'user', content: content, id: 'msg-' + Date.now(), ts: Date.now(), edited: wasEditing || undefined });
             tab._msgStartTime = Date.now();
             this.chatNavClear();
             tab._msgTokens = null;
@@ -1204,6 +1211,7 @@ window.AppChat = (function() {
                 const aTime = this.fmtTime(msg.ts);
                 const aFullTime = this.fmtFullTime(msg.ts);
                 const aTimeHtml = aTime ? ' <span class="msg-ts" title="' + this.escHtml(aFullTime) + '" style="color:var(--v3);font-weight:normal;cursor:help">' + aTime + '</span>' : '';
+                const aRegenHtml = !msg.is_streaming && msg.regenerated ? ' <span class="msg-regen-badge" title="Response was regenerated">regen</span>' : '';
                 const isLastAssistant = !msg.is_streaming && !tab.is_streaming && msgs.slice(idx + 1).filter(m => m.role === 'assistant').length === 0;
                 let thinkingHtml = '';
                 if (msg.thinking && msg.thinking.trim().length > 0) {
@@ -1270,7 +1278,7 @@ window.AppChat = (function() {
                     + '<button class="act-dislike' + (msg.reaction === 'down' ? ' reacted' : '') + '" onclick="event.stopPropagation();window._app.reactToMessage(\'' + tab.tab_id + '\',' + idx + ',\'down\')" title="Not helpful">&#x1F44E;</button>' : '')
                     + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + idx + ')" title="Delete">DEL</button>'
                     + '</div>'
-                    + '<div class="chat-role chat-role-assistant">CLAUDE_' + (isPinned ? ' <span class="pin-indicator" title="Pinned message">&#x1F4CC;</span>' : '') + (msg.reaction === 'up' ? ' <span style="color:var(--ng);font-size:0.625rem" title="Helpful">&#x1F44D;</span>' : '') + (msg.reaction === 'down' ? ' <span style="color:var(--red);font-size:0.625rem" title="Not helpful">&#x1F44E;</span>' : '') + aTimeHtml + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + reactionHtml + '</div>'
+                    + '<div class="chat-role chat-role-assistant">CLAUDE_' + (isPinned ? ' <span class="pin-indicator" title="Pinned message">&#x1F4CC;</span>' : '') + (msg.reaction === 'up' ? ' <span style="color:var(--ng);font-size:0.625rem" title="Helpful">&#x1F44D;</span>' : '') + (msg.reaction === 'down' ? ' <span style="color:var(--red);font-size:0.625rem" title="Not helpful">&#x1F44E;</span>' : '') + aTimeHtml + aRegenHtml + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + reactionHtml + '</div>'
                     + (cf.thinking ? thinkingHtml : '')
                     + thinkingIndicatorHtml
                     + '<div class="chat-bubble-asst" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit">'
@@ -1394,6 +1402,7 @@ window.AppChat = (function() {
                     const uTime = this.fmtTime(msg.ts);
                     const uFullTime = this.fmtFullTime(msg.ts);
                     const uTimeHtml = uTime ? ' <span class="msg-ts" title="' + this.escHtml(uFullTime) + '" style="color:var(--v3);font-weight:normal;cursor:help">' + uTime + '</span>' : '';
+                    const uEditedHtml = msg.edited ? ' <span class="msg-edited-badge" title="Message was edited and resent">edited</span>' : '';
                     const uFold = msg.content && msg.content.length > 500 && !msg.is_streaming;
                     const uCollapsed = msg.collapsed && uFold;
                     const uChars = (msg.content || '').length;
@@ -1408,7 +1417,7 @@ window.AppChat = (function() {
                         + (uFold ? '<button class="act-fold" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + i + ')" title="Fold/Unfold">' + (msg.collapsed ? 'UNFOLD' : 'FOLD') + '</button>' : '')
                         + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Delete">DEL</button>'
                         + '</div>'
-                        + '<div class="chat-role chat-role-user">USER_' + uTimeHtml + (uFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + uChars + 'ch · ' + uLines + 'ln</span>' : '') + '</div>'
+                        + '<div class="chat-role chat-role-user">USER_' + uTimeHtml + uEditedHtml + (uFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + uChars + 'ch · ' + uLines + 'ln</span>' : '') + '</div>'
                         + '<div class="chat-bubble-user" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit;color:var(--ng2)">'
                         + (uCollapsed
                             ? '<div class="chat-collapsed-preview">' + this.renderUserContent(msg.content.slice(0, 200)) + '</div>'
@@ -1816,6 +1825,8 @@ window.AppChat = (function() {
                 originalContent: tab.messages[lastUserIdx].content,
             };
             tab.messages = tab.messages.slice(0, lastUserIdx + 1);
+            // Mark next assistant message as regenerated
+            tab._regenerating = true;
             // Show regenerating indicator
             tab.messages.push({ role: 'assistant', content: '_Regenerating..._', ts: Date.now(), is_regenerating: true });
             tab.is_streaming = true;
