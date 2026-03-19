@@ -3041,5 +3041,111 @@ window.AppChat = (function() {
             });
             return events.slice(0, limit);
         },
+
+        // ========== CHAT: GLOBAL SEARCH ACROSS ALL SESSIONS (Ctrl+Alt+F) ==========
+        toggleGlobalSearch() {
+            if (this._globalSearch.show) {
+                this.closeGlobalSearch();
+            } else {
+                this.openGlobalSearch();
+            }
+        },
+        openGlobalSearch() {
+            this._globalSearch.show = true;
+            this._globalSearch.query = '';
+            this._globalSearch.results = [];
+            this._globalSearch.selectedIdx = 0;
+            this.$nextTick(() => {
+                const input = document.getElementById('global-search-input');
+                if (input) input.focus();
+            });
+        },
+        closeGlobalSearch() {
+            this._globalSearch.show = false;
+            this._globalSearch.query = '';
+            this._globalSearch.results = [];
+            this._globalSearch.selectedIdx = 0;
+        },
+        executeGlobalSearch() {
+            const query = this._globalSearch.query.trim().toLowerCase();
+            if (!query || query.length < 2) {
+                this._globalSearch.results = [];
+                this._globalSearch.selectedIdx = 0;
+                return;
+            }
+            const results = [];
+            for (const tab of this.chatTabs) {
+                if (!tab.messages) continue;
+                for (let i = 0; i < tab.messages.length; i++) {
+                    const msg = tab.messages[i];
+                    if (msg.role === 'tool') continue;
+                    const content = (msg.content || '');
+                    const idx = content.toLowerCase().indexOf(query);
+                    if (idx === -1) continue;
+                    // Build snippet with highlight context
+                    const ctxStart = Math.max(0, idx - 40);
+                    const ctxEnd = Math.min(content.length, idx + query.length + 40);
+                    let snippet = '';
+                    if (ctxStart > 0) snippet += '...';
+                    snippet += content.slice(ctxStart, idx);
+                    snippet += content.slice(idx, idx + query.length);
+                    snippet += content.slice(idx + query.length, ctxEnd);
+                    if (ctxEnd < content.length) snippet += '...';
+                    results.push({
+                        tabId: tab.tab_id,
+                        tabLabel: tab.label,
+                        msgIdx: i,
+                        role: msg.role,
+                        ts: msg.ts,
+                        snippet: snippet,
+                        matchPos: idx,
+                        queryLen: query.length,
+                    });
+                }
+            }
+            // Sort: most recent first
+            results.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+            this._globalSearch.results = results.slice(0, 50); // cap at 50 results
+            this._globalSearch.selectedIdx = 0;
+        },
+        navigateGlobalResult(dir) {
+            const len = this._globalSearch.results.length;
+            if (len === 0) return;
+            this._globalSearch.selectedIdx = (this._globalSearch.selectedIdx + dir + len) % len;
+        },
+        goToGlobalResult(result) {
+            if (!result) return;
+            // Switch to the correct tab
+            if (this.activeChatTab !== result.tabId) {
+                this.activateChatTab(result.tabId);
+            }
+            // Close search
+            this.closeGlobalSearch();
+            // Scroll to the message
+            this.$nextTick(() => {
+                const tab = this.chatTabs.find(t => t.tab_id === result.tabId);
+                if (!tab) return;
+                // Scroll to message
+                const msgEl = document.querySelector('[data-msg-idx="' + result.msgIdx + '"]');
+                if (msgEl) {
+                    msgEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    msgEl.classList.add('chat-msg-highlight');
+                    setTimeout(() => msgEl.classList.remove('chat-msg-highlight'), 2000);
+                }
+            });
+        },
+        globalSearchKeyDown(e) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                this.navigateGlobalResult(1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                this.navigateGlobalResult(-1);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                const result = this._globalSearch.results[this._globalSearch.selectedIdx];
+                if (result) this.goToGlobalResult(result);
+            }
+        },
     };
 })();

@@ -156,6 +156,51 @@
             <button class="chat-toolbar-btn" :class="showStatsPanel && 'active'" @click="showStatsPanel = !showStatsPanel" title="Session statistics">&#x1f4ca; STATS</button>
             <button class="chat-toolbar-btn" :class="_fileSearch.show && 'active'" @click="toggleFileSearch()" title="Search project files">&#x1f4c2; FILES</button>
             <button class="chat-toolbar-btn" @click="openChatSearch()" title="Search in chat (Ctrl+F)">&#x1f50d;</button>
+            <div class="relative">
+                <button class="chat-toolbar-btn" :class="_globalSearch.show && 'active'" @click="toggleGlobalSearch()" title="Search all sessions (Ctrl+Alt+F)">&#x1f50e; ALL</button>
+                <!-- Global search panel -->
+                <div x-show="_globalSearch.show" x-cloak x-transition.duration.150ms
+                     @click.outside="closeGlobalSearch()"
+                     class="global-search-panel">
+                    <div class="global-search-header">
+                        <span>&#x1f50e; GLOBAL_SEARCH</span>
+                        <span class="text-[0.5rem] text-[var(--v3)]" x-text="_globalSearch.results.length + ' results'"></span>
+                    </div>
+                    <div class="global-search-input-wrap">
+                        <input id="global-search-input"
+                               x-model="_globalSearch.query"
+                               @input="executeGlobalSearch()"
+                               @keydown="globalSearchKeyDown($event)"
+                               placeholder="Search all sessions..."
+                               class="global-search-input"
+                               autocomplete="off" spellcheck="false">
+                        <span x-show="_globalSearch.query.length < 2" class="global-search-hint">min 2 chars</span>
+                    </div>
+                    <div class="global-search-results">
+                        <template x-for="(result, idx) in _globalSearch.results" :key="idx">
+                            <div class="global-search-item"
+                                 :class="idx === _globalSearch.selectedIdx && 'selected'"
+                                 @click="goToGlobalResult(result)"
+                                 @mouseenter="_globalSearch.selectedIdx = idx">
+                                <div class="global-search-item-header">
+                                    <span class="global-search-item-tab" x-text="result.tabLabel"></span>
+                                    <span class="global-search-item-role"
+                                          :class="'role-' + result.role"
+                                          x-text="result.role === 'user' ? 'USER' : result.role === 'assistant' ? 'CLAUDE' : 'SYSTEM'"></span>
+                                    <span class="global-search-item-time" x-text="relativeTime(result.ts)"></span>
+                                </div>
+                                <div class="global-search-item-snippet" x-text="result.snippet"></div>
+                            </div>
+                        </template>
+                        <div x-show="_globalSearch.query.length >= 2 && _globalSearch.results.length === 0" class="global-search-empty">
+                            No matches found_
+                        </div>
+                        <div x-show="_globalSearch.query.length < 2 && _globalSearch.results.length === 0" class="global-search-empty">
+                            Type to search across all sessions_ <span class="text-[var(--v3)]">Ctrl+Alt+F</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <button class="chat-toolbar-btn" @click="openCmdPalette()" title="Command Palette (Ctrl+K)" style="font-size:0.5rem;letter-spacing:0.1em">CTRL+K</button>
             <button class="chat-toolbar-btn" @click="openShortcuts()" title="Keyboard Shortcuts (?)">? KEYS</button>
             <button x-show="chatBottomPanel !== 'closed'" class="chat-toolbar-btn" @click="chatBottomPanel = 'closed'" title="Close panel">[X] PANEL</button>

@@ -311,6 +311,9 @@ function _buildAppData() {
         // Chat Search (Ctrl+F)
         chatSearch: { show: false, query: '', total: 0, current: 0, _elements: [] },
 
+        // Global search across all sessions (Ctrl+Alt+F)
+        _globalSearch: { show: false, query: '', results: [], selectedIdx: 0 },
+
         // Chat message keyboard navigation (j/k)
         _chatNavIdx: -1,  // focused message index, -1 = none
         _chatNavTabId: null,
@@ -382,6 +385,7 @@ function _buildAppData() {
             { id: 'chat-tools', label: 'Chat: Toggle Tools Summary', category: 'CHAT', action: () => { this.toggleBottomPanel('summary'); } },
             { id: 'chat-search', label: 'Chat: Search in Messages', shortcut: 'Ctrl+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.openChatSearch()); } },
             { id: 'chat-file-search', label: 'Chat: Search Project Files', shortcut: 'Ctrl+Shift+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.toggleFileSearch()); } },
+            { id: 'chat-global-search', label: 'Chat: Search All Sessions', shortcut: 'Ctrl+Alt+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.toggleGlobalSearch()); } },
             // Themes
             { id: 'theme-synthwave', label: 'Theme: Synthwave', category: 'THEME', action: () => { this.settings.theme = 'synthwave'; localStorage.setItem('ar-settings', JSON.stringify(this.settings)); this.applySettings(); this.showToast('Synthwave'); } },
             { id: 'theme-darcula', label: 'Theme: Darcula (JetBrains)', category: 'THEME', action: () => { this.settings.theme = 'darcula'; localStorage.setItem('ar-settings', JSON.stringify(this.settings)); this.applySettings(); this.showToast('Darcula'); } },
@@ -405,6 +409,8 @@ function _buildAppData() {
             ]},
             { category: 'CHAT', items: [
                 { keys: 'Ctrl+F', desc: 'Search in messages' },
+                { keys: 'Ctrl+Alt+F', desc: 'Search all sessions' },
+                { keys: 'Ctrl+Shift+F', desc: 'Search project files' },
                 { keys: 'Enter', desc: 'Send message' },
                 { keys: 'Shift+Enter', desc: 'New line' },
                 { keys: 'Up / Down', desc: 'Message history (shell-style)' },
@@ -590,8 +596,14 @@ function _buildAppData() {
                     e.preventDefault();
                     this.toggleFileSearch();
                 }
+                // Ctrl+Alt+F — global search across all sessions
+                if ((e.ctrlKey || e.metaKey) && e.altKey && e.key === 'f' && this.section === 'chat') {
+                    e.preventDefault();
+                    this.toggleGlobalSearch();
+                }
                 if (e.key === 'Escape' && this.chatSearch.show) { this.closeChatSearch(); }
                 if (e.key === 'Escape' && this._fileSearch.show) { this.closeFileSearch(); }
+                if (e.key === 'Escape' && this._globalSearch.show) { this.closeGlobalSearch(); }
                 if (e.key === 'Escape' && this.tabCtxMenu.show) { this.tabCtxMenu.show = false; }
                 if (e.key === 'Escape' && this._renamingTabId) { this.cancelRenameTab(); }
                 if (e.key === 'Escape' && this.showShortcuts) { this.closeShortcuts(); }
