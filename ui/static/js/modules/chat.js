@@ -765,6 +765,11 @@ window.AppChat = (function() {
                 if (key === 'k') { e.preventDefault(); this.insertMarkdown(tab, '[', '](url)'); return; }
                 if (key === 'c') { e.preventDefault(); this.insertMarkdown(tab, '```\n', '\n```'); return; }
             }
+            // Alt+Up/Down — turn navigation
+            if (e.altKey && !e.ctrlKey && !e.metaKey) {
+                if (e.key === 'ArrowUp') { e.preventDefault(); this.jumpToPrevTurn(tab); return; }
+                if (e.key === 'ArrowDown') { e.preventDefault(); this.jumpToNextTurn(tab); return; }
+            }
             // ESC cancels edit mode
             if (e.key === 'Escape' && tab._editMode) {
                 e.preventDefault();
@@ -1511,7 +1516,8 @@ window.AppChat = (function() {
                         const uTimeSep = this.fmtTime(msg.ts);
                         const uFullTimeSep = this.fmtFullTime(msg.ts);
                         const relTime = this.relativeTime(msg.ts);
-                        html += '<div class="chat-turn-sep"><div class="chat-turn-sep-line"></div>'
+                        html += '<div class="chat-turn-sep" data-turn="' + turnCount + '"><div class="chat-turn-sep-line"></div>'
+                            + '<span class="chat-turn-badge" onclick="event.stopPropagation();window._app.jumpToTurn(\'' + tab.tab_id + '\',' + turnCount + ')" title="Jump to turn ' + turnCount + ' (Alt+Up/Down)">' + turnCount + '</span>'
                             + '<span class="chat-turn-sep-time msg-ts" title="' + this.escHtml(uFullTimeSep) + '">' + uTimeSep + '</span>'
                             + (relTime !== uTimeSep ? '<span class="chat-turn-sep-label">' + relTime + '</span>' : '')
                             + '<div class="chat-turn-sep-line"></div></div>';
@@ -1524,7 +1530,7 @@ window.AppChat = (function() {
                     const uCollapsed = msg.collapsed && uFold;
                     const uChars = (msg.content || '').length;
                     const uLines = (msg.content || '').split('\n').length;
-                    html += '<div class="msg-wrap chat-msg-fadein chat-msg-row chat-msg-row-user" data-msg-idx="' + i + '">'
+                    html += '<div class="msg-wrap chat-msg-fadein chat-msg-row chat-msg-row-user" data-msg-idx="' + i + '" data-turn="' + turnCount + '">'
                         + '<div class="chat-avatar chat-avatar-user">' + avatarUser + '</div>'
                         + '<div class="chat-body">'
                         + '<div class="msg-actions">'
@@ -1690,6 +1696,76 @@ window.AppChat = (function() {
                 case 'pin': this.togglePinMessage(tabId, idx); break;
                 case 'edit': this.editUserMsg(tabId, idx); break;
             }
+        },
+
+        // ========== CHAT: TURN NAVIGATION ==========
+
+        /** Total number of conversation turns (user messages) in a tab. */
+        getTotalTurns(tab) {
+            if (!tab || !tab.messages) return 0;
+            return tab.messages.filter(m => m.role === 'user').length;
+        },
+
+        /** Scroll to a specific turn by number. */
+        jumpToTurn(tabId, turnNum) {
+            const container = document.getElementById('chat-messages-' + tabId);
+            if (!container) return;
+            // Turn separators have data-turn for turns 2+
+            const sep = container.querySelector('.chat-turn-sep[data-turn="' + turnNum + '"]');
+            if (sep) {
+                sep.scrollIntoView({ block: 'start', behavior: 'smooth' });
+                // Brief highlight
+                sep.classList.add('chat-turn-highlight');
+                setTimeout(() => sep.classList.remove('chat-turn-highlight'), 1200);
+                return;
+            }
+            // Turn 1 uses data-turn on the user message wrapper
+            const firstUser = container.querySelector('.chat-msg-row-user[data-turn="1"]');
+            if (firstUser) {
+                firstUser.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            }
+        },
+
+        /** Jump to previous turn (Alt+Up). */
+        jumpToPrevTurn(tab) {
+            const container = document.getElementById('chat-messages-' + tab.tab_id);
+            if (!container) return;
+            const turns = container.querySelectorAll('.chat-turn-sep[data-turn], .chat-msg-row-user[data-turn]');
+            if (turns.length === 0) return;
+            const containerRect = container.getBoundingClientRect();
+            let currentIdx = turns.length;
+            for (let i = 0; i < turns.length; i++) {
+                const rect = turns[i].getBoundingClientRect();
+                if (rect.top >= containerRect.top - 10) {
+                    currentIdx = i;
+                    break;
+                }
+            }
+            const targetIdx = currentIdx > 0 ? currentIdx - 1 : 0;
+            turns[targetIdx].scrollIntoView({ block: 'start', behavior: 'smooth' });
+            turns[targetIdx].classList.add('chat-turn-highlight');
+            setTimeout(() => turns[targetIdx].classList.remove('chat-turn-highlight'), 1200);
+        },
+
+        /** Jump to next turn (Alt+Down). */
+        jumpToNextTurn(tab) {
+            const container = document.getElementById('chat-messages-' + tab.tab_id);
+            if (!container) return;
+            const turns = container.querySelectorAll('.chat-turn-sep[data-turn], .chat-msg-row-user[data-turn]');
+            if (turns.length === 0) return;
+            const containerRect = container.getBoundingClientRect();
+            let currentIdx = -1;
+            for (let i = 0; i < turns.length; i++) {
+                const rect = turns[i].getBoundingClientRect();
+                if (rect.top >= containerRect.top - 10) {
+                    currentIdx = i;
+                    break;
+                }
+            }
+            const targetIdx = currentIdx < turns.length - 1 ? currentIdx + 1 : turns.length - 1;
+            turns[targetIdx].scrollIntoView({ block: 'start', behavior: 'smooth' });
+            turns[targetIdx].classList.add('chat-turn-highlight');
+            setTimeout(() => turns[targetIdx].classList.remove('chat-turn-highlight'), 1200);
         },
 
         // ========== CHAT: SEARCH (Ctrl+F) ==========

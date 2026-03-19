@@ -2254,6 +2254,31 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     opacity: 0.5;
     white-space: nowrap;
 }
+.chat-turn-badge {
+    font-size: 0.5rem;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+    color: var(--bg);
+    background: var(--v);
+    border-radius: 3px;
+    padding: 1px 5px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+    font-family: monospace;
+    min-width: 16px;
+    text-align: center;
+}
+.chat-turn-badge:hover {
+    background: var(--cyan);
+    transform: scale(1.15);
+}
+.chat-turn-highlight {
+    animation: turn-flash 1.2s ease-out;
+}
+@keyframes turn-flash {
+    0% { background: rgba(180, 74, 255, 0.15); }
+    100% { background: transparent; }
+}
 
 /* === CHAT DATE SEPARATOR === */
 .chat-date-sep {

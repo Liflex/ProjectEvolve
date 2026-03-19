@@ -424,7 +424,7 @@
                                     <span class="chat-input-hint text-[0.5rem] text-[var(--v3)] tracking-wider"
                                           x-text="tab._editMode ? 'ENTER — send edited | ESC — cancel'
                                                : tab._msgHistoryIdx >= 0 ? 'HISTORY ' + (tab._msgHistoryIdx + 1) + '/' + tab._msgHistory.length + ' — UP/DOWN navigate | ESC — exit | ENTER — send'
-                                               : 'ENTER — send | SHIFT+ENTER — newline | UP/DOWN — history | CTRL+SHIFT+B/I/K/C — format'"></span>
+                                               : 'ENTER — send | SHIFT+ENTER — newline | UP/DOWN — history | ALT+UP/DOWN — turns | CTRL+SHIFT+B/I/K/C — format'"></span>
                                     <span class="text-[0.5rem] text-[var(--v3)] tabular-nums" x-show="(tab.input_text || '').length > 0" x-text="(tab.input_text || '').length + 'ch · ' + (tab.input_text || '').trim().split(/\s+/).filter(Boolean).length + 'w'"></span>
                                 </div>
                                 <!-- Slash command menu -->
@@ -510,6 +510,7 @@
                         <div class="chat-shortcut-row"><kbd>Ctrl+F</kbd><span>Search in chat</span></div>
                         <div class="chat-shortcut-row"><kbd>/</kbd><span>Skill autocomplete</span></div>
                         <div class="chat-shortcut-row"><kbd>Up/Down</kbd><span>Message history</span></div>
+                        <div class="chat-shortcut-row"><kbd>Alt+Up/Down</kbd><span>Jump between turns</span></div>
                         <div class="chat-shortcut-row"><kbd>Shift+Enter</kbd><span>New line</span></div>
                         <div class="chat-shortcut-row"><kbd>ESC</kbd><span>Cancel edit / exit history</span></div>
                     </div>
@@ -534,6 +535,12 @@
                       x-text="activeTab?.is_streaming ? (activeTab?.is_thinking ? 'THINKING...' : 'STREAMING...') : 'IDLE'"></span>
                 <span class="status-separator"></span>
                 <span x-text="getChatFilterCount(activeTab) + '/' + (activeTab?.messages?.length || 0) + ' MSGS'"></span>
+                <template x-if="getTotalTurns(activeTab) > 1">
+                    <span>
+                        <span class="status-separator"></span>
+                        <span style="color:var(--v3)" x-text="'TURN ' + getTotalTurns(activeTab)"></span>
+                    </span>
+                </template>
                 <template x-if="getToolCount(activeTab) > 0">
                     <span>
                         <span class="status-separator"></span>
