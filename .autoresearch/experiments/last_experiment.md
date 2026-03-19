@@ -1,26 +1,26 @@
 # Last Experiment Summary
 
-**Experiment #122** — Cat companion — cursor-tracking eye glints
-**Date:** 2026-03-20 02:47:54
+**Experiment #123** — Chat — Ctrl+G Go to Message + enhanced j/k navigation
+**Date:** 2026-03-20
 
 ## What Was Done
 
-N/A
+1. **Ctrl+G Go to Message dialog** — IDE-style jump to message by number
+2. **g/n/m keys in nav mode** — open goto dialog, jump to next user/assistant message
+3. **Message highlight animation** — cyan pulse on jumped-to message
+4. **Command palette entry** — "Chat: Go to Message" in Ctrl+K
 
 ## Files Modified
 
-- `ui/static/modules/cat.js` — cursor tracking state, EYE_GLINT config, render() glint drawing, lifecycle
+- `ui/static/js/app.js` — state, handlers, command palette, shortcuts
+- `ui/static/js/modules/chat.js` — goto methods, type-jump navigation
+- `ui/static/templates/chat-section.js` — goto bar template
+- `ui/static/css/main.css` — goto styles, highlight animation
 
 ## Key Results
 
-Results
-
-**What was done:**
-1. **Cursor-tracking eye glints** — белый пиксель-"catchlight" на каждом глазу следит за курсором мыши
-2. **Smooth interpolation** — glint перемещается с lerp-фактором 0.12 для плавного, естественного отслеживания
-3. **Per-expression positions** — EYE_GLINT конфиг с центрами глаз для neutral, surprised, angry, thinking
-4. **Blink/sleep suppression** — glint скрыт во время моргания и при idle level 2+ (сон)
-5. **No glint на happy/sleepy** — глаза-линии или закрытые, gl
+**Working:** yes
+**Tests:** skipped (UI-only change)
 
 ## For Next Iteration
 

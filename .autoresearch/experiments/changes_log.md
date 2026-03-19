@@ -1,3 +1,25 @@
+## Experiment 123 — Chat — Ctrl+G Go to Message + enhanced j/k navigation
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **Ctrl+G Go to Message dialog** — IDE-style "Go to Line" but for messages. Opens a small input bar at the top of the chat. Supports absolute numbers ("42"), relative forward ("+5"), and relative back ("-3"). Invalid numbers show a toast error with valid range.
+2. **Message highlight on goto** — jumped-to message gets a cyan pulse animation (1.5s) for visual confirmation.
+3. **`g` key in nav mode** — pressing `g` while in j/k navigation mode opens the Go to Message dialog (alternative to Ctrl+G).
+4. **`n` / `m` keys for type jump** — while in nav mode, `n` jumps to the next user message, `m` jumps to the next assistant message. Shows toast if no more messages of that type.
+5. **Command palette entry** — "Chat: Go to Message" added to Ctrl+K palette with Ctrl+G shortcut.
+6. **Keyboard shortcuts updated** — Ctrl+G, `g`, `n`, `m` documented in shortcuts panel.
+
+### Files Modified
+
+- `ui/static/js/app.js` — `_gotoMsg` state, Ctrl+G handler, `g`/`n`/`m` in nav mode, command palette entry, shortcuts
+- `ui/static/js/modules/chat.js` — `openGoToMsg()`, `closeGoToMsg()`, `executeGoToMsg()`, `gotoMsgKeyDown()`, `chatNavJumpNext()`
+- `ui/static/templates/chat-section.js` — Go to Message bar template, NAV badge updated
+- `ui/static/css/main.css` — `.goto-msg-*` styles, `.msg-goto-highlight` animation
+
+---
+
 ## Experiment 2 — Untitled
 
 **Time:** 2026-03-18 18:46:29
