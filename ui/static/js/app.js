@@ -14,6 +14,136 @@ window._copyCode = function(btn, preId) {
     });
 };
 
+// === Code block line selection ===
+(function() {
+    // Per-block selection state: blockId -> Set of line numbers
+    const selections = {};
+    // Last clicked line per block (for shift-range)
+    const lastClicked = {};
+
+    function getBlockId(lnEl) {
+        const block = lnEl.closest('.code-block');
+        return block ? block.dataset.cbId : null;
+    }
+
+    function updateBlockUI(blockId) {
+        const sel = selections[blockId];
+        const count = sel ? sel.size : 0;
+        const block = document.querySelector('.code-block[data-cb-id="' + blockId + '"]');
+        if (!block) return;
+        const selBtn = block.querySelector('.code-copy-sel');
+        if (selBtn) {
+            if (count > 0) {
+                selBtn.style.display = '';
+                selBtn.textContent = '[COPY ' + count + ']';
+            } else {
+                selBtn.style.display = 'none';
+            }
+        }
+        // Update .code-selected classes
+        block.querySelectorAll('.code-line').forEach(line => {
+            const ln = parseInt(line.dataset.ln);
+            if (sel && sel.has(ln)) {
+                line.classList.add('code-selected');
+            } else {
+                line.classList.remove('code-selected');
+            }
+        });
+    }
+
+    function clearSelection(blockId) {
+        if (selections[blockId]) selections[blockId].clear();
+        lastClicked[blockId] = null;
+        updateBlockUI(blockId);
+    }
+
+    function selectLine(blockId, lineNum, shiftKey, ctrlKey) {
+        if (!selections[blockId]) selections[blockId] = new Set();
+        const sel = selections[blockId];
+
+        if (shiftKey && lastClicked[blockId] != null) {
+            // Range selection
+            const from = Math.min(lastClicked[blockId], lineNum);
+            const to = Math.max(lastClicked[blockId], lineNum);
+            // If only one line was selected before, start fresh range
+            if (sel.size === 1 && sel.has(lastClicked[blockId])) {
+                sel.clear();
+            }
+            for (let i = from; i <= to; i++) sel.add(i);
+        } else if (ctrlKey && sel.size > 0) {
+            // Ctrl+click: toggle individual line in selection
+            if (sel.has(lineNum)) sel.delete(lineNum);
+            else sel.add(lineNum);
+            lastClicked[blockId] = lineNum;
+        } else {
+            // Toggle single line
+            if (sel.has(lineNum) && sel.size === 1) {
+                sel.clear();
+                lastClicked[blockId] = null;
+            } else {
+                sel.clear();
+                sel.add(lineNum);
+                lastClicked[blockId] = lineNum;
+            }
+        }
+        updateBlockUI(blockId);
+    }
+
+    // Event delegation for line number clicks
+    document.addEventListener('click', function(evt) {
+        const lnEl = evt.target.closest('.code-ln');
+        if (!lnEl) return;
+        evt.preventDefault();
+        evt.stopPropagation();
+        const blockId = getBlockId(lnEl);
+        if (!blockId) return;
+        const lineNum = parseInt(lnEl.dataset.ln);
+        selectLine(blockId, lineNum, evt.shiftKey, evt.ctrlKey || evt.metaKey);
+    });
+
+    // Copy selected lines
+    document.addEventListener('click', function(evt) {
+        const selBtn = evt.target.closest('.code-copy-sel');
+        if (!selBtn) return;
+        evt.preventDefault();
+        evt.stopPropagation();
+        const blockId = selBtn.dataset.cb;
+        const block = document.querySelector('.code-block[data-cb-id="' + blockId + '"]');
+        if (!block) return;
+        const sel = selections[blockId];
+        if (!sel || sel.size === 0) return;
+        // Collect selected lines in order
+        const lines = [];
+        block.querySelectorAll('.code-line').forEach(line => {
+            const ln = parseInt(line.dataset.ln);
+            if (sel.has(ln)) {
+                // Get text content excluding the line number element
+                const clone = line.cloneNode(true);
+                const lnSpan = clone.querySelector('.code-ln');
+                if (lnSpan) lnSpan.remove();
+                lines.push(clone.textContent);
+            }
+        });
+        const text = lines.join('\n');
+        const origText = selBtn.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            selBtn.textContent = '[COPIED]';
+            selBtn.classList.add('copied');
+            setTimeout(() => { selBtn.textContent = origText; selBtn.classList.remove('copied'); }, 1500);
+        }).catch(() => {
+            selBtn.textContent = '[FAIL]';
+            setTimeout(() => { selBtn.textContent = origText; }, 1500);
+        });
+    });
+
+    // ESC to clear all selections
+    document.addEventListener('keydown', function(evt) {
+        if (evt.key === 'Escape') {
+            Object.keys(selections).forEach(clearSelection);
+        }
+    });
+})();
+
 function _buildAppData() {
     return {
         // ========== MODULE SPREADS (loaded from js/modules/*.js) ==========

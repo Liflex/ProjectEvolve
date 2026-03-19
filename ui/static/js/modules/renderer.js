@@ -89,11 +89,12 @@ window.AppRenderer = (function() {
                         const lines = highlighted.split('\n');
                         if (lines.length > 1 && lines[lines.length - 1].trim() === '') lines.pop();
                         const lineCount = lines.length;
-                        const numbered = lines.map(l => '<span class="code-line">' + (l || ' ') + '</span>').join('\n');
+                        const numbered = lines.map((l, idx) => '<span class="code-line" data-ln="' + (idx + 1) + '"><span class="code-ln" data-ln="' + (idx + 1) + '">' + (idx + 1) + '</span>' + (l || ' ') + '</span>').join('\n');
                         const accentColor = langAccents[(lang || '').toLowerCase()] || 'var(--md-code-header-accent, var(--v3))';
-                        return '<div class="code-block"><div class="code-header">'
+                        return '<div class="code-block" data-cb-id="' + id + '"><div class="code-header">'
                             + '<span class="code-lang" style="color:' + accentColor + '">' + label + '</span>'
                             + '<span class="code-lines-count">' + lineCount + ' lines</span>'
+                            + '<span class="code-copy-sel" data-cb="' + id + '" style="display:none">[COPY SEL]</span>'
                             + '<span class="code-copy" onclick="window._copyCode(this,\'' + id + '\')">[COPY]</span>'
                             + '</div><pre id="' + id + '"><code>' + numbered + '</code></pre></div>';
                     });
