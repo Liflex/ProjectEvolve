@@ -913,6 +913,58 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* === MESSAGE GROUPING (assistant+tool sequences) === */
+.msg-group {
+    position: relative;
+    margin-left: 20px;
+    padding-left: 12px;
+    border-left: 2px solid rgba(0,229,255,0.15);
+    border-radius: 0 4px 4px 0;
+    transition: border-color 0.2s;
+}
+.msg-group:hover {
+    border-left-color: rgba(0,229,255,0.35);
+}
+/* First message in group has avatar, rest don't */
+.msg-group > .msg-wrap:not(:first-child),
+.msg-group > .chat-msg-row:not(:first-child) {
+    margin-top: -2px;
+}
+/* Hide avatar for non-first items in group */
+.msg-group > .msg-wrap:not(:first-child) .chat-avatar,
+.msg-group > .chat-msg-row:not(:first-child) .chat-avatar {
+    visibility: hidden;
+}
+/* Reduced role label for non-first items */
+.msg-group > .msg-wrap:not(:first-child) .chat-role,
+.msg-group > .chat-msg-row:not(:first-child) .chat-role {
+    font-size: 0;
+    height: 0;
+    margin: 0;
+    overflow: hidden;
+}
+/* Group start indicator */
+.msg-group::before {
+    content: '';
+    position: absolute;
+    left: -2px;
+    top: 0;
+    width: 2px;
+    height: 16px;
+    background: var(--cyan);
+    border-radius: 1px;
+    opacity: 0.5;
+}
+/* Compact bubble style within group */
+.msg-group .chat-bubble-asst {
+    border-radius: 3px;
+}
+/* User message bubble improvements */
+.chat-msg-row-user .chat-bubble-user {
+    border-radius: 8px 8px 2px 8px;
+    padding: 8px 14px;
+}
+
 /* === MESSAGE REACTIONS (thumbs up/down) === */
 .msg-reactions {
     display: inline-flex;
