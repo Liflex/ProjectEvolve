@@ -466,11 +466,106 @@
              @click.outside="showStatsPanel = false"
              class="stats-panel">
             <div class="stats-panel-header">
-                <span>&#x1f4ca; SESSION_STATS</span>
+                <span>&#x1f4ca; <span x-text="statsView === 'all' ? 'ALL_SESSIONS' : 'SESSION_STATS'"></span></span>
+                <div class="stats-view-toggle">
+                    <button class="stats-view-btn" :class="statsView === 'session' && 'active'" @click="statsView = 'session'" title="This session only">THIS</button>
+                    <button class="stats-view-btn" :class="statsView === 'all' && 'active'" @click="statsView = 'all'" title="All sessions combined">ALL</button>
+                </div>
                 <button @click="showStatsPanel = false" class="stats-panel-close" title="Close">[X]</button>
             </div>
-            <div class="stats-panel-body" x-show="getSessionStats(activeTab)">
-                <template x-if="getSessionStats(activeTab)">
+
+            <!-- ALL SESSIONS VIEW -->
+            <div class="stats-panel-body" x-show="statsView === 'all' && getAllSessionsStats()">
+                <template x-if="statsView === 'all' && getAllSessionsStats()">
+                    <div>
+                        <!-- Aggregate overview -->
+                        <div class="stats-row">
+                            <div class="stats-card">
+                                <div class="stats-card-label">SESSIONS</div>
+                                <div class="stats-card-value" x-text="getAllSessionsStats().totalSessions"></div>
+                            </div>
+                            <div class="stats-card">
+                                <div class="stats-card-label">MESSAGES</div>
+                                <div class="stats-card-value" x-text="getAllSessionsStats().totalMessages"></div>
+                            </div>
+                            <div class="stats-card">
+                                <div class="stats-card-label">TOOLS</div>
+                                <div class="stats-card-value" style="color:var(--pink)" x-text="getAllSessionsStats().totalTools"></div>
+                            </div>
+                            <div class="stats-card">
+                                <div class="stats-card-label">TOTAL COST</div>
+                                <div class="stats-card-value stats-card-value-sm" style="color:var(--yellow)" x-text="'$' + getAllSessionsStats().totalCost.toFixed(4)"></div>
+                            </div>
+                        </div>
+                        <!-- Aggregate tokens -->
+                        <div class="stats-section">
+                            <div class="stats-section-title">AGGREGATE_TOKENS</div>
+                            <div class="stats-tokens-row">
+                                <span class="stats-token-label">INPUT</span>
+                                <span class="stats-token-value" style="color:var(--cyan)" x-text="(getAllSessionsStats().totalInputTokens / 1000).toFixed(1) + 'K'"></span>
+                                <span class="stats-token-label">OUTPUT</span>
+                                <span class="stats-token-value" style="color:var(--ng2)" x-text="(getAllSessionsStats().totalOutputTokens / 1000).toFixed(1) + 'K'"></span>
+                                <span class="stats-token-label">TURNS</span>
+                                <span class="stats-token-value" style="color:var(--v)" x-text="getAllSessionsStats().totalTurns"></span>
+                            </div>
+                        </div>
+                        <!-- Per-session cards -->
+                        <div class="stats-section">
+                            <div class="stats-section-title">SESSION_BREAKDOWN</div>
+                            <div class="dashboard-session-list">
+                                <template x-for="(sess, idx) in getAllSessionsStats().sessions" :key="sess.tabId">
+                                    <div class="dashboard-session-card" :class="sess.active && 'dashboard-session-active'" @click="activateChatTab(sess.tabId); statsView = 'session'">
+                                        <div class="dsc-header">
+                                            <span class="dsc-dot" :class="sess.active ? 'dsc-dot-active' : 'dsc-dot-idle'"></span>
+                                            <span class="dsc-label" x-text="sess.label"></span>
+                                            <span x-show="sess.active" class="dsc-badge-streaming">STREAMING</span>
+                                            <span class="dsc-rank" x-text="'#' + (idx + 1)"></span>
+                                        </div>
+                                        <div class="dsc-metrics">
+                                            <span class="dsc-metric" title="Messages">&#x1f4ac; <span x-text="sess.messages"></span></span>
+                                            <span class="dsc-metric" title="Turns">&#x21a9; <span x-text="sess.turns"></span></span>
+                                            <span class="dsc-metric" title="Tools">&#x2328; <span x-text="sess.tools"></span></span>
+                                            <span class="dsc-metric" title="Duration">&#x23f1; <span x-text="sess.duration"></span></span>
+                                        </div>
+                                        <div class="dsc-cost-bar">
+                                            <span class="dsc-cost-label" x-text="'$' + sess.cost.toFixed(4)"></span>
+                                            <div class="dsc-cost-track">
+                                                <div class="dsc-cost-fill" :style="'width:' + (getAllSessionsStats().totalCost > 0 ? Math.max(2, (sess.cost / getAllSessionsStats().totalCost) * 100) : 0) + '%'"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        <!-- Activity feed -->
+                        <div class="stats-section">
+                            <div class="stats-section-title">RECENT_ACTIVITY</div>
+                            <div class="dashboard-activity-feed">
+                                <template x-for="(evt, idx) in getActivityFeed(25)" :key="idx">
+                                    <div class="dash-activity-item" :class="evt.isError && 'dash-activity-error'">
+                                        <span class="dai-icon" x-text="evt.role === 'user' ? '&#x1f464;' : evt.isError ? '&#x26a0;' : '&#x2b50;'"></span>
+                                        <span class="dai-tab" x-text="evt.tabLabel" :style="'color:' + (evt.tabId === activeChatTab ? 'var(--v)' : 'var(--v3)')"></span>
+                                        <span class="dai-content" x-text="evt.content"></span>
+                                        <span class="dai-meta">
+                                            <span x-show="evt.duration > 0" x-text="fmtDuration(evt.duration)"></span>
+                                            <span x-show="evt.cost > 0" style="color:var(--yellow)" x-text="'$' + evt.cost.toFixed(4)"></span>
+                                        </span>
+                                        <span class="dai-time" x-text="fmtTime(evt.ts)"></span>
+                                    </div>
+                                </template>
+                                <div x-show="getActivityFeed(25).length === 0" class="text-center py-3 text-[0.625rem] text-[var(--v3)] tracking-wider">NO_ACTIVITY_YET_</div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- THIS SESSION VIEW (original stats) -->
+            <div class="stats-panel-body" x-show="statsView === 'session'">
+                <div x-show="!getSessionStats(activeTab)" class="stats-panel-empty">
+                    NO_DATA_YET_ — Send a message to start tracking_
+                </div>
+                <template x-if="statsView === 'session' && getSessionStats(activeTab)">
                     <div>
                         <!-- Overview row -->
                         <div class="stats-row">
@@ -633,9 +728,6 @@
                         </div>
                     </div>
                 </template>
-            </div>
-            <div x-show="!getSessionStats(activeTab)" class="stats-panel-empty">
-                NO_DATA_YET_ — Send a message to start tracking_
             </div>
         </div>
 

@@ -2464,3 +2464,186 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     0%, 100% { opacity: 0.8; }
     50% { opacity: 1; }
 }
+
+/* ========== Stats Panel: View Toggle ========== */
+.stats-view-toggle {
+    display: flex;
+    gap: 2px;
+    margin-left: auto;
+    margin-right: 8px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 2px;
+    padding: 1px;
+}
+.stats-view-btn {
+    font-size: 0.5rem;
+    letter-spacing: 0.1em;
+    color: var(--v3);
+    background: none;
+    border: none;
+    padding: 2px 8px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.12s;
+}
+.stats-view-btn:hover { color: var(--ng2); }
+.stats-view-btn.active {
+    color: var(--v);
+    background: rgba(180,74,255,0.15);
+    border: 1px solid var(--v2);
+}
+
+/* ========== Dashboard: Session Cards ========== */
+.dashboard-session-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.dashboard-session-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 8px;
+    border: 1px solid var(--v-dim);
+    border-radius: 2px;
+    background: rgba(0,0,0,0.08);
+    cursor: pointer;
+    transition: all 0.12s;
+}
+.dashboard-session-card:hover {
+    border-color: var(--v2);
+    background: rgba(180,74,255,0.06);
+}
+.dashboard-session-active {
+    border-color: var(--cyan);
+    background: rgba(0,229,255,0.04);
+}
+.dsc-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.dsc-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.dsc-dot-active { background: var(--cyan); animation: pulse 1.5s ease-in-out infinite; }
+.dsc-dot-idle { background: var(--v3); }
+.dsc-label {
+    font-size: 0.625rem;
+    color: var(--v);
+    letter-spacing: 0.08em;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dsc-badge-streaming {
+    font-size: 0.4375rem;
+    letter-spacing: 0.12em;
+    color: var(--cyan);
+    background: rgba(0,229,255,0.1);
+    border: 1px solid rgba(0,229,255,0.3);
+    padding: 1px 4px;
+    border-radius: 2px;
+}
+.dsc-rank {
+    font-size: 0.4375rem;
+    color: var(--v3);
+    letter-spacing: 0.08em;
+}
+.dsc-metrics {
+    display: flex;
+    gap: 8px;
+    font-size: 0.5rem;
+    color: var(--v3);
+}
+.dsc-metric {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+.dsc-cost-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.dsc-cost-label {
+    font-size: 0.5625rem;
+    color: var(--yellow);
+    letter-spacing: 0.05em;
+    font-weight: bold;
+    min-width: 48px;
+    text-align: right;
+}
+.dsc-cost-track {
+    flex: 1;
+    height: 4px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.dsc-cost-fill {
+    height: 100%;
+    background: var(--yellow);
+    border-radius: 2px;
+    transition: width 0.3s;
+    opacity: 0.6;
+}
+
+/* ========== Dashboard: Activity Feed ========== */
+.dashboard-activity-feed {
+    max-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+.dash-activity-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 6px;
+    font-size: 0.5rem;
+    border-radius: 2px;
+    transition: background 0.1s;
+}
+.dash-activity-item:hover { background: rgba(0,0,0,0.15); }
+.dash-activity-error { background: rgba(255,51,51,0.06); }
+.dai-icon {
+    flex-shrink: 0;
+    font-size: 0.625rem;
+}
+.dai-tab {
+    font-size: 0.4375rem;
+    letter-spacing: 0.08em;
+    min-width: 60px;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dai-content {
+    flex: 1;
+    color: var(--ng3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.5rem;
+}
+.dai-meta {
+    display: flex;
+    gap: 6px;
+    font-size: 0.4375rem;
+    color: var(--v3);
+    flex-shrink: 0;
+    letter-spacing: 0.04em;
+}
+.dai-time {
+    font-size: 0.4375rem;
+    color: var(--v3);
+    flex-shrink: 0;
+    letter-spacing: 0.04em;
+}

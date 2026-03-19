@@ -259,6 +259,7 @@ function _buildAppData() {
         pinnedMessages: [], // [{tabId, msgIdx, role, preview, ts, content}]
         showPinsPanel: false,
         showStatsPanel: false,
+        statsView: 'session', // 'session' | 'all'
         showExportMenu: false,
 
         // Context menu

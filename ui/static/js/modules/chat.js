@@ -2467,5 +2467,92 @@ window.AppChat = (function() {
                 this.showToast('RECONNECT_FAILED: ' + e.message, 'error');
             }
         },
+
+        // ========== CHAT: ALL SESSIONS AGGREGATE STATS ==========
+        getAllSessionsStats() {
+            if (!this.chatTabs || this.chatTabs.length === 0) return null;
+            const result = {
+                totalSessions: this.chatTabs.length,
+                totalMessages: 0,
+                totalCost: 0,
+                totalInputTokens: 0,
+                totalOutputTokens: 0,
+                totalTurns: 0,
+                totalTools: 0,
+                totalErrors: 0,
+                totalUser: 0,
+                totalAsst: 0,
+                activeSessions: 0,
+                sessions: [],
+            };
+            for (const tab of this.chatTabs) {
+                const s = this.getSessionStats(tab);
+                if (!s) {
+                    result.sessions.push({
+                        label: tab.label, tabId: tab.tab_id,
+                        messages: 0, turns: 0, cost: 0,
+                        active: tab.is_streaming, duration: '—',
+                        inputTokens: 0, outputTokens: 0, tools: 0,
+                    });
+                    continue;
+                }
+                result.totalMessages += s.total;
+                result.totalCost += s.tokens.cost;
+                result.totalInputTokens += s.tokens.input;
+                result.totalOutputTokens += s.tokens.output;
+                result.totalTurns += s.turns;
+                result.totalTools += s.toolCount;
+                result.totalErrors += s.errorCount;
+                result.totalUser += s.userCount;
+                result.totalAsst += s.asstCount;
+                if (tab.is_streaming) result.activeSessions++;
+                result.sessions.push({
+                    label: tab.label,
+                    tabId: tab.tab_id,
+                    messages: s.total,
+                    turns: s.turns,
+                    cost: s.tokens.cost,
+                    inputTokens: s.tokens.input,
+                    outputTokens: s.tokens.output,
+                    tools: s.toolCount,
+                    errors: s.errorCount,
+                    active: tab.is_streaming,
+                    duration: s.duration,
+                    avgResponse: s.avgResponse,
+                });
+            }
+            result.sessions.sort((a, b) => b.cost - a.cost);
+            return result;
+        },
+
+        // ========== CHAT: ACTIVITY FEED ==========
+        getActivityFeed(limit) {
+            limit = limit || 30;
+            const events = [];
+            for (const tab of this.chatTabs) {
+                if (!tab.messages) continue;
+                for (let i = 0; i < tab.messages.length; i++) {
+                    const msg = tab.messages[i];
+                    if (msg.role === 'tool') continue;
+                    const content = (msg.content || '').replace(/\n/g, ' ').slice(0, 100);
+                    events.push({
+                        tabId: tab.tab_id,
+                        tabLabel: tab.label,
+                        role: msg.role,
+                        ts: msg.ts,
+                        content: content,
+                        duration: msg.duration || 0,
+                        cost: msg.msgTokens?.cost || 0,
+                        isError: msg.role === 'assistant' && (msg.content || '').startsWith('[ERROR]'),
+                    });
+                }
+            }
+            events.sort((a, b) => {
+                const ta = a.ts ? new Date(a.ts).getTime() : 0;
+                const tb = b.ts ? new Date(b.ts).getTime() : 0;
+                return tb - ta;
+            });
+            return events.slice(0, limit);
+        },
     };
 })();
