@@ -348,6 +348,40 @@ window.AppChat = (function() {
             });
         },
 
+        // ========== CHAT: MARKDOWN FORMAT TOOLBAR ==========
+        insertMarkdown(tab, before, after) {
+            // Find the textarea for this tab
+            const container = document.querySelector('#chat-messages-' + tab.tab_id)?.closest('.flex.flex-col');
+            if (!container) return;
+            const ta = container.querySelector('textarea');
+            if (!ta || ta.disabled) return;
+            const start = ta.selectionStart;
+            const end = ta.selectionEnd;
+            const text = tab.input_text || '';
+            const selected = text.substring(start, end);
+            const hasSelection = selected.length > 0;
+            // Build new text
+            let newText;
+            if (hasSelection) {
+                newText = text.substring(0, start) + before + selected + after + text.substring(end);
+            } else {
+                newText = text.substring(0, start) + before + after + text.substring(end);
+            }
+            tab.input_text = newText;
+            // Position cursor after formatting
+            this.$nextTick(() => {
+                ta.focus();
+                if (hasSelection) {
+                    // Select the wrapped content
+                    ta.selectionStart = start + before.length;
+                    ta.selectionEnd = start + before.length + selected.length;
+                } else {
+                    // Place cursor between before/after
+                    ta.selectionStart = ta.selectionEnd = start + before.length;
+                }
+            });
+        },
+
         // ========== CHAT: SLASH COMMANDS ==========
         handleChatInput(tab, e) {
             const text = (tab.input_text || '');
@@ -390,6 +424,14 @@ window.AppChat = (function() {
                 if (e.key === 'ArrowUp') { e.preventDefault(); this.slashMenu.selected = Math.max(this.slashMenu.selected - 1, 0); return; }
                 if (e.key === 'Tab' || e.key === 'Enter') { e.preventDefault(); this.selectSlashCommand(this.slashMenu.items[this.slashMenu.selected]); return; }
                 if (e.key === 'Escape') { e.preventDefault(); this.slashMenu.show = false; return; }
+            }
+            // Markdown formatting shortcuts (Ctrl+Shift)
+            if (e.ctrlKey && e.shiftKey) {
+                const key = e.key.toLowerCase();
+                if (key === 'b') { e.preventDefault(); this.insertMarkdown(tab, '**', '**'); return; }
+                if (key === 'i') { e.preventDefault(); this.insertMarkdown(tab, '*', '*'); return; }
+                if (key === 'k') { e.preventDefault(); this.insertMarkdown(tab, '[', '](url)'); return; }
+                if (key === 'c') { e.preventDefault(); this.insertMarkdown(tab, '```\n', '\n```'); return; }
             }
             // ESC cancels edit mode
             if (e.key === 'Escape' && tab._editMode) {

@@ -218,6 +218,21 @@
                         </div>
                         <div class="flex gap-2 items-end">
                             <div class="flex-1 relative">
+                                <!-- Markdown format toolbar -->
+                                <div class="md-format-bar">
+                                    <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '**', '**')" title="Bold (Ctrl+B)">B</button>
+                                    <button class="md-format-btn" style="font-style:italic;font-weight:normal" @mousedown.prevent="insertMarkdown(tab, '*', '*')" title="Italic (Ctrl+I)">I</button>
+                                    <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '`', '`')" title="Inline code"><span class="fmt-icon">&lt;/&gt;</span></button>
+                                    <div class="md-format-sep"></div>
+                                    <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '\`\`\`\n', '\n\`\`\`')" title="Code block"><span class="fmt-icon">{ }</span></button>
+                                    <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '[', '](url)')" title="Link"><span class="fmt-icon">&#x1f517;</span></button>
+                                    <div class="md-format-sep"></div>
+                                    <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '- ', '')" title="Unordered list"><span class="fmt-icon">&#x2022;</span></button>
+                                    <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '1. ', '')" title="Ordered list"><span class="fmt-icon">1.</span></button>
+                                    <div class="md-format-sep"></div>
+                                    <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '> ', '')" title="Blockquote"><span class="fmt-icon">&gt;</span></button>
+                                    <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '---\n', '')" title="Horizontal rule"><span class="fmt-icon">&#x2500;</span></button>
+                                </div>
                                 <textarea x-model="tab.input_text"
                                           @keydown="handleChatKeydown(tab, $event)"
                                           @input="handleChatInput(tab, $event); autoResizeTextarea($event)"
@@ -228,7 +243,7 @@
                                           style="min-height:2.25rem;max-height:200px;overflow-y:hidden"
                                           :disabled="tab.is_streaming"></textarea>
                                 <div class="flex items-center justify-between px-1 mt-0.5">
-                                    <span class="chat-input-hint text-[0.5rem] text-[var(--v3)] tracking-wider" x-text="tab._editMode ? 'ENTER — send edited | ESC — cancel' : 'ENTER — send | SHIFT+ENTER — newline'"></span>
+                                    <span class="chat-input-hint text-[0.5rem] text-[var(--v3)] tracking-wider" x-text="tab._editMode ? 'ENTER — send edited | ESC — cancel' : 'ENTER — send | SHIFT+ENTER — newline | CTRL+SHIFT+B/I/K/C — format'"></span>
                                     <span class="text-[0.5rem] text-[var(--v3)] tabular-nums" x-show="(tab.input_text || '').length > 0" x-text="(tab.input_text || '').length + ' chars'"></span>
                                 </div>
                                 <!-- Slash command menu -->

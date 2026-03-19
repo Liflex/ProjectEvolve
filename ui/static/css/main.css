@@ -794,6 +794,45 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .chat-input-hint { opacity: 0.4; transition: opacity 0.15s; }
 .chat-input-area:focus ~ .flex .chat-input-hint,
 .chat-input-area:not(:placeholder-shown) ~ .flex .chat-input-hint { opacity: 0.6; }
+
+/* === CHAT FORMAT TOOLBAR === */
+.md-format-bar {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    padding: 2px 4px;
+    border-bottom: 1px solid var(--v-dim);
+    background: var(--bg);
+    flex-shrink: 0;
+}
+.md-format-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 4px;
+    font-size: 0.625rem;
+    font-family: monospace;
+    color: var(--v3);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.12s;
+    letter-spacing: 0;
+    font-weight: bold;
+}
+.md-format-btn:hover {
+    color: var(--v);
+    background: rgba(180,74,255,0.06);
+    border-color: var(--v-dim);
+}
+.md-format-btn:active {
+    background: rgba(180,74,255,0.12);
+}
+.md-format-btn .fmt-icon { font-size: 0.6875rem; }
+.md-format-sep { width: 1px; height: 14px; background: var(--v-dim); margin: 0 3px; flex-shrink: 0; }
 .streaming-cursor {
     display: inline-block;
     width: 8px;
