@@ -1620,6 +1620,64 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     font-size: 0.625rem;
 }
 
+/* === @-MENTION FILE AUTOCOMPLETE === */
+.mention-menu {
+    background: var(--bg);
+    border: 1px solid var(--v-dim);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+.mention-menu-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-bottom: 1px solid var(--v-dim);
+    background: var(--bg2);
+}
+.mention-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+    transition: background 0.1s;
+}
+.mention-menu-item:hover, .mention-menu-item.selected {
+    background: rgba(180,74,255,0.08);
+}
+.mention-menu-item.selected {
+    border-left: 2px solid var(--v);
+}
+.mention-file-icon {
+    font-size: 0.625rem;
+    flex-shrink: 0;
+}
+.mention-file-path {
+    font-size: 0.625rem;
+    color: var(--cyan);
+    font-family: monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 280px;
+}
+.mention-file-line {
+    font-size: 0.5625rem;
+    color: var(--amber);
+    font-family: monospace;
+    flex-shrink: 0;
+}
+.mention-file-snippet {
+    font-size: 0.5rem;
+    color: var(--v3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-left: auto;
+    max-width: 120px;
+}
+
 /* === THEME PREVIEW CARDS === */
 .theme-preview-card {
     background: var(--bg);

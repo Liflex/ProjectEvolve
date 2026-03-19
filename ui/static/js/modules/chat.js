@@ -459,6 +459,8 @@ window.AppChat = (function() {
 
         async sendChatMessage(tab) {
             if ((!tab.input_text?.trim() && (!tab._attachments || tab._attachments.length === 0)) || tab.is_streaming) return;
+            this.mentionMenu.show = false;
+            this.mentionMenu.items = [];
             let content = tab.input_text.trim();
             // Append attached images as markdown
             if (tab._attachments && tab._attachments.length > 0) {
@@ -601,6 +603,8 @@ window.AppChat = (function() {
             }
             const text = (tab.input_text || '');
             if (text.startsWith('/')) {
+                this.mentionMenu.show = false;
+                this.mentionMenu.items = [];
                 const query = text.slice(1).toLowerCase().split(' ')[0];
                 if (query.length < 25) {
                     // Sort: local commands first, then skills
@@ -631,9 +635,115 @@ window.AppChat = (function() {
                 }
             }
             this.slashMenu.show = false;
+            // @-mention file autocomplete
+            this._handleMentionInput(tab, text);
+        },
+
+        // ========== CHAT: @-MENTION FILE AUTOCOMPLETE ==========
+        _handleMentionInput(tab, text) {
+            const ta = document.querySelector('#chat-messages-' + tab.tab_id)?.closest('.flex.flex-col')?.querySelector('textarea');
+            if (!ta) return;
+            const cursorPos = ta.selectionStart;
+            // Look for @pattern before cursor: @query (not preceded by letter/digit)
+            const beforeCursor = text.slice(0, cursorPos);
+            const mentionMatch = beforeCursor.match(/(?:^|\s|[(\[{"'])@([\w./\\-]*)$/);
+            if (mentionMatch) {
+                const query = mentionMatch[1];
+                const startPos = beforeCursor.length - mentionMatch[0].length;
+                this.mentionMenu._startPos = startPos;
+                this.mentionMenu._tabId = tab.tab_id;
+                this.mentionMenu.selected = 0;
+                if (query.length === 0) {
+                    // Show recent files or project structure hint
+                    this.mentionMenu.show = false;
+                    this.mentionMenu.items = [];
+                    this.mentionMenu.query = '';
+                    return;
+                }
+                this.mentionMenu.query = query;
+                this.mentionMenu.show = true;
+                // Cat: react when mention menu opens
+                if (window.CatModule && CatModule.isActive() && !CatModule.getSpeech() && Math.random() < 0.3) {
+                    const mentionCatTips = [
+                        '*прищурился* Ищем файлы? Мяу!',
+                        'Файл-файл! *хвост махнул*',
+                        'Упоминание файла! =^.^=',
+                        '*ушами шевелит* Какой файл?',
+                    ];
+                    CatModule.setSpeechText(mentionCatTips[Math.floor(Math.random() * mentionCatTips.length)], 2500);
+                }
+                // Debounce search
+                if (this.mentionMenu._timer) clearTimeout(this.mentionMenu._timer);
+                this.mentionMenu._timer = setTimeout(() => this._fetchMentionFiles(tab), 250);
+            } else {
+                if (this.mentionMenu._timer) clearTimeout(this.mentionMenu._timer);
+                this.mentionMenu.show = false;
+                this.mentionMenu.items = [];
+                this.mentionMenu.query = '';
+            }
+        },
+
+        async _fetchMentionFiles(tab) {
+            const q = this.mentionMenu.query;
+            if (!q || q.length < 1 || !tab || !tab.project_path) return;
+            try {
+                // Use file search API — but we want file names, not grep content
+                // Use a lightweight glob-style search
+                const params = new URLSearchParams({ path: tab.project_path, q: q, max_results: '15' });
+                const res = await fetch('/api/fs/search?' + params);
+                if (!res.ok) { this.mentionMenu.items = []; return; }
+                const data = await res.json();
+                // Deduplicate by file path, keep unique files
+                const seen = new Set();
+                const items = [];
+                for (const r of (data.results || [])) {
+                    if (!seen.has(r.file)) {
+                        seen.add(r.file);
+                        items.push({ file: r.file, line: r.line, snippet: r.snippet || '' });
+                    }
+                    if (items.length >= 12) break;
+                }
+                this.mentionMenu.items = items;
+                this.mentionMenu.show = items.length > 0;
+                this.mentionMenu.selected = Math.min(this.mentionMenu.selected, Math.max(0, items.length - 1));
+            } catch (e) {
+                this.mentionMenu.items = [];
+                this.mentionMenu.show = false;
+            }
+        },
+
+        selectFileMention(item) {
+            if (!item) return;
+            const tab = this.activeTab;
+            if (!tab) return;
+            const text = tab.input_text || '';
+            const startPos = this.mentionMenu._startPos;
+            // Find end of @query after cursor
+            const ta = document.querySelector('#chat-messages-' + tab.tab_id)?.closest('.flex.flex-col')?.querySelector('textarea');
+            const endPos = ta ? ta.selectionStart : text.length;
+            // Replace @query with @filepath:line
+            const ref = '@' + item.file + ':' + item.line;
+            tab.input_text = text.slice(0, startPos) + ref + ' ' + text.slice(endPos);
+            this.mentionMenu.show = false;
+            this.mentionMenu.items = [];
+            this.$nextTick(() => {
+                if (ta) {
+                    ta.focus();
+                    const newPos = startPos + ref.length + 1;
+                    ta.setSelectionRange(newPos, newPos);
+                }
+                this.resizeInputForTab(tab);
+            });
         },
 
         handleChatKeydown(tab, e) {
+            // @-mention menu takes priority (file autocomplete)
+            if (this.mentionMenu.show && this.mentionMenu._tabId === tab.tab_id) {
+                if (e.key === 'ArrowDown') { e.preventDefault(); this.mentionMenu.selected = Math.min(this.mentionMenu.selected + 1, Math.max(0, this.mentionMenu.items.length - 1)); return; }
+                if (e.key === 'ArrowUp') { e.preventDefault(); this.mentionMenu.selected = Math.max(this.mentionMenu.selected - 1, 0); return; }
+                if (e.key === 'Tab' || e.key === 'Enter') { e.preventDefault(); this.selectFileMention(this.mentionMenu.items[this.mentionMenu.selected]); return; }
+                if (e.key === 'Escape') { e.preventDefault(); this.mentionMenu.show = false; this.mentionMenu.items = []; return; }
+            }
             if (this.slashMenu.show && this.slashMenu._tabId === tab.tab_id) {
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.slashMenu.selected = Math.min(this.slashMenu.selected + 1, this.slashMenu.items.length - 1); return; }
                 if (e.key === 'ArrowUp') { e.preventDefault(); this.slashMenu.selected = Math.max(this.slashMenu.selected - 1, 0); return; }

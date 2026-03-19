@@ -395,7 +395,7 @@
                                           @input="handleChatInput(tab, $event); autoResizeTextarea($event)"
                                           @focus="chatNavClear()"
                                           @paste="handleChatPaste(tab, $event)"
-                                          placeholder="Message_ (/ for commands, paste images, drag files, Ctrl+Shift+F search files)"
+                                          placeholder="Message_ (/ commands, @ file mention, paste images, drag files, Ctrl+Shift+F search files)"
                                           rows="1"
                                           class="chat-input-area w-full bg-[var(--bg)] border px-3 py-2 text-sm text-[var(--ng2)] tracking-wider resize-none editor"
                                           :class="tab._editMode ? 'border-[var(--yellow)]' : 'border-[var(--v-dim)]'"
@@ -434,8 +434,27 @@
                                         </div>
                                     </template>
                                 </div>
+                                <!-- @-mention file autocomplete -->
+                                <div x-show="mentionMenu.show && mentionMenu._tabId === tab.tab_id && mentionMenu.items.length > 0"
+                                     x-transition.opacity.duration.100ms
+                                     class="mention-menu absolute bottom-full left-0 mb-1 z-10"
+                                     style="width:420px;max-height:280px;overflow-y:auto">
+                                    <div class="mention-menu-header">
+                                        <span style="font-size:0.4375rem;letter-spacing:0.2em;color:var(--cyan)">FILE_MENTION</span>
+                                        <span style="font-size:0.4375rem;color:var(--v3)">— TAB/ENTER select · ESC close</span>
+                                    </div>
+                                    <template x-for="(item, idx) in mentionMenu.items" :key="item.file + ':' + item.line">
+                                        <div class="mention-menu-item"
+                                             :class="idx === mentionMenu.selected && 'selected'"
+                                             @mousedown.prevent="selectFileMention(item)">
+                                            <span class="mention-file-icon">&#x1f4c4;</span>
+                                            <span class="mention-file-path" x-text="item.file"></span>
+                                            <span class="mention-file-line" x-text="':' + item.line"></span>
+                                            <span class="mention-file-snippet" x-text="item.snippet ? item.snippet.slice(0, 50) : ''"></span>
+                                        </div>
+                                    </template>
+                                </div>
                             </div>
-                            <button @click="sendChatMessage(tab)" :disabled="tab.is_streaming || (!tab.input_text?.trim() && (!tab._attachments || tab._attachments.length === 0))"
                                     class="px-4 py-2 border border-[var(--v)] text-[var(--v)] text-xs tracking-wider hover:bg-[rgba(180,74,255,0.1)] disabled:opacity-30 transition-all shrink-0 relative"
                                     :title="tab._pendingFeedback?.length ? tab._pendingFeedback.length + ' reaction(s) queued — will be sent with next message' : 'Send message'">
                                 [> SEND]

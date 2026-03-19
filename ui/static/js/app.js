@@ -286,6 +286,8 @@ function _buildAppData() {
 
         // Slash command menu
         slashMenu: { show: false, items: [], filter: '', selected: 0, _tabId: null },
+        // @-mention file autocomplete
+        mentionMenu: { show: false, items: [], query: '', selected: 0, _tabId: null, _timer: null, _startPos: 0 },
         chatDragOver: false,
 
         // Prompt templates — skill-based quick actions
