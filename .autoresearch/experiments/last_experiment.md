@@ -1,31 +1,26 @@
 # Last Experiment Summary
 
-**Experiment #115** — Chat — @-mention file autocomplete in input
-**Date:** 2026-03-20 02:12:29
+**Experiment #116** — Chat — live diff preview in message edit mode
+**Date:** 2026-03-20
 
 ## What Was Done
 
-N/A
+1. **Live diff preview in edit mode** — при редактировании сообщения (EDIT) показывается кнопка DIFF с счётчиками +/- изменений
+2. **Diff panel** — раскрывающаяся панель с inline diff (оригинал → редактированный) с word-level highlighting
+3. **UNCHANGED indicator** — когда текст не изменён, показывается зелёный "✓ UNCHANGED"
+4. **Diff stats** — в кнопке DIFF показываются -N/+M (удалено/добавлено строк)
+5. **Uses existing infrastructure** — `renderInlineDiff`, `simpleLineDiff`, `_highlightWordDiff`
 
 ## Files Modified
 
-- Target:** chat.js, chat-section.js, app.js, main.css
-- `ui/static/js/app.js` — состояние `mentionMenu`
-- `ui/static/js/modules/chat.js` — методы `_handleMentionInput`, `_fetchMentionFiles`, `selectFileMention`, keydown handling
-- `ui/static/templates/chat-section.js` — dropdown template, обновлён placeholder
-- `ui/static/css/main.css` — стили `.mention-menu*`
+- `ui/static/js/modules/chat.js` — методы `toggleEditDiff`, `renderEditDiff`, `editDiffStats`; состояние `_editDiffOpen`
+- `ui/static/templates/chat-section.js` — diff toggle button, UNCHANGED badge, diff panel с x-html
+- `ui/static/css/main.css` — стили `.edit-mode-diff-toggle`, `.edit-diff-panel*`, `.edit-diff-badge-*`
 
 ## Key Results
 
-Results
-
-**What was done:**
-1. **@-mention file autocomplete** — при вводе `@` в chat input показывается dropdown с файлами проекта (через `/api/fs/search`)
-2. **Keyboard navigation** — ArrowUp/Down, Tab/Enter для выбора, Escape для закрытия
-3. **Smart detection** — regex находит `@query` перед курсором (не только в начале строки)
-4. **File reference insert** — при выборе вставляется `@filepath:line` в input
-5. **Slash menu compatibility** — меню не конфликтуют, только один активен
-6. **Cat reac
+**Working:** yes
+**Tests:** skipped (frontend-only change, JS syntax verified)
 
 ## For Next Iteration
 
