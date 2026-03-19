@@ -1058,6 +1058,7 @@ window.AppChat = (function() {
             const icons = { read: '&#x1f4d6;', edit: '&#x270f;', write: '&#x1f4be;', bash: '&#x2328;', search: '&#x1f50d;', other: '&#x2699;' };
             const colors = { read: 'var(--cyan)', edit: 'var(--yellow)', write: 'var(--ng)', bash: 'var(--pink)', search: 'var(--amber)', other: 'var(--v3)' };
             const labels = { read: 'READ', edit: 'EDIT', write: 'WRITE', bash: 'BASH', search: 'SEARCH', other: 'TOOL' };
+            const cf = this.chatFilters; // message type filters
             const avatarUser = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
             const avatarAsst = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
             const avatarTool = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>';
@@ -1148,7 +1149,7 @@ window.AppChat = (function() {
                     + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + idx + ')" title="Delete">DEL</button>'
                     + '</div>'
                     + '<div class="chat-role chat-role-assistant">CLAUDE_' + (isPinned ? ' <span class="pin-indicator" title="Pinned message">&#x1F4CC;</span>' : '') + (msg.reaction === 'up' ? ' <span style="color:var(--ng);font-size:0.625rem" title="Helpful">&#x1F44D;</span>' : '') + (msg.reaction === 'down' ? ' <span style="color:var(--red);font-size:0.625rem" title="Not helpful">&#x1F44E;</span>' : '') + (aTime ? ' <span style="color:var(--v3);font-weight:normal">' + aTime + '</span>' : '') + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + reactionHtml + '</div>'
-                    + thinkingHtml
+                    + (cf.thinking ? thinkingHtml : '')
                     + thinkingIndicatorHtml
                     + '<div class="chat-bubble-asst" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit">'
                     + (aCollapsed
@@ -1248,6 +1249,7 @@ window.AppChat = (function() {
             while (i < msgs.length) {
                 const msg = msgs[i];
                 if (msg.role === 'user') {
+                    if (!cf.user) { i++; continue; }
                     turnCount++;
                     // Date group separator — new heading when day changes
                     const dateLabel = this.dateGroupLabel(msg.ts);
@@ -1304,9 +1306,20 @@ window.AppChat = (function() {
                             groupParts.push({ type: 'tool', toolGroup, idx: toolStart });
                         }
                     }
+                    // Filter group parts based on chatFilters
+                    const filteredParts = groupParts.filter(p => {
+                        if (p.type === 'assistant' && !cf.assistant) {
+                            // Always show streaming assistant messages
+                            if (p.msg && p.msg.is_streaming) return true;
+                            return false;
+                        }
+                        if (p.type === 'tool' && !cf.tool) return false;
+                        return true;
+                    });
+                    if (filteredParts.length === 0) continue;
                     // Render group parts
                     let groupHtml = '';
-                    for (const part of groupParts) {
+                    for (const part of filteredParts) {
                         if (part.type === 'assistant') {
                             groupHtml += renderAssistantMsg(part.msg, part.idx, tab);
                         } else {
@@ -1314,7 +1327,7 @@ window.AppChat = (function() {
                         }
                     }
                     // Wrap in .msg-group if multiple parts
-                    if (groupParts.length > 1) {
+                    if (filteredParts.length > 1) {
                         html += '<div class="msg-group">' + groupHtml + '</div>';
                     } else {
                         html += groupHtml;
@@ -1874,6 +1887,23 @@ window.AppChat = (function() {
             if (!tab) return;
             for (const msg of tab.messages) { msg.collapsed = false; }
             this.chatTick++;
+        },
+
+        // ========== CHAT: MESSAGE TYPE FILTERS ==========
+        toggleChatFilter(type) {
+            this.chatFilters[type] = !this.chatFilters[type];
+            this.chatTick++;
+        },
+        getChatFilterCount(tab) {
+            if (!tab) return 0;
+            const f = this.chatFilters;
+            let count = 0;
+            for (const msg of tab.messages) {
+                if (msg.role === 'user' && f.user) count++;
+                else if (msg.role === 'assistant' && f.assistant) count++;
+                else if (msg.role === 'tool' && f.tool) count++;
+            }
+            return count;
         },
 
         // ========== CHAT: BOTTOM PANEL ==========

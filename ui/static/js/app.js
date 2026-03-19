@@ -262,6 +262,9 @@ function _buildAppData() {
         statsView: 'session', // 'session' | 'all'
         showExportMenu: false,
 
+        // Message type filters
+        chatFilters: { user: true, assistant: true, tool: true, thinking: true },
+
         // Context menu
         ctxMenu: { show: false, items: [], x: 0, y: 0 },
 

@@ -75,6 +75,21 @@
             <button class="chat-toolbar-btn" @click="collapseAllMessages()" title="Collapse all long messages">FOLD ALL</button>
             <button class="chat-toolbar-btn" @click="expandAllMessages()" title="Expand all folded messages">UNFOLD</button>
             <div class="chat-toolbar-sep"></div>
+            <!-- Message type filters -->
+            <button class="chat-filter-btn" :class="chatFilters.user && 'active'" @click="toggleChatFilter('user')" title="Toggle user messages">
+                <span :style="'color:' + (chatFilters.user ? 'var(--v)' : 'var(--v3)')">&#x1f464;</span> USER
+            </button>
+            <button class="chat-filter-btn" :class="chatFilters.assistant && 'active'" @click="toggleChatFilter('assistant')" title="Toggle assistant messages">
+                <span :style="'color:' + (chatFilters.assistant ? 'var(--cyan)' : 'var(--v3)')">&#x2b50;</span> CLAUDE
+            </button>
+            <button class="chat-filter-btn" :class="chatFilters.tool && 'active'" @click="toggleChatFilter('tool')" title="Toggle tool calls">
+                <span :style="'color:' + (chatFilters.tool ? 'var(--pink)' : 'var(--v3)')">&#x2699;</span> TOOLS
+            </button>
+            <button class="chat-filter-btn" :class="chatFilters.thinking && 'active'" @click="toggleChatFilter('thinking')" title="Toggle thinking blocks">
+                <span :style="'color:' + (chatFilters.thinking ? 'var(--amber)' : 'var(--v3)')">&#x1f4ad;</span> THINK
+            </button>
+            <span x-show="!chatFilters.user || !chatFilters.assistant || !chatFilters.tool || !chatFilters.thinking" class="chat-filter-badge" x-text="'FILTERED'" title="Some message types are hidden"></span>
+            <div class="chat-toolbar-sep"></div>
             <div class="relative">
                 <button class="chat-toolbar-btn" :class="showPinsPanel && 'active'" @click="showPinsPanel = !showPinsPanel" title="Pinned messages">
                     &#x1F4CC; PINS
@@ -110,7 +125,7 @@
                 </div>
             </div>
             <div class="chat-toolbar-sep"></div>
-            <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider" x-show="activeTab" x-text="(activeTab?.messages?.length || 0) + ' MSGS'"></span>
+            <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider" x-show="activeTab" x-text="getChatFilterCount(activeTab) + '/' + (activeTab?.messages?.length || 0) + ' MSGS'"></span>
             <!-- Streaming elapsed timer -->
             <span x-show="activeTab && activeTab.is_streaming && activeTab._msgStartTime"
                   class="text-[0.5625rem] text-[var(--cyan)] tracking-wider tabular-nums"
@@ -437,7 +452,7 @@
                       :class="activeTab?.is_streaming ? (activeTab?.is_thinking ? 'thinking' : 'streaming') : ''"
                       x-text="activeTab?.is_streaming ? (activeTab?.is_thinking ? 'THINKING...' : 'STREAMING...') : 'IDLE'"></span>
                 <span class="status-separator"></span>
-                <span x-text="(activeTab?.messages?.length || 0) + ' MSGS'"></span>
+                <span x-text="getChatFilterCount(activeTab) + '/' + (activeTab?.messages?.length || 0) + ' MSGS'"></span>
                 <template x-if="getToolCount(activeTab) > 0">
                     <span>
                         <span class="status-separator"></span>
