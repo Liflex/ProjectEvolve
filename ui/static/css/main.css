@@ -1277,7 +1277,7 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .chat-input-area:focus ~ .flex .chat-input-hint,
 .chat-input-area:not(:placeholder-shown) ~ .flex .chat-input-hint { opacity: 0.6; }
 
-/* === CHAT PROMPT TEMPLATES === */
+/* === CHAT QUICK ACTION CHIPS === */
 .prompt-templates-bar {
     padding: 4px 4px 2px;
     border-bottom: 1px solid var(--v-dim);
@@ -1285,9 +1285,9 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .prompt-chip {
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    padding: 2px 8px;
-    font-size: 0.5625rem;
+    gap: 4px;
+    padding: 2px 7px;
+    font-size: 0.5rem;
     letter-spacing: 0.08em;
     color: var(--v3);
     background: var(--bg);
@@ -1301,16 +1301,24 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .prompt-chip:hover {
     color: var(--v);
     border-color: var(--v2);
-    background: rgba(180, 74, 255, 0.06);
 }
 .prompt-chip:active {
     transform: scale(0.96);
 }
-.prompt-chip-icon {
-    font-weight: bold;
-    color: var(--cyan);
-    font-size: 0.625rem;
+/* Category dot */
+.prompt-chip-cat {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
 }
+/* Category colors */
+.prompt-chip-speckit .prompt-chip-cat { background: #b44aff; }
+.prompt-chip-speckit:hover { border-color: #b44aff; background: rgba(180, 74, 255, 0.08); }
+.prompt-chip-code .prompt-chip-cat { background: #00d4aa; }
+.prompt-chip-code:hover { border-color: #00d4aa; background: rgba(0, 212, 170, 0.08); }
+.prompt-chip-git .prompt-chip-cat { background: #ffaa00; }
+.prompt-chip-git:hover { border-color: #ffaa00; background: rgba(255, 170, 0, 0.08); }
 .prompt-chip-toggle {
     display: inline-flex;
     align-items: center;

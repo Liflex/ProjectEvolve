@@ -725,11 +725,16 @@ window.AppChat = (function() {
             if (tab) { tab._attachments = []; this.chatTick++; }
         },
 
-        // ========== CHAT: PROMPT TEMPLATES ==========
+        // ========== CHAT: PROMPT QUICK ACTIONS ==========
         insertPromptTemplate(tab, template) {
             if (!tab) return;
-            const prefix = template.text;
-            tab.input_text = tab.input_text ? tab.input_text + '\n' + prefix : prefix;
+            const cmd = template.text;
+            // Slash commands: insert at beginning (or replace current empty input), cursor at end
+            if (cmd.startsWith('/')) {
+                tab.input_text = cmd;
+            } else {
+                tab.input_text = tab.input_text ? tab.input_text + '\n' + cmd : cmd;
+            }
             this.chatTick++;
             this.$nextTick(() => {
                 const ta = document.querySelector('#chat-messages-' + tab.tab_id)?.closest('.flex.flex-col')?.querySelector('textarea');
