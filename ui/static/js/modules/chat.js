@@ -1618,5 +1618,57 @@ window.AppChat = (function() {
             if (!tab || !tab.messages) return 0;
             return tab.messages.filter(m => m.role === 'tool').length;
         },
+
+        // ========== CHAT: SESSION STATS PANEL ==========
+        getSessionStats(tab) {
+            if (!tab || !tab.messages || tab.messages.length === 0) return null;
+            const msgs = tab.messages;
+            // Message counts
+            const userCount = msgs.filter(m => m.role === 'user').length;
+            const asstCount = msgs.filter(m => m.role === 'assistant').length;
+            const toolCount = msgs.filter(m => m.role === 'tool').length;
+            // Turns (user messages = turns)
+            const turns = userCount;
+            // Tool breakdown
+            const toolBreakdown = {};
+            const toolLabels = { read: 'READ', edit: 'EDIT', write: 'WRITE', bash: 'BASH', search: 'SEARCH', other: 'OTHER' };
+            const toolColors = { read: 'var(--cyan)', edit: 'var(--yellow)', write: 'var(--ng)', bash: 'var(--pink)', search: 'var(--amber)', other: 'var(--v3)' };
+            for (const m of msgs) {
+                if (m.role === 'tool') {
+                    const tt = toolLabels[m.toolType || 'other'] || 'OTHER';
+                    toolBreakdown[tt] = (toolBreakdown[tt] || 0) + 1;
+                }
+            }
+            const toolMax = Math.max(1, ...Object.values(toolBreakdown));
+            const toolEntries = Object.entries(toolBreakdown).sort((a, b) => b[1] - a[1]).map(([label, count]) => ({
+                label, count,
+                color: toolColors[Object.keys(toolLabels).find(k => toolLabels[k] === label) || 'other'] || 'var(--v3)',
+                pct: Math.round((count / toolMax) * 100),
+            }));
+            // Response times
+            const responseTimes = msgs.filter(m => m.role === 'assistant' && m.duration && m.duration > 0).map(m => m.duration);
+            const avgResponse = responseTimes.length > 0 ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length : 0;
+            const maxResponse = responseTimes.length > 0 ? Math.max(...responseTimes) : 0;
+            const minResponse = responseTimes.length > 0 ? Math.min(...responseTimes) : 0;
+            // Token usage
+            const totalOutput = msgs.filter(m => m.msgTokens?.output).reduce((s, m) => s + m.msgTokens.output, 0);
+            // Errors
+            const errorCount = msgs.filter(m => m.role === 'assistant' && m.content?.startsWith('[ERROR]')).length;
+            // Pinned
+            const pinnedCount = this.pinnedMessages.filter(p => p.tabId === tab.tab_id).length;
+            // Reactions
+            const upCount = msgs.filter(m => m.reaction === 'up').length;
+            const downCount = msgs.filter(m => m.reaction === 'down').length;
+            return {
+                total: msgs.length,
+                userCount, asstCount, toolCount, turns,
+                toolEntries,
+                avgResponse, maxResponse, minResponse, responseTimes: responseTimes.length,
+                tokens: { input: tab.tokens?.input || 0, output: tab.tokens?.output || 0, cost: tab.tokens?.cost || 0, threshold: tab.tokens?.threshold || 180000 },
+                totalOutputTokens: totalOutput,
+                errorCount, pinnedCount, upCount, downCount,
+                duration: this.getSessionDuration(tab),
+            };
+        },
     };
 })();

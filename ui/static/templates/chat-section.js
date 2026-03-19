@@ -102,6 +102,7 @@
             <div class="chat-toolbar-sep"></div>
             <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider" x-show="activeTab" x-text="(activeTab?.messages?.length || 0) + ' MSGS'"></span>
             <div class="flex-1"></div>
+            <button class="chat-toolbar-btn" :class="showStatsPanel && 'active'" @click="showStatsPanel = !showStatsPanel" title="Session statistics">&#x1f4ca; STATS</button>
             <button class="chat-toolbar-btn" @click="openChatSearch()" title="Search in chat (Ctrl+F)">&#x1f50d;</button>
             <button class="chat-toolbar-btn" @click="openCmdPalette()" title="Command Palette (Ctrl+K)" style="font-size:0.5rem;letter-spacing:0.1em">CTRL+K</button>
             <button x-show="chatBottomPanel !== 'closed'" class="chat-toolbar-btn" @click="chatBottomPanel = 'closed'" title="Close panel">[X] PANEL</button>
@@ -362,6 +363,138 @@
                         <span style="color:var(--yellow)" x-text="'$' + activeTab.tokens.cost.toFixed(4)"></span>
                     </span>
                 </template>
+            </div>
+        </div>
+
+        <!-- Session Stats Panel -->
+        <div x-show="showStatsPanel && activeTab" x-cloak x-transition.duration.150ms
+             @click.outside="showStatsPanel = false"
+             class="stats-panel">
+            <div class="stats-panel-header">
+                <span>&#x1f4ca; SESSION_STATS</span>
+                <button @click="showStatsPanel = false" class="stats-panel-close" title="Close">[X]</button>
+            </div>
+            <div class="stats-panel-body" x-show="getSessionStats(activeTab)">
+                <template x-if="getSessionStats(activeTab)">
+                    <div>
+                        <!-- Overview row -->
+                        <div class="stats-row">
+                            <div class="stats-card">
+                                <div class="stats-card-label">TURNS</div>
+                                <div class="stats-card-value" x-text="getSessionStats(activeTab).turns"></div>
+                            </div>
+                            <div class="stats-card">
+                                <div class="stats-card-label">MESSAGES</div>
+                                <div class="stats-card-value" x-text="getSessionStats(activeTab).total"></div>
+                            </div>
+                            <div class="stats-card">
+                                <div class="stats-card-label">TOOLS</div>
+                                <div class="stats-card-value" style="color:var(--pink)" x-text="getSessionStats(activeTab).toolCount"></div>
+                            </div>
+                            <div class="stats-card">
+                                <div class="stats-card-label">DURATION</div>
+                                <div class="stats-card-value stats-card-value-sm" x-text="getSessionStats(activeTab).duration"></div>
+                            </div>
+                        </div>
+                        <!-- Message breakdown -->
+                        <div class="stats-section">
+                            <div class="stats-section-title">MESSAGE_BREAKDOWN</div>
+                            <div class="stats-bar-row">
+                                <span class="stats-bar-label">USER</span>
+                                <div class="stats-bar-track">
+                                    <div class="stats-bar-fill" style="background:var(--v)" :style="'width:' + Math.round((getSessionStats(activeTab).userCount / getSessionStats(activeTab).total) * 100) + '%'"></div>
+                                </div>
+                                <span class="stats-bar-count" x-text="getSessionStats(activeTab).userCount"></span>
+                            </div>
+                            <div class="stats-bar-row">
+                                <span class="stats-bar-label">ASSISTANT</span>
+                                <div class="stats-bar-track">
+                                    <div class="stats-bar-fill" style="background:var(--cyan)" :style="'width:' + Math.round((getSessionStats(activeTab).asstCount / getSessionStats(activeTab).total) * 100) + '%'"></div>
+                                </div>
+                                <span class="stats-bar-count" x-text="getSessionStats(activeTab).asstCount"></span>
+                            </div>
+                            <div class="stats-bar-row">
+                                <span class="stats-bar-label">TOOL</span>
+                                <div class="stats-bar-track">
+                                    <div class="stats-bar-fill" style="background:var(--pink)" :style="'width:' + Math.round((getSessionStats(activeTab).toolCount / getSessionStats(activeTab).total) * 100) + '%'"></div>
+                                </div>
+                                <span class="stats-bar-count" x-text="getSessionStats(activeTab).toolCount"></span>
+                            </div>
+                        </div>
+                        <!-- Tool usage breakdown -->
+                        <div class="stats-section" x-show="getSessionStats(activeTab).toolEntries.length > 0">
+                            <div class="stats-section-title">TOOL_USAGE</div>
+                            <template x-for="(tool, idx) in getSessionStats(activeTab).toolEntries" :key="idx">
+                                <div class="stats-bar-row">
+                                    <span class="stats-bar-label" :style="'color:' + tool.color" x-text="tool.label"></span>
+                                    <div class="stats-bar-track">
+                                        <div class="stats-bar-fill" :style="'background:' + tool.color + ';width:' + tool.pct + '%'"></div>
+                                    </div>
+                                    <span class="stats-bar-count" x-text="'x' + tool.count"></span>
+                                </div>
+                            </template>
+                        </div>
+                        <!-- Tokens & Cost -->
+                        <div class="stats-section">
+                            <div class="stats-section-title">TOKENS_&_COST</div>
+                            <div class="stats-tokens-row">
+                                <span class="stats-token-label">INPUT</span>
+                                <span class="stats-token-value" :style="'color:' + (getSessionStats(activeTab).tokens.input > getSessionStats(activeTab).tokens.threshold * 0.8 ? 'var(--amber)' : 'var(--cyan)')"
+                                      x-text="(getSessionStats(activeTab).tokens.input / 1000).toFixed(1) + 'K'"></span>
+                                <span class="stats-token-label">OUTPUT</span>
+                                <span class="stats-token-value" style="color:var(--ng2)" x-text="(getSessionStats(activeTab).tokens.output / 1000).toFixed(1) + 'K'"></span>
+                                <span class="stats-token-label">COST</span>
+                                <span class="stats-token-value" style="color:var(--yellow)" x-text="'$' + getSessionStats(activeTab).tokens.cost.toFixed(4)"></span>
+                            </div>
+                            <!-- Context window bar -->
+                            <div class="stats-ctx-bar">
+                                <div class="stats-ctx-track">
+                                    <div class="stats-ctx-fill" :style="'width:' + Math.min(100, (getSessionStats(activeTab).tokens.input / getSessionStats(activeTab).tokens.threshold) * 100) + '%;' +
+                                        'background:' + (getSessionStats(activeTab).tokens.input > getSessionStats(activeTab).tokens.threshold * 0.9 ? 'var(--red)' : getSessionStats(activeTab).tokens.input > getSessionStats(activeTab).tokens.threshold * 0.7 ? 'var(--amber)' : 'var(--cyan)')"></div>
+                                </div>
+                                <span class="stats-ctx-label" x-text="'CTX ' + Math.round((getSessionStats(activeTab).tokens.input / getSessionStats(activeTab).tokens.threshold) * 100) + '%'"></span>
+                            </div>
+                        </div>
+                        <!-- Response times -->
+                        <div class="stats-section" x-show="getSessionStats(activeTab).responseTimes > 0">
+                            <div class="stats-section-title">RESPONSE_TIMES</div>
+                            <div class="stats-timing-grid">
+                                <div class="stats-timing-item">
+                                    <span class="stats-timing-label">AVG</span>
+                                    <span class="stats-timing-value" x-text="fmtDuration(Math.round(getSessionStats(activeTab).avgResponse))"></span>
+                                </div>
+                                <div class="stats-timing-item">
+                                    <span class="stats-timing-label">MIN</span>
+                                    <span class="stats-timing-value" style="color:var(--ng)" x-text="fmtDuration(Math.round(getSessionStats(activeTab).minResponse))"></span>
+                                </div>
+                                <div class="stats-timing-item">
+                                    <span class="stats-timing-label">MAX</span>
+                                    <span class="stats-timing-value" style="color:var(--red)" x-text="fmtDuration(Math.round(getSessionStats(activeTab).maxResponse))"></span>
+                                </div>
+                                <div class="stats-timing-item">
+                                    <span class="stats-timing-label">SAMPLES</span>
+                                    <span class="stats-timing-value" x-text="getSessionStats(activeTab).responseTimes"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Footer stats -->
+                        <div class="stats-footer">
+                            <span x-show="getSessionStats(activeTab).errorCount > 0" style="color:var(--red)">
+                                &#x26a0; <span x-text="getSessionStats(activeTab).errorCount + ' ERRORS'"></span>
+                            </span>
+                            <span x-show="getSessionStats(activeTab).pinnedCount > 0" style="color:var(--amber)">
+                                &#x1f4cc; <span x-text="getSessionStats(activeTab).pinnedCount + ' PINNED'"></span>
+                            </span>
+                            <span x-show="getSessionStats(activeTab).upCount > 0 || getSessionStats(activeTab).downCount > 0">
+                                <span x-show="getSessionStats(activeTab).upCount > 0" style="color:var(--ng)">&#x1f44d;<span x-text="getSessionStats(activeTab).upCount"></span></span>
+                                <span x-show="getSessionStats(activeTab).downCount > 0" style="color:var(--red);margin-left:4px">&#x1f44e;<span x-text="getSessionStats(activeTab).downCount"></span></span>
+                            </span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <div x-show="!getSessionStats(activeTab)" class="stats-panel-empty">
+                NO_DATA_YET_ — Send a message to start tracking_
             </div>
         </div>
 
