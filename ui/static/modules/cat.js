@@ -215,7 +215,64 @@
     const PAW_OUTLINE = decode([0x07, 0x05, 0x07], 3, 4);
     const PAW_FILL = decode([0x07, 0x07, 0x07], 3, 4);
 
-    const CW = 45, CH = 37;
+    // ================================================================
+    //  MOUTH SPRITES — per-expression (width × 2 rows)
+    // ================================================================
+
+    // Neutral: small straight line (5×2)
+    const MOUTH_NEUTRAL = decode([0x08, 0x00], 5, 2);
+    // Happy: curved up smile (7×3)
+    const MOUTH_HAPPY = decode([0x02, 0x3E, 0x01], 7, 3);
+    // Surprised: small O shape (5×4)
+    const MOUTH_SURPRISED = decode([0x0E, 0x11, 0x11, 0x0E], 5, 4);
+    // Angry: small frown (7×3)
+    const MOUTH_ANGRY = decode([0x01, 0x3E, 0x02], 7, 3);
+    // Thinking: slightly asymmetric (5×2)
+    const MOUTH_THINKING = decode([0x0C, 0x02], 5, 2);
+    // Sleepy: small (3×1)
+    const MOUTH_SLEEPY = decode([0x02], 3, 1);
+
+    // Mouth config: { sprite, x-offset from HEAD_POS, y-offset from HEAD_POS, color }
+    const MOUTH_CFG = {
+        neutral:   { sprite: MOUTH_NEUTRAL,   dx: 10, dy: 15, color: '#b44aff' },
+        happy:     { sprite: MOUTH_HAPPY,     dx: 9,  dy: 14, color: '#ff69b4' },
+        surprised: { sprite: MOUTH_SURPRISED, dx: 10, dy: 14, color: '#ff69b4' },
+        angry:     { sprite: MOUTH_ANGRY,     dx: 9,  dy: 14, color: '#ff3355' },
+        thinking:  { sprite: MOUTH_THINKING,  dx: 10, dy: 15, color: '#88aaff' },
+        sleepy:    { sprite: MOUTH_SLEEPY,    dx: 11, dy: 16, color: '#b44aff' },
+    };
+
+    // ================================================================
+    //  WHISKERS — drawn as canvas lines (3 per side)
+    //  Positions relative to HEAD_POS center of face
+    // ================================================================
+
+    const WHISKER_BASE = {
+        // Left whiskers (from face center-left going outward)
+        left: [
+            { sx: 2, sy: 13, ex: -5, ey: 11 },
+            { sx: 2, sy: 14, ex: -6, ey: 14 },
+            { sx: 2, sy: 15, ex: -5, ey: 17 },
+        ],
+        // Right whiskers (from face center-right going outward)
+        right: [
+            { sx: 23, sy: 13, ex: 30, ey: 11 },
+            { sx: 23, sy: 14, ex: 31, ey: 14 },
+            { sx: 23, sy: 15, ex: 30, ey: 17 },
+        ],
+    };
+
+    // Whisker config per expression: { droop, spread, color, wobble }
+    const WHISKER_CFG = {
+        neutral:   { droop: 0,  spread: 1.0, color: '#d98fff', wobble: 0 },
+        happy:     { droop: -1, spread: 1.1, color: '#ff69b4', wobble: 0 },
+        surprised: { droop: -2, spread: 1.3, color: '#ffff66', wobble: 1 },
+        angry:     { droop: 2,  spread: 0.8, color: '#ff3355', wobble: 2 },
+        thinking:  { droop: 1,  spread: 0.9, color: '#88aaff', wobble: 0 },
+        sleepy:    { droop: 1,  spread: 0.85, color: '#d98fff', wobble: 0 },
+    };
+
+    const CW = 50, CH = 37;
 
     // ================================================================
     //  SPEECH MESSAGES
@@ -566,6 +623,7 @@
     let _hoverReactionCooldown = 0;        // prevent hover reaction spam
     let _speechAction = null;              // { type: 'insert', value: '/commit ' } — actionable speech
     let _particles = [];                   // floating particles (Zzz, hearts, sparkles)
+    let _whiskerWobble = 0;                // whisker wobble phase
 
     // ================================================================
     //  PARTICLES (Zzz, hearts, sparkles)
@@ -654,6 +712,45 @@
         2: ['*зевает*... Мяу...', '*сонно моргает*', 'Скучно...', '*сонный мяу*', 'Мурр... хочу на ручки...'],
         3: ['*храпит*... zzz', '*свернулся клубком*', 'Мурр... *храпит*', '*сонный писк*... zZzZ'],
     };
+
+    // ================================================================
+    //  WHISKER & MOUTH RENDERING
+    // ================================================================
+
+    function renderWhiskers(headX, headY) {
+        const wCfg = WHISKER_CFG[expression] || WHISKER_CFG.neutral;
+        ctx.save();
+        ctx.strokeStyle = wCfg.color;
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.7;
+
+        // Wobble animation for angry/surprised
+        const wb = wCfg.wobble > 0 ? Math.sin(_whiskerWobble) * wCfg.wobble : 0;
+
+        for (const side of ['left', 'right']) {
+            for (const w of WHISKER_BASE[side]) {
+                const sx = (headX + w.sx) * ps;
+                const sy = (headY + w.sy + wCfg.droop) * ps;
+                const spreadMul = wCfg.spread;
+                // Direction multiplier: left goes negative-x, right positive-x
+                const dir = side === 'left' ? -1 : 1;
+                const dx = (w.ex - w.sx) * dir * spreadMul;
+                const dy = (w.ey - w.sy) + wb * (side === 'left' ? 1 : -1);
+                const ex = sx + dx * ps;
+                const ey = (headY + w.sy + dy + wCfg.droop) * ps;
+                ctx.beginPath();
+                ctx.moveTo(sx, sy);
+                ctx.lineTo(ex, ey);
+                ctx.stroke();
+            }
+        }
+        ctx.restore();
+    }
+
+    function renderMouth(headX, headY) {
+        const mCfg = MOUTH_CFG[expression] || MOUTH_CFG.neutral;
+        drawGrid(mCfg.sprite, headX + mCfg.dx, headY + mCfg.dy, mCfg.color);
+    }
 
     // ================================================================
     //  RENDER
@@ -755,6 +852,16 @@
             drawGrid(frames[eyeFrame], cfg.x + _headOffX, cfg.y + _headOffY + headExtraY, eyeColor);
         }
 
+        // Head position for whiskers/mouth (follows head offset)
+        const hx = HEAD_POS.x + _headOffX;
+        const hy = HEAD_POS.y + _headOffY + headExtraY;
+
+        // Mouth (below eyes)
+        renderMouth(hx, hy);
+
+        // Whiskers (on sides of face)
+        renderWhiskers(hx, hy);
+
         // Floating particles (Zzz, hearts, sparkles) — rendered on top
         renderParticles();
     }
@@ -816,6 +923,19 @@
         }
 
         // Stretch/yawn: rare animation during idle
+        // Whisker wobble animation (for angry/surprised expressions)
+        const wCfg = WHISKER_CFG[expression] || WHISKER_CFG.neutral;
+        if (wCfg.wobble > 0) {
+            _whiskerWobble += 0.3;
+        } else {
+            // Smoothly decay wobble
+            if (Math.abs(_whiskerWobble) > 0.01) {
+                _whiskerWobble *= 0.85;
+            } else {
+                _whiskerWobble = 0;
+            }
+        }
+
         if (_stretchTicks > 0) {
             _stretchTicks--;
             // Phase progression: prep(0) → stretch(1) → hold(2) → relax(3)
