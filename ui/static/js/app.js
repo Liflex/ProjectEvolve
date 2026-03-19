@@ -142,7 +142,24 @@ window._copyCode = function(btn, preId) {
             Object.keys(selections).forEach(clearSelection);
         }
     });
-})();
+})()
+// === Code block wrap and fold toggles ===
+window._toggleCodeWrap = function(btn, preId) {
+    var block = btn.closest('.code-block');
+    if (!block) return;
+    var isWrapped = block.classList.toggle('code-wrap');
+    btn.textContent = isWrapped ? '[NOWRAP]' : '[WRAP]';
+    btn.classList.toggle('code-ctrl-active', isWrapped);
+};
+
+window._toggleCodeFold = function(btn, preId) {
+    var block = btn.closest('.code-block');
+    if (!block) return;
+    var isFolded = block.classList.toggle('code-folded');
+    btn.textContent = isFolded ? '[UNFOLD]' : '[FOLD]';
+    btn.classList.toggle('code-ctrl-active', isFolded);
+};
+;
 
 function _buildAppData() {
     return {

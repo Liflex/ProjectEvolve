@@ -149,6 +149,50 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
 .md .code-block .code-header { background: var(--code-header-bg); border-bottom: 1px solid var(--v-dim); }
 .md .code-block .code-lang { color: var(--code-lang-color); }
 .md .code-block pre { background: var(--code-bg); }
+
+/* === Code block wrap toggle === */
+.md .code-block.code-wrap pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-x: visible;
+}
+.md .code-block.code-wrap .code-line {
+    padding-left: 3.2em;
+}
+.md .code-block.code-wrap .code-ln {
+    position: absolute;
+    left: 0;
+}
+
+/* === Code block fold toggle === */
+.md .code-block.code-folded pre {
+    display: none;
+}
+.md .code-block.code-folded .code-header {
+    border-bottom-color: var(--v-dim);
+    opacity: 0.7;
+}
+
+/* === Code block control buttons (WRAP, FOLD) === */
+.md .code-block .code-ctrl {
+    font-size: 0.5625rem;
+    letter-spacing: 0.1em;
+    color: var(--v3);
+    cursor: pointer;
+    padding: 2px 6px;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+}
+.md .code-block .code-ctrl:hover {
+    color: var(--v);
+    border-color: var(--v-dim);
+    background: rgba(180,74,255,0.05);
+}
+.md .code-block .code-ctrl.code-ctrl-active {
+    color: var(--cyan);
+    border-color: rgba(0,229,255,0.2);
+    background: rgba(0,229,255,0.05);
+}
 .md blockquote { border-left: 3px solid var(--md-blockquote-border, var(--pink)); padding-left: 0.75rem; margin: 0.5rem 0; color: var(--md-blockquote-text, var(--v3)); background: rgba(0,0,0,0.1); padding: 0.5rem 0.75rem; border-radius: 0 3px 3px 0; }
 .md table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.8125rem; border: 1px solid var(--v-dim); border-radius: 3px; overflow: hidden; }
 .md th { border: 1px solid var(--v-dim); padding: 4px 8px; background: var(--md-table-header-bg, rgba(180,74,255,0.05)); color: var(--md-h2-color, var(--v)); text-align: left; font-weight: normal; }

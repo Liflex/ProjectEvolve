@@ -95,6 +95,8 @@ window.AppRenderer = (function() {
                             + '<span class="code-lang" style="color:' + accentColor + '">' + label + '</span>'
                             + '<span class="code-lines-count">' + lineCount + ' lines</span>'
                             + '<span class="code-copy-sel" data-cb="' + id + '" style="display:none">[COPY SEL]</span>'
+                            + '<span class="code-ctrl" onclick="event.stopPropagation();window._toggleCodeWrap(this,\'' + id + '\')" title="Toggle word wrap">[WRAP]</span>'
+                            + '<span class="code-ctrl" onclick="event.stopPropagation();window._toggleCodeFold(this,\'' + id + '\')" title="Toggle fold">[FOLD]</span>'
                             + '<span class="code-copy" onclick="window._copyCode(this,\'' + id + '\')">[COPY]</span>'
                             + '</div><pre id="' + id + '"><code>' + numbered + '</code></pre></div>';
                     });
