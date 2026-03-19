@@ -257,7 +257,10 @@
                                           style="min-height:2.25rem;max-height:200px;overflow-y:hidden"
                                           :disabled="tab.is_streaming"></textarea>
                                 <div class="flex items-center justify-between px-1 mt-0.5">
-                                    <span class="chat-input-hint text-[0.5rem] text-[var(--v3)] tracking-wider" x-text="tab._editMode ? 'ENTER — send edited | ESC — cancel' : 'ENTER — send | SHIFT+ENTER — newline | CTRL+SHIFT+B/I/K/C — format'"></span>
+                                    <span class="chat-input-hint text-[0.5rem] text-[var(--v3)] tracking-wider"
+                                          x-text="tab._editMode ? 'ENTER — send edited | ESC — cancel'
+                                               : tab._msgHistoryIdx >= 0 ? 'HISTORY ' + (tab._msgHistoryIdx + 1) + '/' + tab._msgHistory.length + ' — UP/DOWN navigate | ESC — exit | ENTER — send'
+                                               : 'ENTER — send | SHIFT+ENTER — newline | UP/DOWN — history | CTRL+SHIFT+B/I/K/C — format'"></span>
                                     <span class="text-[0.5rem] text-[var(--v3)] tabular-nums" x-show="(tab.input_text || '').length > 0" x-text="(tab.input_text || '').length + ' chars'"></span>
                                 </div>
                                 <!-- Slash command menu -->
@@ -314,8 +317,9 @@
                         <div class="chat-shortcut-row"><kbd>Ctrl+K</kbd><span>Command Palette</span></div>
                         <div class="chat-shortcut-row"><kbd>Ctrl+F</kbd><span>Search in chat</span></div>
                         <div class="chat-shortcut-row"><kbd>/</kbd><span>Skill autocomplete</span></div>
+                        <div class="chat-shortcut-row"><kbd>Up/Down</kbd><span>Message history</span></div>
                         <div class="chat-shortcut-row"><kbd>Shift+Enter</kbd><span>New line</span></div>
-                        <div class="chat-shortcut-row"><kbd>ESC</kbd><span>Cancel edit</span></div>
+                        <div class="chat-shortcut-row"><kbd>ESC</kbd><span>Cancel edit / exit history</span></div>
                     </div>
                 </div>
             </div>

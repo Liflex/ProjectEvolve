@@ -46,6 +46,9 @@ window.AppChat = (function() {
                     scrolledUp: false,
                     created_at: new Date().toISOString(),
                     tokens: { input: 0, output: 0, cost: 0, threshold: 180000 },
+                    _msgHistory: [],
+                    _msgHistoryIdx: -1,
+                    _msgDraft: '',
                 };
                 this.chatTabs.push(tab);
                 this.activeChatTab = tab.tab_id;
@@ -344,6 +347,13 @@ window.AppChat = (function() {
                 content = quotePrefix + content;
                 tab._quotedMsg = null;
             }
+            // Push to message history (shell-style Up/Down navigation)
+            if (tab._msgHistory.length === 0 || tab._msgHistory[tab._msgHistory.length - 1] !== content) {
+                tab._msgHistory.push(content);
+                if (tab._msgHistory.length > 100) tab._msgHistory.shift();
+            }
+            tab._msgHistoryIdx = -1;
+            tab._msgDraft = '';
             tab.input_text = '';
             tab._editMode = null; // clear edit mode on send
             this.resizeInputForTab(tab);
@@ -436,6 +446,11 @@ window.AppChat = (function() {
 
         // ========== CHAT: SLASH COMMANDS ==========
         handleChatInput(tab, e) {
+            // Reset history navigation when user types (stop browsing history)
+            if (tab._msgHistoryIdx >= 0) {
+                tab._msgHistoryIdx = -1;
+                tab._msgDraft = '';
+            }
             const text = (tab.input_text || '');
             if (text.startsWith('/')) {
                 const query = text.slice(1).toLowerCase().split(' ')[0];
@@ -490,6 +505,51 @@ window.AppChat = (function() {
                 e.preventDefault();
                 this.cancelEditMode(tab.tab_id);
                 return;
+            }
+            // ESC also exits history browsing
+            if (e.key === 'Escape' && tab._msgHistoryIdx >= 0) {
+                e.preventDefault();
+                tab.input_text = tab._msgDraft;
+                tab._msgHistoryIdx = -1;
+                tab._msgDraft = '';
+                return;
+            }
+            // Message history navigation (shell-style Up/Down)
+            if (!e.ctrlKey && !e.altKey && !e.metaKey) {
+                if (e.key === 'ArrowUp' && tab._msgHistory.length > 0) {
+                    const ta = e.target;
+                    const cursorAtStart = ta.selectionStart === 0 && ta.selectionEnd === 0;
+                    const inputEmpty = !(tab.input_text || '').trim();
+                    if (inputEmpty || cursorAtStart) {
+                        e.preventDefault();
+                        // Save current draft on first navigation
+                        if (tab._msgHistoryIdx < 0) {
+                            tab._msgDraft = tab.input_text || '';
+                        }
+                        // Move backward in history
+                        const newIdx = tab._msgHistoryIdx < 0
+                            ? tab._msgHistory.length - 1
+                            : Math.max(0, tab._msgHistoryIdx - 1);
+                        tab._msgHistoryIdx = newIdx;
+                        tab.input_text = tab._msgHistory[newIdx];
+                        this.$nextTick(() => this.resizeInputForTab(tab));
+                        return;
+                    }
+                }
+                if (e.key === 'ArrowDown' && tab._msgHistoryIdx >= 0) {
+                    e.preventDefault();
+                    if (tab._msgHistoryIdx < tab._msgHistory.length - 1) {
+                        tab._msgHistoryIdx++;
+                        tab.input_text = tab._msgHistory[tab._msgHistoryIdx];
+                    } else {
+                        // End of history — restore draft
+                        tab._msgHistoryIdx = -1;
+                        tab.input_text = tab._msgDraft;
+                        tab._msgDraft = '';
+                    }
+                    this.$nextTick(() => this.resizeInputForTab(tab));
+                    return;
+                }
             }
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
