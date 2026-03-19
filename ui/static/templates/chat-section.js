@@ -105,6 +105,7 @@
             <button class="chat-toolbar-btn" :class="showStatsPanel && 'active'" @click="showStatsPanel = !showStatsPanel" title="Session statistics">&#x1f4ca; STATS</button>
             <button class="chat-toolbar-btn" @click="openChatSearch()" title="Search in chat (Ctrl+F)">&#x1f50d;</button>
             <button class="chat-toolbar-btn" @click="openCmdPalette()" title="Command Palette (Ctrl+K)" style="font-size:0.5rem;letter-spacing:0.1em">CTRL+K</button>
+            <button class="chat-toolbar-btn" @click="openShortcuts()" title="Keyboard Shortcuts (?)">? KEYS</button>
             <button x-show="chatBottomPanel !== 'closed'" class="chat-toolbar-btn" @click="chatBottomPanel = 'closed'" title="Close panel">[X] PANEL</button>
         </div>
 
@@ -545,6 +546,50 @@
                     </div>
                 </template>
             </template>
+        </div>
+
+        <!-- Keyboard Shortcuts Panel -->
+        <div x-show="showShortcuts" x-cloak x-transition.duration.150ms
+             class="fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+             @click.self="closeShortcuts()"
+             @keydown.escape.window="closeShortcuts()">
+            <div class="shortcuts-panel">
+                <div class="shortcuts-panel-header">
+                    <span class="shortcuts-panel-title">&#x2328; KEYBOARD_SHORTCUTS</span>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[0.5rem] text-[var(--v3)] tracking-wider">press ? to toggle</span>
+                        <button @click="closeShortcuts()" class="shortcuts-panel-close" title="Close (ESC)">[X]</button>
+                    </div>
+                </div>
+                <div class="shortcuts-panel-search">
+                    <span class="shortcuts-search-icon">&#x1f50d;</span>
+                    <input id="shortcuts-filter-input"
+                           x-model="shortcutsFilter"
+                           placeholder="Filter shortcuts..."
+                           class="shortcuts-search-input"
+                           autocomplete="off" spellcheck="false">
+                </div>
+                <div class="shortcuts-panel-body">
+                    <template x-for="cat in filteredShortcuts" :key="cat.category">
+                        <div class="shortcuts-category">
+                            <div class="shortcuts-category-title" x-text="cat.category"></div>
+                            <template x-for="item in cat.items" :key="item.keys">
+                                <div class="shortcuts-item">
+                                    <kbd class="shortcuts-key" x-text="item.keys"></kbd>
+                                    <span class="shortcuts-desc" x-text="item.desc"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                    <div x-show="filteredShortcuts.length === 0" class="shortcuts-empty">
+                        No shortcuts match your filter_
+                    </div>
+                </div>
+                <div class="shortcuts-panel-footer">
+                    <span class="text-[0.5rem] text-[var(--v3)]">Shortcuts work when input is not focused_</span>
+                    <span class="text-[0.5rem] text-[var(--v3)]">Ctrl+K for Command Palette</span>
+                </div>
+            </div>
         </div>
 
         <!-- Image Lightbox -->

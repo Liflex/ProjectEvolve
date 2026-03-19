@@ -115,6 +115,10 @@ function _buildAppData() {
         _browseEntries: [],
         _preflightResult: null,
 
+        // Keyboard Shortcuts Panel
+        showShortcuts: false,
+        shortcutsFilter: '',
+
         // Command Palette (Ctrl+K / Ctrl+Shift+P)
         cmdPalette: { show: false, query: '', selected: 0, _recent: [] },
         cmdPaletteCommands: [
@@ -149,6 +153,40 @@ function _buildAppData() {
             { id: 'toggle-cat', label: 'Toggle: Cat Companion', category: 'TOGGLE', action: () => this.toggleSetting('catCompanion') },
             { id: 'toggle-sidebar', label: 'Toggle: Compact Sidebar', category: 'TOGGLE', action: () => this.toggleSetting('compactSidebar') },
             { id: 'toggle-thinking', label: 'Toggle: Show Thinking Blocks', category: 'TOGGLE', action: () => this.toggleSetting('showThinking') },
+        ],
+        // Keyboard Shortcuts reference data (for shortcuts overlay)
+        keyboardShortcuts: [
+            { category: 'NAVIGATION', items: [
+                { keys: 'Alt+1', desc: 'Research Lab' },
+                { keys: 'Alt+2', desc: 'Chat' },
+                { keys: 'Alt+3 — 9', desc: 'Lab pages (Dashboard, Experiments, ...)' },
+                { keys: 'Ctrl+K', desc: 'Command Palette' },
+                { keys: '?', desc: 'Keyboard Shortcuts (this panel)' },
+            ]},
+            { category: 'CHAT', items: [
+                { keys: 'Ctrl+F', desc: 'Search in messages' },
+                { keys: 'Enter', desc: 'Send message' },
+                { keys: 'Shift+Enter', desc: 'New line' },
+                { keys: 'Up / Down', desc: 'Message history (shell-style)' },
+                { keys: 'ESC', desc: 'Cancel edit / exit history / close panels' },
+                { keys: '/', desc: 'Skill autocomplete menu' },
+            ]},
+            { category: 'INPUT FORMATTING', items: [
+                { keys: 'Ctrl+Shift+B', desc: 'Bold **text**' },
+                { keys: 'Ctrl+Shift+I', desc: 'Italic *text*' },
+                { keys: 'Ctrl+Shift+K', desc: 'Link [text](url)' },
+                { keys: 'Ctrl+Shift+C', desc: 'Code block ```' },
+            ]},
+            { category: 'MESSAGES', items: [
+                { keys: 'Right-click', desc: 'Context menu (Copy, Quote, Edit, Pin, etc.)' },
+                { keys: 'Double-click tab', desc: 'Rename tab' },
+                { keys: 'Hover + actions', desc: 'COPY / QUOTE / EDIT / REGEN / PIN / FOLD / DEL' },
+            ]},
+            { category: 'FILES & MEDIA', items: [
+                { keys: 'Paste image', desc: 'Attach clipboard image to message' },
+                { keys: 'Drag & drop', desc: 'Drop files into chat input' },
+                { keys: 'Clip button', desc: 'File picker for attachments' },
+            ]},
         ],
         slashCommands: [
             // Local commands (handled by frontend)
@@ -196,6 +234,16 @@ function _buildAppData() {
         },
         get activeTab() {
             return this.chatTabs.find(t => t.tab_id === this.activeChatTab) || null;
+        },
+        get filteredShortcuts() {
+            if (!this.shortcutsFilter) return this.keyboardShortcuts;
+            const q = this.shortcutsFilter.toLowerCase();
+            return this.keyboardShortcuts.map(cat => ({
+                category: cat.category,
+                items: cat.items.filter(item =>
+                    item.keys.toLowerCase().includes(q) || item.desc.toLowerCase().includes(q)
+                ),
+            })).filter(cat => cat.items.length > 0);
         },
 
         // Pet events tracking
@@ -279,6 +327,13 @@ function _buildAppData() {
                 if (e.key === 'Escape' && this.chatSearch.show) { this.closeChatSearch(); }
                 if (e.key === 'Escape' && this.tabCtxMenu.show) { this.tabCtxMenu.show = false; }
                 if (e.key === 'Escape' && this._renamingTabId) { this.cancelRenameTab(); }
+                if (e.key === 'Escape' && this.showShortcuts) { this.closeShortcuts(); }
+                // ? opens keyboard shortcuts panel (when not in input)
+                if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+                    e.preventDefault();
+                    this.showShortcuts ? this.closeShortcuts() : this.openShortcuts();
+                }
                 if (e.key === 'Enter' && this.chatSearch.show && document.activeElement.id === 'chat-search-input') {
                     e.preventDefault();
                     this.navigateChatMatch(e.shiftKey ? -1 : 1);
@@ -372,6 +427,20 @@ function _buildAppData() {
         },
         closeCmdPalette() {
             this.cmdPalette.show = false;
+        },
+
+        // ========== KEYBOARD SHORTCUTS PANEL ==========
+        openShortcuts() {
+            this.showShortcuts = true;
+            this.shortcutsFilter = '';
+            this.$nextTick(() => {
+                const inp = document.getElementById('shortcuts-filter-input');
+                if (inp) inp.focus();
+            });
+        },
+        closeShortcuts() {
+            this.showShortcuts = false;
+            this.shortcutsFilter = '';
         },
         executePaletteCmd(cmd) {
             if (!cmd) return;
