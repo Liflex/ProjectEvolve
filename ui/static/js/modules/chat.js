@@ -1739,6 +1739,32 @@ window.AppChat = (function() {
             this._chatNavIdx = -1;
         },
 
+        /** Jump to next message of a specific role (user/assistant) from current nav position. */
+        chatNavJumpNext(role) {
+            const tab = this.activeTab;
+            if (!tab || !tab.messages) return;
+            const startIdx = this._chatNavIdx >= 0 ? this._chatNavIdx + 1 : 0;
+            for (let i = startIdx; i < tab.messages.length; i++) {
+                if (tab.messages[i].role === role) {
+                    // Clear current focus
+                    this.chatNavClear();
+                    this._chatNavTabId = tab.tab_id;
+                    this._chatNavIdx = i;
+                    // Focus and scroll
+                    const container = document.getElementById('chat-messages-' + tab.tab_id);
+                    if (container) {
+                        const msgs = container.querySelectorAll('.msg-wrap');
+                        if (msgs[i]) {
+                            msgs[i].classList.add('msg-focused');
+                            msgs[i].scrollIntoView({ block: 'center', behavior: 'smooth' });
+                        }
+                    }
+                    return;
+                }
+            }
+            this.showToast('No more ' + role + ' messages', 'info');
+        },
+
         chatNavAction(action) {
             const idx = this._chatNavIdx;
             const tabId = this._chatNavTabId;
@@ -1765,6 +1791,69 @@ window.AppChat = (function() {
                     break;
                 }
             }
+        },
+
+        // ========== CHAT: GO TO MESSAGE (Ctrl+G) ==========
+
+        openGoToMsg() {
+            if (!this.activeTab) return;
+            this._gotoMsg.show = true;
+            this._gotoMsg.query = '';
+            this.$nextTick(() => {
+                const input = document.getElementById('goto-msg-input');
+                if (input) input.focus();
+            });
+        },
+
+        closeGoToMsg() {
+            this._gotoMsg.show = false;
+            this._gotoMsg.query = '';
+        },
+
+        executeGoToMsg() {
+            const q = (this._gotoMsg.query || '').trim();
+            if (!q || !this.activeTab) return;
+            const tab = this.activeTab;
+            // Support: "42" (absolute), "+5" (relative forward), "-3" (relative back)
+            let targetIdx;
+            if (q.startsWith('+')) {
+                // Relative forward from current nav position or last visible
+                const base = this._chatNavIdx >= 0 ? this._chatNavIdx : (tab.messages.length - 1);
+                targetIdx = base + parseInt(q.slice(1), 10);
+            } else if (q.startsWith('-')) {
+                const base = this._chatNavIdx >= 0 ? this._chatNavIdx : 0;
+                targetIdx = base + parseInt(q, 10);
+            } else {
+                targetIdx = parseInt(q, 10);
+            }
+            if (isNaN(targetIdx) || targetIdx < 0 || targetIdx >= tab.messages.length) {
+                this.showToast('MSG #' + q + ' not found (0-' + (tab.messages.length - 1) + ')', 'error');
+                return;
+            }
+            this._gotoMsg.show = false;
+            // Scroll to message and focus it
+            const container = document.getElementById('chat-messages-' + tab.tab_id);
+            if (!container) return;
+            const msgEls = container.querySelectorAll('.msg-wrap');
+            if (msgEls[targetIdx]) {
+                msgEls[targetIdx].scrollIntoView({ block: 'center', behavior: 'smooth' });
+                msgEls[targetIdx].classList.add('msg-goto-highlight');
+                setTimeout(() => msgEls[targetIdx].classList.remove('msg-goto-highlight'), 1500);
+                // Also set nav focus
+                this._chatNavTabId = tab.tab_id;
+                this._chatNavIdx = targetIdx;
+            }
+        },
+
+        gotoMsgKeyDown(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.executeGoToMsg();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                this.closeGoToMsg();
+            }
+            e.stopPropagation();
         },
 
         // ========== CHAT: TURN NAVIGATION ==========

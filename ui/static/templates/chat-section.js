@@ -135,7 +135,7 @@
                   x-text="(_clockTick, 'ELAPSED ' + getStreamingElapsed(activeTab))"></span>
             <span x-show="activeTab && activeTab.is_streaming && activeTab._msgStartTime"
                   class="w-1.5 h-1.5 rounded-full bg-[var(--cyan)] animate-pulse ml-1"></span>
-            <span class="text-[0.5rem] text-[var(--v)] tracking-wider blink" x-show="_chatNavIdx >= 0" x-text="'NAV ' + (_chatNavIdx + 1) + ' [c q e f p d t]'"></span>
+            <span class="text-[0.5rem] text-[var(--v)] tracking-wider blink" x-show="_chatNavIdx >= 0" x-text="'NAV #' + (_chatNavIdx + 1) + ' [c q e f p d t n m g]'"></span>
             <div class="flex-1"></div>
             <div class="relative">
                 <button class="chat-toolbar-btn" :class="showExportMenu && 'active'" @click.stop="showExportMenu = !showExportMenu" title="Export session to Markdown">&#x1f4e4; EXPORT</button>
@@ -226,6 +226,21 @@
                 <button @click="navigateChatMatch(1)" class="chat-search-nav-btn" :disabled="chatSearch.total === 0" title="Next (Enter)">&#x25BC;</button>
             </div>
             <button @click="closeChatSearch()" class="chat-search-close" title="Close (Escape)">[X]</button>
+        </div>
+
+        <!-- Go to Message (Ctrl+G) -->
+        <div x-show="_gotoMsg.show && activeTab" x-cloak x-transition.duration.150ms
+             class="goto-msg-bar">
+            <span class="goto-msg-icon">&#x1f3af;</span>
+            <span class="goto-msg-label">GOTO</span>
+            <input id="goto-msg-input"
+                   x-model="_gotoMsg.query"
+                   @keydown="gotoMsgKeyDown($event)"
+                   placeholder="Message # (e.g. 42, +5, -3)"
+                   class="goto-msg-input"
+                   autocomplete="off" spellcheck="false">
+            <span class="goto-msg-hint" x-text="activeTab ? '0-' + (activeTab.messages.length - 1) : ''"></span>
+            <button @click="closeGoToMsg()" class="goto-msg-close" title="Close (Escape)">[X]</button>
         </div>
 
         <!-- File Search Panel -->

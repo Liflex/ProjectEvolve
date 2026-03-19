@@ -314,6 +314,9 @@ function _buildAppData() {
         // Global search across all sessions (Ctrl+Alt+F)
         _globalSearch: { show: false, query: '', results: [], selectedIdx: 0 },
 
+        // Go to Message dialog (Ctrl+G)
+        _gotoMsg: { show: false, query: '' },
+
         // Chat message keyboard navigation (j/k)
         _chatNavIdx: -1,  // focused message index, -1 = none
         _chatNavTabId: null,
@@ -386,6 +389,7 @@ function _buildAppData() {
             { id: 'chat-search', label: 'Chat: Search in Messages', shortcut: 'Ctrl+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.openChatSearch()); } },
             { id: 'chat-file-search', label: 'Chat: Search Project Files', shortcut: 'Ctrl+Shift+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.toggleFileSearch()); } },
             { id: 'chat-global-search', label: 'Chat: Search All Sessions', shortcut: 'Ctrl+Alt+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.toggleGlobalSearch()); } },
+            { id: 'chat-goto-msg', label: 'Chat: Go to Message', shortcut: 'Ctrl+G', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.openGoToMsg()); } },
             // Themes
             { id: 'theme-synthwave', label: 'Theme: Synthwave', category: 'THEME', action: () => { this.settings.theme = 'synthwave'; localStorage.setItem('ar-settings', JSON.stringify(this.settings)); this.applySettings(); this.showToast('Synthwave'); } },
             { id: 'theme-darcula', label: 'Theme: Darcula (JetBrains)', category: 'THEME', action: () => { this.settings.theme = 'darcula'; localStorage.setItem('ar-settings', JSON.stringify(this.settings)); this.applySettings(); this.showToast('Darcula'); } },
@@ -416,9 +420,13 @@ function _buildAppData() {
                 { keys: 'Up / Down', desc: 'Message history (shell-style)' },
                 { keys: 'ESC', desc: 'Cancel edit / exit history / close panels' },
                 { keys: '/', desc: 'Skill autocomplete menu' },
+                { keys: 'Ctrl+G', desc: 'Go to message by number' },
             ]},
             { category: 'MESSAGE NAV (j/k)', items: [
                 { keys: 'j / k', desc: 'Navigate messages down / up' },
+                { keys: 'g', desc: 'Open Go to Message dialog' },
+                { keys: 'n', desc: 'Jump to next user message' },
+                { keys: 'm', desc: 'Jump to next assistant message' },
                 { keys: 'ESC', desc: 'Clear message focus' },
                 { keys: 'c', desc: 'Copy focused message' },
                 { keys: 'q', desc: 'Quote focused message' },
@@ -604,6 +612,12 @@ function _buildAppData() {
                 if (e.key === 'Escape' && this.chatSearch.show) { this.closeChatSearch(); }
                 if (e.key === 'Escape' && this._fileSearch.show) { this.closeFileSearch(); }
                 if (e.key === 'Escape' && this._globalSearch.show) { this.closeGlobalSearch(); }
+                // Ctrl+G — Go to Message (like VS Code)
+                if ((e.ctrlKey || e.metaKey) && e.key === 'g' && this.section === 'chat' && this.activeTab) {
+                    e.preventDefault();
+                    this._gotoMsg.show ? this.closeGoToMsg() : this.openGoToMsg();
+                }
+                if (e.key === 'Escape' && this._gotoMsg.show) { this.closeGoToMsg(); }
                 if (e.key === 'Escape' && this.tabCtxMenu.show) { this.tabCtxMenu.show = false; }
                 if (e.key === 'Escape' && this._renamingTabId) { this.cancelRenameTab(); }
                 if (e.key === 'Escape' && this.showShortcuts) { this.closeShortcuts(); }
@@ -617,6 +631,10 @@ function _buildAppData() {
                     e.preventDefault();
                     this.navigateChatMatch(e.shiftKey ? -1 : 1);
                 }
+                if (e.key === 'Enter' && this._gotoMsg.show && document.activeElement.id === 'goto-msg-input') {
+                    e.preventDefault();
+                    this.executeGoToMsg();
+                }
                 // Chat message keyboard navigation (j/k) — only when in chat section, not in input
                 if (this.section === 'chat' && this.activeTab && !e.ctrlKey && !e.metaKey && !e.altKey) {
                     const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
@@ -624,9 +642,10 @@ function _buildAppData() {
                     const inCmdPalette = this.cmdPalette.show;
                     const inSearch = this.chatSearch.show;
                     const inFileSearch = this._fileSearch.show;
-                    if (!inInput && !inSlashMenu && !inCmdPalette && !inSearch && !inFileSearch) {
+                    if (!inInput && !inSlashMenu && !inCmdPalette && !inSearch && !inFileSearch && !this._gotoMsg.show) {
                         if (e.key === 'j') { e.preventDefault(); this.chatNavFocus(1); }
                         else if (e.key === 'k') { e.preventDefault(); this.chatNavFocus(-1); }
+                        else if (e.key === 'g' && !e.shiftKey) { e.preventDefault(); this.openGoToMsg(); }
                         else if (e.key === 'Escape' && this._chatNavIdx >= 0) { this.chatNavClear(); }
                         else if (this._chatNavIdx >= 0) {
                             // Action shortcuts on focused message
@@ -637,6 +656,8 @@ function _buildAppData() {
                             else if (e.key === 'p') { e.preventDefault(); this.chatNavAction('pin'); }
                             else if (e.key === 'e') { e.preventDefault(); this.chatNavAction('edit'); }
                             else if (e.key === 't') { e.preventDefault(); this.chatNavAction('turn'); }
+                            else if (e.key === 'n') { e.preventDefault(); this.chatNavJumpNext('user'); }
+                            else if (e.key === 'm') { e.preventDefault(); this.chatNavJumpNext('assistant'); }
                         }
                     }
                 }
