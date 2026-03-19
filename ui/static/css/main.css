@@ -281,6 +281,27 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     background: var(--v-dim);
     margin: 4px 8px;
 }
+.ctx-menu-shortcut {
+    margin-left: auto;
+    font-size: 0.5rem;
+    color: var(--v3);
+    letter-spacing: 0.08em;
+    opacity: 0.6;
+}
+
+/* === TAB RENAME INPUT === */
+.tab-rename-input {
+    width: 80px;
+    background: var(--bg);
+    border: 1px solid var(--v);
+    color: var(--ng2);
+    font-size: 0.6875rem;
+    font-family: 'VT323', monospace;
+    letter-spacing: 0.08em;
+    padding: 0 4px;
+    outline: none;
+    border-radius: 2px;
+}
 
 /* === CAT CANVAS === */
 .cat-frame { border: 2px solid var(--v-dim); image-rendering: pixelated; overflow: visible; box-shadow: 0 0 12px rgba(180,74,255,0.08); }

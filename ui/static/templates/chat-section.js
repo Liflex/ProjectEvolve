@@ -8,15 +8,29 @@
             <!-- Tab buttons -->
             <div class="flex items-center overflow-x-auto flex-1">
                 <template x-for="tab in chatTabs" :key="tab.tab_id">
-                    <div class="flex items-center shrink-0 group">
+                    <div class="flex items-center shrink-0 group"
+                         @contextmenu="showTabContextMenu(tab, $event)">
                         <button @click="activateChatTab(tab.tab_id)"
+                                @dblclick.stop="startRenameTab(tab.tab_id)"
                                 class="flex items-center gap-2 px-3 py-2 text-xs tracking-wider transition-colors"
                                 :class="activeChatTab === tab.tab_id ? 'text-[var(--v)] border-b-2 border-[var(--v)] -mb-[2px]' : 'text-[var(--v3)] hover:text-[var(--ng2)]'">
                             <span class="w-1.5 h-1.5 rounded-full" :class="tab.is_streaming ? 'bg-[var(--cyan)] animate-pulse' : tab.ws_state === 'connected' ? 'bg-[var(--ng)]' : tab.ws_state === 'connecting' ? 'bg-[var(--amber)] animate-pulse' : 'bg-[var(--v3)]'"></span>
-                            <span class="truncate max-w-[100px]" x-text="tab.label"></span>
-                            <span x-show="tab.messages.length > 0" class="text-[0.5rem] tabular-nums px-1 bg-[var(--v-dim)] text-[var(--v3)]" x-text="tab.messages.length"></span>
+                            <template x-if="_renamingTabId === tab.tab_id">
+                                <input id="tab-rename-input"
+                                       x-model="_renameText"
+                                       @keydown="onRenameKeydown($event)"
+                                       @blur="finishRenameTab()"
+                                       @click.stop
+                                       class="tab-rename-input"
+                                       maxlength="30">
+                            </template>
+                            <template x-if="_renamingTabId !== tab.tab_id">
+                                <span class="truncate max-w-[100px]" x-text="tab.label"></span>
+                            </template>
+                            <span x-show="tab.messages.length > 0 && _renamingTabId !== tab.tab_id" class="text-[0.5rem] tabular-nums px-1 bg-[var(--v-dim)] text-[var(--v3)]" x-text="tab.messages.length"></span>
                         </button>
                         <button @click="closeChatTab(tab.tab_id)"
+                                x-show="_renamingTabId !== tab.tab_id"
                                 class="text-[var(--v3)] hover:text-[var(--red)] text-xs px-1 mr-1 opacity-0 group-hover:opacity-100 transition-opacity">x</button>
                     </div>
                 </template>
@@ -402,6 +416,32 @@
                     </template>
                     <div x-show="pastSessions.length === 0" class="text-center py-6 text-[0.625rem] text-[var(--v3)] tracking-widest">NO_PREVIOUS_SESSIONS_</div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Tab Context Menu (right-click on tab) -->
+        <div x-show="tabCtxMenu.show" x-cloak x-transition.duration.100ms
+             class="ctx-menu"
+             :style="'left:' + tabCtxMenu.x + 'px;top:' + tabCtxMenu.y + 'px'"
+             @click.stop
+             @click.outside="tabCtxMenu.show = false">
+            <div class="ctx-menu-item" @click="tabCtxAction('rename')">
+                <span class="ctx-menu-icon">&#x270f;</span>
+                <span>RENAME</span>
+                <span class="ctx-menu-shortcut">DBL-CLICK</span>
+            </div>
+            <div class="ctx-menu-sep"></div>
+            <div class="ctx-menu-item" @click="tabCtxAction('close')">
+                <span class="ctx-menu-icon">&#x2715;</span>
+                <span>CLOSE TAB</span>
+            </div>
+            <div class="ctx-menu-item" x-show="chatTabs.length > 1" @click="tabCtxAction('close-others')">
+                <span class="ctx-menu-icon">&#x2261;</span>
+                <span>CLOSE OTHERS</span>
+            </div>
+            <div class="ctx-menu-item ctx-menu-danger" x-show="chatTabs.length > 0" @click="tabCtxAction('close-all')">
+                <span class="ctx-menu-icon">&#x2715;</span>
+                <span>CLOSE ALL</span>
             </div>
         </div>
     `;

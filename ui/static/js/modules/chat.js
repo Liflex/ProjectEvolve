@@ -79,6 +79,58 @@ window.AppChat = (function() {
             }
         },
 
+        // ========== CHAT: TAB RENAME ==========
+        startRenameTab(tabId) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab) return;
+            this._renamingTabId = tabId;
+            this._renameText = tab.label;
+            this.$nextTick(() => {
+                const input = document.getElementById('tab-rename-input');
+                if (input) { input.focus(); input.select(); }
+            });
+        },
+        finishRenameTab() {
+            if (!this._renamingTabId) return;
+            const tab = this.chatTabs.find(t => t.tab_id === this._renamingTabId);
+            if (tab && this._renameText.trim()) {
+                tab.label = this._renameText.trim().slice(0, 30);
+            }
+            this._renamingTabId = null;
+            this._renameText = '';
+        },
+        cancelRenameTab() {
+            this._renamingTabId = null;
+            this._renameText = '';
+        },
+        onRenameKeydown(e) {
+            if (e.key === 'Enter') { e.preventDefault(); this.finishRenameTab(); }
+            else if (e.key === 'Escape') { e.preventDefault(); this.cancelRenameTab(); }
+            e.stopPropagation();
+        },
+
+        // ========== CHAT: TAB CONTEXT MENU ==========
+        showTabContextMenu(tab, e) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.tabCtxMenu = { show: true, tabId: tab.tab_id, x: e.clientX, y: e.clientY };
+        },
+        tabCtxAction(action) {
+            const tabId = this.tabCtxMenu.tabId;
+            this.tabCtxMenu.show = false;
+            if (!tabId) return;
+            if (action === 'rename') { this.startRenameTab(tabId); }
+            else if (action === 'close') { this.closeChatTab(tabId); }
+            else if (action === 'close-others') {
+                const others = this.chatTabs.filter(t => t.tab_id !== tabId);
+                for (const t of others) { this.closeChatTab(t.tab_id); }
+            }
+            else if (action === 'close-all') {
+                const all = [...this.chatTabs];
+                for (const t of all) { this.closeChatTab(t.tab_id); }
+            }
+        },
+
         // ========== CHAT: WEBSOCKET ==========
         connectChatWebSocket(tab) {
             const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';

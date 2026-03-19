@@ -87,6 +87,13 @@ function _buildAppData() {
         // Context menu
         ctxMenu: { show: false, items: [], x: 0, y: 0 },
 
+        // Tab rename
+        _renamingTabId: null,
+        _renameText: '',
+
+        // Tab context menu
+        tabCtxMenu: { show: false, tabId: null, x: 0, y: 0 },
+
         // Clock tick (forces status bar re-render every second)
         _clockTick: 0,
 
@@ -264,6 +271,8 @@ function _buildAppData() {
                     this.openChatSearch();
                 }
                 if (e.key === 'Escape' && this.chatSearch.show) { this.closeChatSearch(); }
+                if (e.key === 'Escape' && this.tabCtxMenu.show) { this.tabCtxMenu.show = false; }
+                if (e.key === 'Escape' && this._renamingTabId) { this.cancelRenameTab(); }
                 if (e.key === 'Enter' && this.chatSearch.show && document.activeElement.id === 'chat-search-input') {
                     e.preventDefault();
                     this.navigateChatMatch(e.shiftKey ? -1 : 1);
