@@ -65,6 +65,10 @@ window.AppChat = (function() {
                 this.connectChatWebSocket(tab);
                 this._scheduleChatSave();
                 this.showToast('SESSION STARTED', 'success');
+                // Request notification permission for background agent alerts
+                if ('Notification' in window && Notification.permission === 'default') {
+                    Notification.requestPermission();
+                }
                 // Cat: greet new session
                 if (window.CatModule && CatModule.isActive()) {
                     CatModule.setExpression('happy');
@@ -417,6 +421,8 @@ window.AppChat = (function() {
                         }
                         _app.chatTick++;
                         _app._scheduleChatSave();
+                        // Notification: sound + browser notification when agent finishes in background
+                        _app.notifyAgentDone(tab);
                     } else if (msg.type === 'error') {
                         // Remove regenerating placeholder on error
                         const errLast = tab.messages[tab.messages.length - 1];

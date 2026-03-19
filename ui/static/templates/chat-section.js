@@ -474,6 +474,7 @@
                                     </template>
                                 </div>
                             </div>
+                            <button @click="sendChatMessage(tab)" :disabled="tab.is_streaming"
                                     class="px-4 py-2 border border-[var(--v)] text-[var(--v)] text-xs tracking-wider hover:bg-[rgba(180,74,255,0.1)] disabled:opacity-30 transition-all shrink-0 relative"
                                     :title="tab._pendingFeedback?.length ? tab._pendingFeedback.length + ' reaction(s) queued — will be sent with next message' : 'Send message'">
                                 [> SEND]
