@@ -1153,6 +1153,8 @@ window.AppChat = (function() {
                     ? '<div class="md">' + this.linkFilePaths(this.renderMarkdown(msg.content)) + cursorHtml + '</div>'
                     : '<div class="md">' + this.linkFilePaths(this.renderMarkdown(msg.content)) + '</div>';
                 const aTime = this.fmtTime(msg.ts);
+                const aFullTime = this.fmtFullTime(msg.ts);
+                const aTimeHtml = aTime ? ' <span class="msg-ts" title="' + this.escHtml(aFullTime) + '" style="color:var(--v3);font-weight:normal;cursor:help">' + aTime + '</span>' : '';
                 const isLastAssistant = !msg.is_streaming && !tab.is_streaming && msgs.slice(idx + 1).filter(m => m.role === 'assistant').length === 0;
                 let thinkingHtml = '';
                 if (msg.thinking && msg.thinking.trim().length > 0) {
@@ -1219,7 +1221,7 @@ window.AppChat = (function() {
                     + '<button class="act-dislike' + (msg.reaction === 'down' ? ' reacted' : '') + '" onclick="event.stopPropagation();window._app.reactToMessage(\'' + tab.tab_id + '\',' + idx + ',\'down\')" title="Not helpful">&#x1F44E;</button>' : '')
                     + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + idx + ')" title="Delete">DEL</button>'
                     + '</div>'
-                    + '<div class="chat-role chat-role-assistant">CLAUDE_' + (isPinned ? ' <span class="pin-indicator" title="Pinned message">&#x1F4CC;</span>' : '') + (msg.reaction === 'up' ? ' <span style="color:var(--ng);font-size:0.625rem" title="Helpful">&#x1F44D;</span>' : '') + (msg.reaction === 'down' ? ' <span style="color:var(--red);font-size:0.625rem" title="Not helpful">&#x1F44E;</span>' : '') + (aTime ? ' <span style="color:var(--v3);font-weight:normal">' + aTime + '</span>' : '') + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + reactionHtml + '</div>'
+                    + '<div class="chat-role chat-role-assistant">CLAUDE_' + (isPinned ? ' <span class="pin-indicator" title="Pinned message">&#x1F4CC;</span>' : '') + (msg.reaction === 'up' ? ' <span style="color:var(--ng);font-size:0.625rem" title="Helpful">&#x1F44D;</span>' : '') + (msg.reaction === 'down' ? ' <span style="color:var(--red);font-size:0.625rem" title="Not helpful">&#x1F44E;</span>' : '') + aTimeHtml + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + reactionHtml + '</div>'
                     + (cf.thinking ? thinkingHtml : '')
                     + thinkingIndicatorHtml
                     + '<div class="chat-bubble-asst" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit">'
@@ -1333,13 +1335,16 @@ window.AppChat = (function() {
                     // Turn separator before each user message (except the first turn)
                     if (turnCount > 1) {
                         const uTimeSep = this.fmtTime(msg.ts);
+                        const uFullTimeSep = this.fmtFullTime(msg.ts);
                         const relTime = this.relativeTime(msg.ts);
                         html += '<div class="chat-turn-sep"><div class="chat-turn-sep-line"></div>'
-                            + '<span class="chat-turn-sep-time">' + uTimeSep + '</span>'
+                            + '<span class="chat-turn-sep-time msg-ts" title="' + this.escHtml(uFullTimeSep) + '">' + uTimeSep + '</span>'
                             + (relTime !== uTimeSep ? '<span class="chat-turn-sep-label">' + relTime + '</span>' : '')
                             + '<div class="chat-turn-sep-line"></div></div>';
                     }
                     const uTime = this.fmtTime(msg.ts);
+                    const uFullTime = this.fmtFullTime(msg.ts);
+                    const uTimeHtml = uTime ? ' <span class="msg-ts" title="' + this.escHtml(uFullTime) + '" style="color:var(--v3);font-weight:normal;cursor:help">' + uTime + '</span>' : '';
                     const uFold = msg.content && msg.content.length > 500 && !msg.is_streaming;
                     const uCollapsed = msg.collapsed && uFold;
                     const uChars = (msg.content || '').length;
@@ -1354,7 +1359,7 @@ window.AppChat = (function() {
                         + (uFold ? '<button class="act-fold" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + i + ')" title="Fold/Unfold">' + (msg.collapsed ? 'UNFOLD' : 'FOLD') + '</button>' : '')
                         + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Delete">DEL</button>'
                         + '</div>'
-                        + '<div class="chat-role chat-role-user">USER_' + (uTime ? ' <span style="color:var(--v3);font-weight:normal">' + uTime + '</span>' : '') + (uFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + uChars + 'ch · ' + uLines + 'ln</span>' : '') + '</div>'
+                        + '<div class="chat-role chat-role-user">USER_' + uTimeHtml + (uFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + uChars + 'ch · ' + uLines + 'ln</span>' : '') + '</div>'
                         + '<div class="chat-bubble-user" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit;color:var(--ng2)">'
                         + (uCollapsed
                             ? '<div class="chat-collapsed-preview">' + this.renderUserContent(msg.content.slice(0, 200)) + '</div>'

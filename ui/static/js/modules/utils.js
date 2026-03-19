@@ -29,6 +29,14 @@ window.AppUtils = (function() {
             return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
         },
 
+        fmtFullTime(ts) {
+            if (!ts) return '';
+            const d = new Date(ts);
+            const pad = (n, l = 2) => String(n).padStart(l, '0');
+            return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear()
+                + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+        },
+
         relativeTime(ts) {
             if (!ts) return '';
             const diff = Math.floor((Date.now() - ts) / 1000);

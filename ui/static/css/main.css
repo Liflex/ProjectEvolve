@@ -222,6 +222,17 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     border: 1px solid var(--v-dim);
     border-radius: 2px;
     font-weight: normal;
+}
+
+.msg-ts {
+    cursor: help;
+    border-bottom: 1px dotted transparent;
+    transition: color 0.15s, border-color 0.15s;
+}
+.msg-ts:hover {
+    color: var(--v) !important;
+    border-bottom-color: var(--v-dim);
+}
     vertical-align: middle;
 }
 
