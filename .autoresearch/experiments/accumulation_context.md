@@ -1,3 +1,25 @@
+## Experiment 115 — Chat — @-mention file autocomplete in input
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **@-mention file autocomplete** — type `@` in chat input to search project files via `/api/fs/search`
+2. **Keyboard navigation** — ArrowUp/Down, Tab/Enter to select, Escape to close
+3. **Smart @ detection** — regex finds `@query` before cursor, not just at line start
+4. **File reference insert** — selecting a file inserts `@filepath:line` into input
+5. **Slash menu compatibility** — mutually exclusive, no conflicts
+6. **Cat reactions** — occasional Russian speech when mention menu opens
+
+### Files Modified
+
+- `ui/static/js/app.js` — `mentionMenu` state
+- `ui/static/js/modules/chat.js` — `_handleMentionInput`, `_fetchMentionFiles`, `selectFileMention`
+- `ui/static/templates/chat-section.js` — mention dropdown template
+- `ui/static/css/main.css` — `.mention-menu*` styles
+
+---
+
 ## Experiment 114 — Chat — code block INSERT and RUN action buttons
 
 **Date:** 2026-03-20
@@ -4619,6 +4641,36 @@ Results
 **What was done:**
 1. **`/api/fs/search` backend endpoint** — text-based grep search через `os.walk()`. Поддерживает 30+ текстовых расширений (.py, .js, .ts, .md, .json, .yaml, .html, .css, .sh, .rs, .go, .java, .c и др.). Пропускает `.git`, `node_modules`, `__pycache__`, `vendor`, `dist` и т.д. Лимит: 30 результатов, макс. размер файла 512KB. Path traversal protection через `allowed_bases`.
 2. **File Search Panel** — collapsible панель в chat toolbar (кнопка FILES или Ctrl+Shift+F). De
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 114 — Chat — code block INSERT and RUN action buttons
+
+**Date:** 2026-03-20 02:07:48
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- `ui/static/js/modules/renderer.js` — добавлены кнопки [INSERT] и [RUN] в заголовок code block, атрибут `data-lang` на div
+- `ui/static/js/app.js` — глобальные обработчики `window._insertCode()` и `window._runCode()`, обновление shortcuts panel
+- `ui/static/css/main.css` — стили `.code-action`, `.code-action-insert`, `.code-action-run`, `.code-action-done`
+
+### Results
+
+Results
+
+**What was done:**
+1. **[INSERT]** — на всех code blocks, вставляет содержимое в chat input textarea. Если в input уже есть текст — добавляет с новой строки. Фокусирует input.
+2. **[RUN]** — только на bash/shell/zsh блоках. Отправляет команду агенту: `Run this command: ```bash ... ````. Проверяет что агент не занят (streaming guard).
+3. **Visual feedback** — кнопки показывают [INSERTED]/[SENT] на 1.5 сек после клика.
+4. **Cat reactions** — INSERT: thinking + "*вставил код в инпут* Попра
 
 ### Notes for Next
 

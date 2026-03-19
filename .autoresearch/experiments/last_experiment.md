@@ -1,26 +1,36 @@
 # Last Experiment Summary
 
-**Experiment #114** — Chat — code block INSERT and RUN action buttons
+**Experiment #115** — Chat — @-mention file autocomplete in input
 **Date:** 2026-03-20
 
 ## What Was Done
 
-1. **[INSERT] button** on all code blocks — inserts code content into chat input textarea. Useful for asking about code, making modifications, or referencing specific code in follow-up messages.
-2. **[RUN] button** on bash/shell/zsh code blocks only — sends the command to the agent for execution with a formatted "Run this command:" message. Includes streaming guard (won't send if agent is busy).
-3. **Visual feedback** — buttons show [INSERTED]/[SENT] confirmation for 1.5s after click.
-4. **Cat reactions** — INSERT triggers thinking expression + Russian speech, RUN triggers working expression + "running" speech.
-5. **Shortcuts panel updated** — added [INSERT] and [RUN] to MESSAGES category.
+1. **@-mention file autocomplete** — при вводе `@` в chat input показывается dropdown с результатами поиска файлов из проекта (через `/api/fs/search` endpoint из exp113)
+2. **Navigation** — ArrowUp/ArrowDown для навигации, Tab/Enter для выбора, Escape для закрытия
+3. **Smart detection** — regex `/@(query)$/` находит @-pattern перед курсором (не только в начале строки)
+4. **File reference insert** — при выборе файла вставляется `@filepath:line` в input текст
+5. **Slash menu compatibility** — @-mention и /-commands не конфликтуют, только один активен одновременно
+6. **Cat reactions** — кот иногда реагирует на открытие mention menu (30% шанс)
+7. **Visual styling** — dropdown в стиле slash menu с file icon, path (cyan), line number (amber), snippet
 
 ## Files Modified
 
-- `ui/static/js/modules/renderer.js` — added [INSERT] and [RUN] buttons to code block header HTML, `data-lang` attribute on code-block div
-- `ui/static/js/app.js` — `window._insertCode()` and `window._runCode()` global handlers, shortcuts panel entries
-- `ui/static/css/main.css` — `.code-action`, `.code-action-insert`, `.code-action-run`, `.code-action-done` styles
+- `ui/static/js/app.js` — добавлено состояние `mentionMenu`
+- `ui/static/js/modules/chat.js` — `_handleMentionInput`, `_fetchMentionFiles`, `selectFileMention`, keydown handling
+- `ui/static/templates/chat-section.js` — dropdown template, обновлён placeholder
+- `ui/static/css/main.css` — стили `.mention-menu`, `.mention-menu-item`, `.mention-file-*`
 
 ## Key Results
 
-**Working:** Yes
-**Tests:** Skipped (frontend-only change, no backend impact)
+**What was done:**
+- Полноценный @-mention autocomplete для файлов в чате
+- Debounce 250ms для поиска
+- Dedup результатов по file path
+- Max 12 результатов
+- Cursor position tracking для корректной замены @query на @filepath:line
+
+**Working:** yes
+**Tests:** skipped (UI feature, server imports OK)
 
 ## For Next Iteration
 

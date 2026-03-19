@@ -2158,3 +2158,24 @@ Results
 2. **File Search Panel** — collapsible панель в chat toolbar (кнопка FILES или Ctrl+Shift+F). De
 
 
+## Experiment 114 — Chat — code block INSERT and RUN action buttons
+
+**Time:** 2026-03-20 02:07:48
+
+**Files:** `ui/static/js/modules/renderer.js` — добавлены кнопки [INSERT] и [RUN] в заголовок code block, атрибут `data-lang` на div, `ui/static/js/app.js` — глобальные обработчики `window._insertCode()` и `window._runCode()`, обновление shortcuts panel, `ui/static/css/main.css` — стили `.code-action`, `.code-action-insert`, `.code-action-run`, `.code-action-done`
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **[INSERT]** — на всех code blocks, вставляет содержимое в chat input textarea. Если в input уже есть текст — добавляет с новой строки. Фокусирует input.
+2. **[RUN]** — только на bash/shell/zsh блоках. Отправляет команду агенту: `Run this command: ```bash ... ````. Проверяет что агент не занят (streaming guard).
+3. **Visual feedback** — кнопки показывают [INSERTED]/[SENT] на 1.5 сек после клика.
+4. **Cat reactions** — INSERT: thinking + "*вставил код в инпут* Попра
+
+
