@@ -247,6 +247,8 @@ function _buildAppData() {
         compareData: {},
         compareLoading: false,
         judgeVerdict: null,
+        judgeAllVerdicts: null,
+        judgeProfileView: null,
         config: { name: '', description: '', goals: [], constraints: [], tech_stack: [], focus_areas: [] },
         prompt: '',
         changesLog: '',

@@ -1,4 +1,4 @@
-"""Post-experiment auto-judge — quality evaluator.
+"""Post-experiment auto-judge — quality evaluator with multiple profiles.
 
 Evaluates experiment results after the agent commits by running
 a set of lightweight checks:
@@ -8,6 +8,11 @@ a set of lightweight checks:
   4. Diff size sanity — not too large, not empty
   5. Report quality — does the experiment report have proper sections?
   6. Code quality — are there code smells in the diff?
+
+Three judge profiles with different perspectives:
+  - strict:   Focus on minimal, clean changes. Low tolerance for warnings.
+  - balanced: Equal weight on all checks (default).
+  - lenient:  Focus on functionality. Tolerates larger changes.
 
 Produces a verdict dict with score, decision recommendation, and check details.
 """
@@ -37,20 +42,95 @@ class CheckResult:
 
 
 # ---------------------------------------------------------------------------
+# Judge profiles
+# ---------------------------------------------------------------------------
+
+@dataclass
+class JudgeProfile:
+    """Configuration for a judge's evaluation perspective."""
+    name: str
+    label: str
+    description: str
+    # Per-check weights (check_name → weight multiplier)
+    weights: Dict[str, float] = field(default_factory=dict)
+    # Thresholds for recommendation
+    fail_threshold: int = 2       # fails >= this → DISCARD
+    warn_threshold: int = 3       # warns >= this → REVIEW
+    # Score multiplier for final score (profile-specific adjustment)
+    score_adjust: float = 0.0
+
+
+JUDGE_PROFILES: Dict[str, JudgeProfile] = {
+    "strict": JudgeProfile(
+        name="strict",
+        label="STRICT",
+        description="Minimal changes, clean code, low tolerance for warnings",
+        weights={
+            "commit_exists": 1.0,
+            "file_consistency": 2.0,   # must match exactly
+            "syntax_check": 2.0,       # no errors at all
+            "diff_size": 2.0,          # prefer small diffs
+            "report_quality": 0.5,     # less important
+            "code_quality": 2.0,       # code quality matters
+        },
+        fail_threshold=1,    # 1 fail → DISCARD
+        warn_threshold=2,    # 2 warns → REVIEW
+        score_adjust=-0.05,
+    ),
+    "balanced": JudgeProfile(
+        name="balanced",
+        label="BALANCED",
+        description="Equal weight on all checks",
+        weights={
+            "commit_exists": 1.0,
+            "file_consistency": 1.0,
+            "syntax_check": 1.0,
+            "diff_size": 1.0,
+            "report_quality": 1.0,
+            "code_quality": 1.0,
+        },
+        fail_threshold=2,
+        warn_threshold=3,
+        score_adjust=0.0,
+    ),
+    "lenient": JudgeProfile(
+        name="lenient",
+        label="LENIENT",
+        description="Focus on functionality, tolerates larger changes",
+        weights={
+            "commit_exists": 1.5,       # still important
+            "file_consistency": 0.5,    # minor mismatches ok
+            "syntax_check": 1.5,        # errors still matter
+            "diff_size": 0.5,           # large changes ok
+            "report_quality": 1.0,
+            "code_quality": 0.5,        # code smells tolerated
+        },
+        fail_threshold=2,
+        warn_threshold=4,    # more tolerant
+        score_adjust=0.05,
+    ),
+}
+
+
+# ---------------------------------------------------------------------------
 # Judge
 # ---------------------------------------------------------------------------
 
 class ExperimentJudge:
-    """Lightweight post-experiment evaluator.
+    """Lightweight post-experiment evaluator with profile support.
 
     Usage::
 
         judge = ExperimentJudge(project_dir)
-        verdict = judge.evaluate(
-            claimed_files=["ui/static/js/modules/chat.js"],
-            agent_decision="KEEP",
-            agent_score=0.8,
-        )
+
+        # Run with default profile
+        verdict = judge.evaluate(claimed_files=["..."], agent_decision="KEEP")
+
+        # Run with specific profile
+        verdict = judge.evaluate(claimed_files=["..."], profile="strict")
+
+        # Run all profiles
+        all_verdicts = judge.evaluate_all(claimed_files=["..."])
     """
 
     def __init__(self, project_dir: Path):
@@ -83,10 +163,8 @@ class ExperimentJudge:
 
     def _check_diff_files(self, claimed_files: List[str]) -> CheckResult:
         """Compare claimed files_modified with actual git diff."""
-        # Get files changed in last commit
         diff_output = self._run_git("diff", "--name-only", "HEAD~1", "HEAD")
         if not diff_output.strip():
-            # Maybe only one commit exists
             diff_output = self._run_git("diff", "--name-only", "--cached")
         if not diff_output.strip():
             diff_output = self._run_git("show", "--name-only", "--pretty=format:", "HEAD")
@@ -97,7 +175,6 @@ class ExperimentJudge:
         if not actual_files:
             return CheckResult("file_consistency", "warn", "No file changes detected in last commit")
 
-        # Normalize paths for comparison
         def normalize(p: str) -> str:
             return p.replace("\\", "/").lstrip("./")
 
@@ -152,7 +229,6 @@ class ExperimentJudge:
                         encoding="utf-8", errors="replace",
                     )
                 elif ext in (".js", ".ts", ".jsx", ".tsx"):
-                    # Basic check: file is valid UTF-8 and not empty
                     content = fpath.read_text(encoding="utf-8", errors="replace")
                     if not content.strip():
                         errors.append(f"{f}: empty file")
@@ -174,7 +250,6 @@ class ExperimentJudge:
         if not stat.strip():
             return CheckResult("diff_size", "warn", "No diff stats available")
 
-        # Parse: "3 files changed, 50 insertions(+), 10 deletions(-)"
         m = re.search(r"(\d+) files? changed", stat)
         files_changed = int(m.group(1)) if m else 0
         m = re.search(r"(\d+) insertion", stat)
@@ -203,7 +278,6 @@ class ExperimentJudge:
             "diff_size", "pass",
             f"{files_changed} file(s), +{insertions}/-{deletions} lines"
         )
-
 
     def _check_report_quality(self, report_text: str) -> CheckResult:
         """Validate experiment report has proper sections."""
@@ -274,59 +348,63 @@ class ExperimentJudge:
             return CheckResult("code_quality", "warn", "; ".join(issues))
         return CheckResult("code_quality", "pass", "No code smells detected")
 
-    def evaluate(
+    def _run_all_checks(
         self,
-        claimed_files: Optional[List[str]] = None,
-        agent_decision: str = "",
-        agent_score: Optional[float] = None,
-        report_text: str = "",
-    ) -> Dict[str, Any]:
-        """Run all checks and produce a verdict.
-
-        Returns dict with:
-            - score: float (0.0-1.0)
-            - recommendation: "KEEP" | "DISCARD" | "REVIEW"
-            - checks: list of check result dicts
-            - summary: str
-        """
-        claimed_files = claimed_files or []
+        claimed_files: List[str],
+        report_text: str,
+    ) -> List[CheckResult]:
+        """Run all checks and return results."""
         checks: List[CheckResult] = []
-
-        # Run all checks
         checks.append(self._check_commit_exists())
         checks.append(self._check_diff_files(claimed_files))
         checks.append(self._check_syntax())
         checks.append(self._check_diff_size())
-
-        # Enhanced checks
         checks.append(self._check_report_quality(report_text))
         checks.append(self._check_code_quality())
+        return checks
 
-        # Calculate score from checks
-        total_weight = sum(c.weight for c in checks)
+    def _compute_verdict(
+        self,
+        checks: List[CheckResult],
+        profile: JudgeProfile,
+        agent_decision: str = "",
+        agent_score: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Apply profile weights and thresholds to produce a verdict."""
+        # Apply profile-specific weights
+        weighted_checks = []
+        for c in checks:
+            w = profile.weights.get(c.name, 1.0)
+            weighted_checks.append(CheckResult(c.name, c.status, c.message, weight=w))
+
+        # Calculate score
+        total_weight = sum(c.weight for c in weighted_checks)
         if total_weight == 0:
             score = 0.5
         else:
             score_map = {"pass": 1.0, "warn": 0.5, "fail": 0.0}
-            weighted = sum(score_map.get(c.status, 0.5) * c.weight for c in checks)
+            weighted = sum(score_map.get(c.status, 0.5) * c.weight for c in weighted_checks)
             score = weighted / total_weight
 
-        # Recommendation
-        fails = sum(1 for c in checks if c.status == "fail")
-        warns = sum(1 for c in checks if c.status == "warn")
+        # Apply profile score adjustment
+        score = max(0.0, min(1.0, score + profile.score_adjust))
 
-        if fails >= 2:
+        # Recommendation based on profile thresholds
+        fails = sum(1 for c in weighted_checks if c.status == "fail")
+        warns = sum(1 for c in weighted_checks if c.status == "warn")
+
+        if fails >= profile.fail_threshold:
             recommendation = "DISCARD"
         elif fails >= 1:
             recommendation = "REVIEW"
-        elif warns >= 3:
+        elif warns >= profile.warn_threshold:
             recommendation = "REVIEW"
         else:
             recommendation = "KEEP"
 
         # Summary
-        passed = sum(1 for c in checks if c.status == "pass")
-        summary = f"{passed}/{len(checks)} checks passed"
+        passed = sum(1 for c in weighted_checks if c.status == "pass")
+        summary = f"{passed}/{len(weighted_checks)} checks passed"
         if fails:
             summary += f", {fails} failed"
         if warns:
@@ -336,10 +414,94 @@ class ExperimentJudge:
             "score": round(score, 2),
             "recommendation": recommendation,
             "checks": [
-                {"name": c.name, "status": c.status, "message": c.message}
-                for c in checks
+                {
+                    "name": c.name,
+                    "status": c.status,
+                    "message": c.message,
+                    "weight": round(c.weight, 2),
+                }
+                for c in weighted_checks
             ],
             "summary": summary,
+            "profile": profile.name,
+            "profile_label": profile.label,
             "agent_decision": agent_decision,
             "agent_score": agent_score,
+        }
+
+    def evaluate(
+        self,
+        claimed_files: Optional[List[str]] = None,
+        agent_decision: str = "",
+        agent_score: Optional[float] = None,
+        report_text: str = "",
+        profile: str = "balanced",
+    ) -> Dict[str, Any]:
+        """Run all checks and produce a verdict.
+
+        Args:
+            claimed_files: Files the agent claims to have modified.
+            agent_decision: Agent's own KEEP/DISCARD decision.
+            agent_score: Agent's self-assessed score (0.0-1.0).
+            report_text: The experiment report text.
+            profile: Judge profile name ("strict", "balanced", "lenient").
+
+        Returns:
+            Dict with score, recommendation, checks, summary, profile info.
+        """
+        claimed_files = claimed_files or []
+        prof = JUDGE_PROFILES.get(profile, JUDGE_PROFILES["balanced"])
+        checks = self._run_all_checks(claimed_files, report_text)
+        return self._compute_verdict(checks, prof, agent_decision, agent_score)
+
+    def evaluate_all(
+        self,
+        claimed_files: Optional[List[str]] = None,
+        agent_decision: str = "",
+        agent_score: Optional[float] = None,
+        report_text: str = "",
+    ) -> Dict[str, Any]:
+        """Run all judge profiles and return combined verdicts.
+
+        Returns dict with:
+            - profiles: dict of profile_name → verdict
+            - consensus: "KEEP" | "DISCARD" | "REVIEW" | "SPLIT"
+            - consensus_score: average score across profiles
+            - agent_decision, agent_score
+        """
+        claimed_files = claimed_files or []
+        checks = self._run_all_checks(claimed_files, report_text)
+
+        profiles: Dict[str, Dict[str, Any]] = {}
+        for name, prof in JUDGE_PROFILES.items():
+            profiles[name] = self._compute_verdict(
+                [CheckResult(c.name, c.status, c.message) for c in checks],
+                prof, agent_decision, agent_score,
+            )
+
+        # Consensus: majority vote
+        recs = [v["recommendation"] for v in profiles.values()]
+        keep_count = recs.count("KEEP")
+        discard_count = recs.count("DISCARD")
+        review_count = recs.count("REVIEW")
+
+        if keep_count >= 2:
+            consensus = "KEEP"
+        elif discard_count >= 2:
+            consensus = "DISCARD"
+        elif review_count >= 2:
+            consensus = "REVIEW"
+        else:
+            consensus = "SPLIT"
+
+        # Average score
+        avg_score = sum(v["score"] for v in profiles.values()) / len(profiles) if profiles else 0
+
+        return {
+            "profiles": profiles,
+            "consensus": consensus,
+            "consensus_score": round(avg_score, 2),
+            "agent_decision": agent_decision,
+            "agent_score": agent_score,
+            "available_profiles": list(JUDGE_PROFILES.keys()),
         }

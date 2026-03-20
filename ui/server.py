@@ -219,12 +219,19 @@ def _enrich_experiment(entry: Dict[str, Any], section: str, exp_dir: Path = None
 
     # Load persisted judge verdict if available
     judge_verdict = None
+    judge_all_verdicts = None
     if exp_dir:
+        import json as _json
         judge_file = exp_dir / f"judge_{entry.get('number', 0)}.json"
         if judge_file.exists():
             try:
-                import json as _json
                 judge_verdict = _json.loads(judge_file.read_text(encoding="utf-8"))
+            except (OSError, _json.JSONDecodeError):
+                pass
+        judge_all_file = exp_dir / f"judge_{entry.get('number', 0)}_all.json"
+        if judge_all_file.exists():
+            try:
+                judge_all_verdicts = _json.loads(judge_all_file.read_text(encoding="utf-8"))
             except (OSError, _json.JSONDecodeError):
                 pass
 
@@ -235,6 +242,7 @@ def _enrich_experiment(entry: Dict[str, Any], section: str, exp_dir: Path = None
         "results": _extract_section(section, "Results"),
         "notes": _extract_section(section, "Notes for Next"),
         "judge_verdict": judge_verdict,
+        "judge_all_verdicts": judge_all_verdicts,
     }
 
 
@@ -541,8 +549,8 @@ async def get_experiment(n: int):
 
 
 @app.get("/api/judge/{n}")
-async def judge_experiment(n: int):
-    """Run post-experiment judge on experiment N."""
+async def judge_experiment(n: int, profile: str = "balanced"):
+    """Run post-experiment judge on experiment N with optional profile."""
     import json as _json
     from utils.judge import ExperimentJudge
     project = get_project_dir()
@@ -556,12 +564,39 @@ async def judge_experiment(n: int):
             claimed_files=exp.get("files_modified", []),
             agent_decision=exp.get("decision", ""),
             report_text=exp.get("results", ""),
+            profile=profile,
         )
         # Persist verdict to JSON file
         judge_file = get_exp_dir() / f"judge_{n}.json"
         judge_file.write_text(_json.dumps(verdict, indent=2), encoding="utf-8")
         _invalidate_cache()
         return verdict
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/judge/{n}/all")
+async def judge_experiment_all(n: int):
+    """Run all judge profiles on experiment N."""
+    import json as _json
+    from utils.judge import ExperimentJudge
+    project = get_project_dir()
+    try:
+        experiments = parse_experiments()
+        exp = next((e for e in experiments if e["number"] == n), None)
+        if not exp:
+            raise HTTPException(status_code=404, detail=f"Experiment {n} not found")
+        judge = ExperimentJudge(project)
+        verdicts = judge.evaluate_all(
+            claimed_files=exp.get("files_modified", []),
+            agent_decision=exp.get("decision", ""),
+            report_text=exp.get("results", ""),
+        )
+        # Persist all-profiles verdict
+        judge_file = get_exp_dir() / f"judge_{n}_all.json"
+        judge_file.write_text(_json.dumps(verdicts, indent=2), encoding="utf-8")
+        _invalidate_cache()
+        return verdicts
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -972,7 +1007,7 @@ async def start_run(data: RunRequest):
             try:
                 exp_data = ar.parse_experiment_report(output, exp_num)
 
-                # Run post-experiment judge
+                # Run post-experiment judge (balanced profile + all profiles)
                 try:
                     from utils.judge import ExperimentJudge
                     import json as _json
@@ -983,13 +1018,28 @@ async def start_run(data: RunRequest):
                         report_text=output,
                     )
                     exp_data["judge_verdict"] = verdict
-                    # Persist verdict to JSON file for list view
                     judge_file = exp_dir / f"judge_{exp_num}.json"
                     judge_file.write_text(_json.dumps(verdict, indent=2), encoding="utf-8")
                     _log_append(
                         f"[JUDGE] Exp #{exp_num}: score={verdict['score']}, "
                         f"rec={verdict['recommendation']}, {verdict['summary']}"
                     )
+                    # Also run all profiles for consensus
+                    try:
+                        all_verdicts = judge.evaluate_all(
+                            claimed_files=exp_data.get("files_modified", []),
+                            agent_decision=exp_data.get("agent_decision", ""),
+                            report_text=output,
+                        )
+                        exp_data["judge_all_verdicts"] = all_verdicts
+                        all_file = exp_dir / f"judge_{exp_num}_all.json"
+                        all_file.write_text(_json.dumps(all_verdicts, indent=2), encoding="utf-8")
+                        _log_append(
+                            f"[JUDGE-ALL] Exp #{exp_num}: consensus={all_verdicts['consensus']}, "
+                            f"avg={all_verdicts['consensus_score']}"
+                        )
+                    except Exception as ae:
+                        logger.warning("All-judges failed for exp %d: %s", exp_num, ae)
                 except Exception as je:
                     logger.warning("Judge failed for exp %d: %s", exp_num, je)
 

@@ -355,13 +355,26 @@ window.AppLab = (function() {
         },
 
         // --- Judge ---
-        async judgeExperiment(n) {
+        async judgeExperiment(n, profile) {
             this.judgeVerdict = null;
+            this.judgeAllVerdicts = null;
             try {
-                this.judgeVerdict = await this.api('/api/judge/' + n);
+                const url = '/api/judge/' + n + (profile && profile !== 'balanced' ? '?profile=' + profile : '');
+                this.judgeVerdict = await this.api(url);
             } catch (e) {
                 console.error('[judgeExperiment] FAILED:', e);
                 this.showToast('JUDGE FAILED', 'error');
+            }
+        },
+        async judgeExperimentAll(n) {
+            this.judgeVerdict = null;
+            this.judgeAllVerdicts = null;
+            this.judgeProfileView = null;
+            try {
+                this.judgeAllVerdicts = await this.api('/api/judge/' + n + '/all');
+            } catch (e) {
+                console.error('[judgeExperimentAll] FAILED:', e);
+                this.showToast('ALL JUDGES FAILED', 'error');
             }
         },
         async runCompare() {

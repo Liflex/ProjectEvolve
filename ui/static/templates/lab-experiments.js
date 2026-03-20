@@ -60,7 +60,11 @@
                             <span class="text-[0.625rem] text-[var(--v3)] w-28 truncate shrink-0" x-text="exp.date"></span>
                             <span class="text-sm w-10 text-right shrink-0" :class="scoreCls(exp.score)" style="font-family:'Press Start 2P',monospace" x-text="exp.score"></span>
                             <!-- Judge verdict badge -->
-                            <span x-show="exp.judge_verdict" class="judge-list-badge shrink-0"
+                            <span x-show="exp.judge_all_verdicts" class="judge-list-badge shrink-0"
+                                  :class="exp.judge_all_verdicts?.consensus === 'KEEP' ? 'judge-keep' : exp.judge_all_verdicts?.consensus === 'DISCARD' ? 'judge-discard' : 'judge-review'"
+                                  :title="'All Judges: ' + (exp.judge_all_verdicts?.consensus || '') + ' (avg ' + (exp.judge_all_verdicts?.consensus_score || '') + ')'"
+                                  x-text="'J:' + (exp.judge_all_verdicts?.consensus || '?')"></span>
+                            <span x-show="!exp.judge_all_verdicts && exp.judge_verdict" class="judge-list-badge shrink-0"
                                   :class="exp.judge_verdict?.recommendation === 'KEEP' ? 'judge-keep' : exp.judge_verdict?.recommendation === 'DISCARD' ? 'judge-discard' : 'judge-review'"
                                   :title="'Judge: ' + (exp.judge_verdict?.summary || '')"
                                   x-text="exp.judge_verdict?.recommendation === 'KEEP' ? 'J:KEEP' : exp.judge_verdict?.recommendation === 'DISCARD' ? 'J:DISC' : 'J:REV'"></span>
@@ -158,11 +162,76 @@
                                     <div class="mb-3">
                                         <div class="flex items-center justify-between mb-1.5">
                                             <div class="text-[0.5625rem] text-[var(--v3)] tracking-widest">JUDGE_VERDICT_</div>
-                                            <button x-show="!judgeVerdict" @click="judgeExperiment(selectedExp)" class="text-[0.5625rem] px-2 py-0.5 tracking-wider border border-[var(--v-dim)] text-[var(--v3)] hover:border-[var(--v)] hover:text-[var(--v)] transition-all">[RUN JUDGE]</button>
-                                            <button x-show="judgeVerdict" @click="judgeVerdict=null" class="text-[0.5625rem] text-[var(--v3)] hover:text-[var(--red)] tracking-wider">[CLEAR]</button>
+                                            <div class="flex items-center gap-2">
+                                                <template x-if="!judgeAllVerdicts && !judgeVerdict">
+                                                    <div class="flex items-center gap-1">
+                                                        <button @click="judgeExperiment(selectedExp, 'balanced')" class="text-[0.5625rem] px-2 py-0.5 tracking-wider border border-[var(--v-dim)] text-[var(--v3)] hover:border-[var(--v)] hover:text-[var(--v)] transition-all">[RUN]</button>
+                                                        <button @click="judgeExperimentAll(selectedExp)" class="text-[0.5625rem] px-2 py-0.5 tracking-wider border border-[var(--v2)] text-[var(--v)] hover:border-[var(--v)] hover:text-[var(--ng)] transition-all" title="Run all judge profiles">[ALL JUDGES]</button>
+                                                    </div>
+                                                </template>
+                                                <template x-if="judgeAllVerdicts">
+                                                    <div class="flex items-center gap-1">
+                                                        <button @click="judgeAllVerdicts=null;judgeVerdict=null" class="text-[0.5625rem] text-[var(--v3)] hover:text-[var(--red)] tracking-wider">[CLEAR]</button>
+                                                    </div>
+                                                </template>
+                                                <template x-if="judgeVerdict && !judgeAllVerdicts">
+                                                    <div class="flex items-center gap-1">
+                                                        <button @click="judgeExperimentAll(selectedExp)" class="text-[0.5rem] px-1.5 py-0.5 tracking-wider border border-[var(--v2)] text-[var(--v3)] hover:border-[var(--v)] hover:text-[var(--v)] transition-all">[ALL]</button>
+                                                        <button @click="judgeVerdict=null" class="text-[0.5625rem] text-[var(--v3)] hover:text-[var(--red)] tracking-wider">[CLEAR]</button>
+                                                    </div>
+                                                </template>
+                                            </div>
                                         </div>
-                                        <div x-show="judgeVerdict" class="bg-[var(--bg)] p-3 pixel-border">
+                                        <!-- All Judges View -->
+                                        <template x-if="judgeAllVerdicts">
+                                            <div>
+                                                <!-- Consensus bar -->
+                                                <div class="bg-[var(--bg)] p-3 pixel-border mb-2">
+                                                    <div class="flex items-center gap-3 mb-1">
+                                                        <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider">CONSENSUS</span>
+                                                        <span class="text-sm" :class="judgeAllVerdicts.consensus === 'KEEP' ? 'text-[var(--ng)]' : judgeAllVerdicts.consensus === 'DISCARD' ? 'text-[var(--red)]' : 'text-[var(--amber)]'" style="font-family:'Press Start 2P',monospace" x-text="judgeAllVerdicts.consensus"></span>
+                                                        <span class="text-[0.625rem] text-[var(--v3)]">AVG</span>
+                                                        <span class="text-sm text-[var(--v)]" style="font-family:'Press Start 2P',monospace" x-text="judgeAllVerdicts.consensus_score"></span>
+                                                        <span x-show="judgeAllVerdicts.consensus === 'SPLIT'" class="text-[0.5rem] text-[var(--amber)] ml-auto tracking-wider">JUDGES DISAGREE</span>
+                                                    </div>
+                                                    <!-- Per-profile verdicts -->
+                                                    <div class="flex gap-2 mt-2">
+                                                        <template x-for="(verdict, pname) in (judgeAllVerdicts.profiles || {})" :key="pname">
+                                                            <div class="flex-1 bg-[rgba(0,0,0,0.2)] p-2 border border-[var(--v-dim)] cursor-pointer transition-all"
+                                                                 :class="judgeProfileView === pname && 'border-[var(--v)]'"
+                                                                 @click="judgeProfileView = (judgeProfileView === pname ? null : pname)">
+                                                                <div class="text-[0.5rem] text-[var(--v3)] tracking-widest mb-1" x-text="verdict.profile_label"></div>
+                                                                <div class="flex items-center gap-2">
+                                                                    <span class="text-xs" :class="verdict.recommendation === 'KEEP' ? 'text-[var(--ng)]' : verdict.recommendation === 'DISCARD' ? 'text-[var(--red)]' : 'text-[var(--amber)]'" style="font-family:'Press Start 2P',monospace" x-text="verdict.recommendation"></span>
+                                                                    <span class="text-[0.625rem] text-[var(--v)]" style="font-family:'Press Start 2P',monospace" x-text="verdict.score"></span>
+                                                                </div>
+                                                                <div class="text-[0.4375rem] text-[var(--v3)] mt-0.5" x-text="verdict.summary"></div>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                                <!-- Expanded profile details -->
+                                                <template x-if="judgeProfileView && (judgeAllVerdicts.profiles || {})[judgeProfileView]">
+                                                    <div class="bg-[var(--bg)] p-3 pixel-border">
+                                                        <div class="flex items-center gap-2 mb-2">
+                                                            <span class="text-[0.5625rem] text-[var(--v)] tracking-wider" x-text="(judgeAllVerdicts.profiles || {})[judgeProfileView]?.profile_label + ' CHECKS'"></span>
+                                                        </div>
+                                                        <template x-for="(chk, ci) in ((judgeAllVerdicts.profiles || {})[judgeProfileView]?.checks || [])" :key="ci">
+                                                            <div class="flex items-center gap-2 py-0.5 text-[0.5625rem]">
+                                                                <span x-text="chk.status === 'pass' ? '&#x2705;' : chk.status === 'fail' ? '&#x274C;' : '&#x26A0;'" class="shrink-0 text-xs"></span>
+                                                                <span class="text-[var(--v3)] tracking-wider w-28 shrink-0" x-text="chk.name"></span>
+                                                                <span class="text-[var(--ng3)] flex-1" x-text="chk.message"></span>
+                                                                <span class="text-[0.4375rem] text-[var(--v3)] shrink-0" x-text="'w:' + (chk.weight || 1)"></span>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+                                        <!-- Single profile view -->
+                                        <div x-show="judgeVerdict && !judgeAllVerdicts" class="bg-[var(--bg)] p-3 pixel-border">
                                             <div class="flex items-center gap-3 mb-2">
+                                                <span class="text-[0.5rem] px-1 py-px border border-[var(--v-dim)] text-[var(--v3)]" x-text="judgeVerdict.profile_label || 'BALANCED'"></span>
                                                 <span class="text-sm" :class="judgeVerdict.recommendation === 'KEEP' ? 'text-[var(--ng)]' : judgeVerdict.recommendation === 'DISCARD' ? 'text-[var(--red)]' : 'text-[var(--amber)]'" style="font-family:'Press Start 2P',monospace" x-text="judgeVerdict.recommendation"></span>
                                                 <span class="text-[0.625rem] text-[var(--v3)]">SCORE</span>
                                                 <span class="text-sm text-[var(--v)]" style="font-family:'Press Start 2P',monospace" x-text="judgeVerdict.score"></span>
@@ -172,11 +241,12 @@
                                                 <div class="flex items-center gap-2 py-0.5 text-[0.5625rem]">
                                                     <span x-text="chk.status === 'pass' ? '&#x2705;' : chk.status === 'fail' ? '&#x274C;' : '&#x26A0;'" class="shrink-0 text-xs"></span>
                                                     <span class="text-[var(--v3)] tracking-wider w-28 shrink-0" x-text="chk.name"></span>
-                                                    <span class="text-[var(--ng3)]" x-text="chk.message"></span>
+                                                    <span class="text-[var(--ng3)] flex-1" x-text="chk.message"></span>
+                                                    <span class="text-[0.4375rem] text-[var(--v3)] shrink-0" x-text="'w:' + (chk.weight || 1)"></span>
                                                 </div>
                                             </template>
                                         </div>
-                                        <div x-show="!judgeVerdict" class="text-[0.5625rem] text-[var(--v3)] tracking-wider">Click RUN JUDGE to evaluate this experiment_</div>
+                                        <div x-show="!judgeVerdict && !judgeAllVerdicts" class="text-[0.5625rem] text-[var(--v3)] tracking-wider">Click RUN or ALL JUDGES to evaluate_</div>
                                     </div>
                                     <div x-show="selectedExpData?.files_modified?.length" class="mb-3">
                                         <div class="text-[0.5625rem] text-[var(--v3)] tracking-widest mb-1">FILES_MODIFIED_</div>
