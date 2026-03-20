@@ -162,6 +162,45 @@ window.AppChat = (function() {
             e.stopPropagation();
         },
 
+        // ========== CHAT: TAB DRAG REORDER ==========
+        onTabDragStart(tabId, e) {
+            // Don't drag while renaming
+            if (this._renamingTabId) { e.preventDefault(); return; }
+            this._dragTabId = tabId;
+            this._dragOverTabId = null;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', tabId);
+        },
+        onTabDragOver(tabId, e) {
+            if (!this._dragTabId || this._dragTabId === tabId) return;
+            this._dragOverTabId = tabId;
+            e.dataTransfer.dropEffect = 'move';
+        },
+        onTabDrop(targetTabId) {
+            const dragTabId = this._dragTabId;
+            if (!dragTabId || dragTabId === targetTabId) { this._dragTabId = null; this._dragOverTabId = null; return; }
+            const fromIdx = this.chatTabs.findIndex(t => t.tab_id === dragTabId);
+            const toIdx = this.chatTabs.findIndex(t => t.tab_id === targetTabId);
+            if (fromIdx < 0 || toIdx < 0) { this._dragTabId = null; this._dragOverTabId = null; return; }
+            // Remove from old position and insert at new position
+            const [moved] = this.chatTabs.splice(fromIdx, 1);
+            this.chatTabs.splice(toIdx, 0, moved);
+            this._dragTabId = null;
+            this._dragOverTabId = null;
+        },
+        onTabDragEnd() {
+            this._dragTabId = null;
+            this._dragOverTabId = null;
+        },
+        _moveTab(tabId, direction) {
+            const idx = this.chatTabs.findIndex(t => t.tab_id === tabId);
+            if (idx < 0) return;
+            const newIdx = idx + direction;
+            if (newIdx < 0 || newIdx >= this.chatTabs.length) return;
+            const [moved] = this.chatTabs.splice(idx, 1);
+            this.chatTabs.splice(newIdx, 0, moved);
+        },
+
         // ========== CHAT: TAB CONTEXT MENU ==========
         showTabContextMenu(tab, e) {
             e.preventDefault();
@@ -182,6 +221,8 @@ window.AppChat = (function() {
                 const all = [...this.chatTabs];
                 for (const t of all) { this.closeChatTab(t.tab_id); }
             }
+            else if (action === 'move-left') { this._moveTab(tabId, -1); }
+            else if (action === 'move-right') { this._moveTab(tabId, 1); }
         },
 
         // ========== CHAT: WEBSOCKET ==========

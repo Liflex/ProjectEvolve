@@ -346,6 +346,10 @@ function _buildAppData() {
         _renamingTabId: null,
         _renameText: '',
 
+        // Tab drag reorder
+        _dragTabId: null,
+        _dragOverTabId: null,
+
         // Tab context menu
         tabCtxMenu: { show: false, tabId: null, x: 0, y: 0 },
 
@@ -449,6 +453,7 @@ function _buildAppData() {
             { category: 'MESSAGES', items: [
                 { keys: 'Right-click', desc: 'Context menu (Copy, Quote, Edit, Pin, etc.)' },
                 { keys: 'Double-click tab', desc: 'Rename tab' },
+                { keys: 'Drag tab', desc: 'Reorder tabs by drag & drop' },
                 { keys: 'Hover + actions', desc: 'COPY / QUOTE / EDIT / REGEN / PIN / FOLD / DEL' },
                 { keys: 'Code [INSERT]', desc: 'Insert code block into chat input' },
                 { keys: 'Code [RUN]', desc: 'Send bash command to agent (shell blocks only)' },

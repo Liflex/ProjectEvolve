@@ -748,6 +748,12 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     border-radius: 2px;
 }
 
+/* === TAB DRAG REORDER === */
+.tab-dragging {
+    opacity: 0.4;
+    transition: opacity 0.15s;
+}
+
 /* === TAB NOTIFICATION BADGES === */
 .tab-unread-badge {
     font-size: 0.5625rem;

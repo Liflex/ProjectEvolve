@@ -9,6 +9,13 @@
             <div class="flex items-center overflow-x-auto flex-1">
                 <template x-for="tab in chatTabs" :key="tab.tab_id">
                     <div class="flex items-center shrink-0 group"
+                         :class="_dragTabId === tab.tab_id && 'tab-dragging'"
+                         :style="_dragOverTabId === tab.tab_id && _dragTabId !== tab.tab_id ? 'border-left: 2px solid var(--v);' : ''"
+                         draggable="true"
+                         @dragstart="onTabDragStart(tab.tab_id, $event)"
+                         @dragover.prevent="onTabDragOver(tab.tab_id, $event)"
+                         @dragend="onTabDragEnd()"
+                         @drop.prevent="onTabDrop(tab.tab_id)"
                          @contextmenu="showTabContextMenu(tab, $event)">
                         <button @click="activateChatTab(tab.tab_id)"
                                 @dblclick.stop="startRenameTab(tab.tab_id)"
@@ -1121,6 +1128,18 @@
                 <span class="ctx-menu-icon">&#x270f;</span>
                 <span>RENAME</span>
                 <span class="ctx-menu-shortcut">DBL-CLICK</span>
+            </div>
+            <div class="ctx-menu-item ctx-menu-hint" style="pointer-events:none">
+                <span style="font-size:0.4375rem;color:var(--v3)">DRAG TAB TO REORDER</span>
+            </div>
+            <div class="ctx-menu-sep"></div>
+            <div class="ctx-menu-item" x-show="chatTabs.length > 1" @click="tabCtxAction('move-left')">
+                <span class="ctx-menu-icon">&#x25C0;</span>
+                <span>MOVE LEFT</span>
+            </div>
+            <div class="ctx-menu-item" x-show="chatTabs.length > 1" @click="tabCtxAction('move-right')">
+                <span class="ctx-menu-icon">&#x25B6;</span>
+                <span>MOVE RIGHT</span>
             </div>
             <div class="ctx-menu-sep"></div>
             <div class="ctx-menu-item" @click="tabCtxAction('close')">
