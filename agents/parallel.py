@@ -960,11 +960,12 @@ async def run_parallel_judges(
     report_text: str,
     profiles: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Run judge evaluation in parallel using separate agents.
+    """Run judge evaluation sequentially using separate agent sessions.
 
-    Instead of running all judge profiles sequentially in a single
-    ExperimentJudge.evaluate_all() call, this runs each profile
-    as a separate agent for truly independent evaluation.
+    Each judge runs in its own Claude Code SDK session, one at a time.
+    After all 3 profiles finish, a 4th chief judge may run if verdicts disagree.
+
+    This approach respects rate limits (only 1 active session at a time).
 
     Args:
         project_dir: Project root path.
@@ -999,7 +1000,10 @@ async def run_parallel_judges(
         ),
     }
 
-    tasks = []
+    # Run judges SEQUENTIALLY — one session at a time to respect rate limits
+    verdicts = {}
+    parsed_count = 0
+    completed_count = 0
     for profile in profiles:
         system = profile_prompts.get(profile, profile_prompts["balanced"])
         prompt = (
@@ -1022,36 +1026,37 @@ async def run_parallel_judges(
             f"reason: one sentence explaining your verdict\n"
             f"risks: list of strings — specific issues to fix (for REWORK) or concerns (for all)"
         )
-        tasks.append(AgentTask(
+
+        task = AgentTask(
             label=f"judge-{profile}",
             prompt=prompt,
             cwd=str(project_dir),
             max_turns=1,
             append_system_prompt=system,
-        ))
+        )
 
-    runner = ParallelAgentRunner(max_concurrency=1)
-    results = await runner.run(tasks)
+        logger.info("Running judge-%s...", profile)
+        runner = ParallelAgentRunner(max_concurrency=1)
+        results = await runner.run([task])
 
-    # Parse verdicts from agent outputs
-    import json as _json
-    import re
-    verdicts = {}
-    parsed_count = 0
-    for task in results:
-        if task.status != "completed":
+        # Parse verdict from agent output
+        result = results[0]
+        if result.status != "completed":
             verdicts[task.label] = {
                 "verdict": "DISCARD",
                 "score": 0.0,
-                "reason": f"Agent failed: {task.status}",
+                "reason": f"Agent failed: {result.status}",
+                "_agent_failed": True,
             }
             continue
 
-        output = task.output.strip()
+        completed_count += 1
+        output = result.output.strip()
         parsed = _try_parse_judge_json(output)
         if parsed:
             verdicts[task.label] = parsed
             parsed_count += 1
+            logger.info("Judge-%s: %s (score=%.2f)", profile, parsed["verdict"], parsed.get("score", 0))
         else:
             verdicts[task.label] = {
                 "verdict": "DISCARD",
@@ -1059,6 +1064,7 @@ async def run_parallel_judges(
                 "reason": "Could not parse judge output",
                 "raw_output": output[:500],
             }
+            logger.warning("Judge-%s: could not parse output", profile)
 
     # Compute consensus
     chief_verdict = None
@@ -1069,54 +1075,37 @@ async def run_parallel_judges(
         rework_count = sum(1 for v in verdicts.values() if v.get("verdict") == "REWORK")
         discard_count = sum(1 for v in verdicts.values() if v.get("verdict") == "DISCARD")
 
-        if keep_count > len(verdicts) / 2:
-            # Majority KEEP — no chief needed
+        if keep_count >= 2:
+            # Majority KEEP (2+) — no chief needed
             consensus = "KEEP"
-        elif discard_count > len(verdicts) / 2 and rework_count == 0:
-            # Clear majority DISCARD with no REWORK — reject
+        elif rework_count >= 2:
+            # Majority REWORK (2+) — feature useful but needs fixes
+            consensus = "REWORK"
+        elif discard_count == len(verdicts):
+            # Unanimous DISCARD — all judges agree it should go
             consensus = "DISCARD"
-        elif rework_count > 0 or keep_count > 0:
-            # Any REWORK or any KEEP among DISCARDs → likely needs review
-            # Chief decides: is it worth keeping with fixes, or should it go?
-            if discard_count >= 2 and rework_count == 0 and keep_count == 0:
-                consensus = "DISCARD"
-            elif keep_count >= 1 or rework_count >= 2:
-                # Feature has support — chief decides between KEEP/REWORK
-                chief_verdict = await _run_chief_judge(
-                    project_dir=project_dir,
-                    report_text=report_text,
-                    verdicts=verdicts,
-                )
-                if chief_verdict:
-                    consensus = chief_verdict.get("verdict", "REWORK")
-                    avg_score = chief_verdict.get("score", avg_score)
-                    verdicts["chief"] = {
-                        "verdict": chief_verdict["verdict"],
-                        "score": chief_verdict["score"],
-                        "reason": chief_verdict.get("reason", ""),
-                        "source": "chief_judge",
-                    }
-                else:
-                    # Chief failed — default to REWORK (safer than DISCARD)
-                    consensus = "REWORK"
+        elif keep_count > 0 or rework_count > 0:
+            # Any positive (KEEP or REWORK) with disagreement → chief decides
+            # This covers: 2D+1K, 2D+1R, 1K+1R+1D, etc.
+            chief_verdict = await _run_chief_judge(
+                project_dir=project_dir,
+                report_text=report_text,
+                verdicts=verdicts,
+            )
+            if chief_verdict:
+                consensus = chief_verdict.get("verdict", "REWORK")
+                avg_score = chief_verdict.get("score", avg_score)
+                verdicts["chief"] = {
+                    "verdict": chief_verdict["verdict"],
+                    "score": chief_verdict["score"],
+                    "reason": chief_verdict.get("reason", ""),
+                    "source": "chief_judge",
+                }
             else:
-                # Genuine split — invoke chief
-                chief_verdict = await _run_chief_judge(
-                    project_dir=project_dir,
-                    report_text=report_text,
-                    verdicts=verdicts,
-                )
-                if chief_verdict:
-                    consensus = chief_verdict.get("verdict", "REWORK")
-                    avg_score = chief_verdict.get("score", avg_score)
-                    verdicts["chief"] = {
-                        "verdict": chief_verdict["verdict"],
-                        "score": chief_verdict["score"],
-                        "reason": chief_verdict.get("reason", ""),
-                        "source": "chief_judge",
-                    }
-                else:
-                    consensus = "REWORK"
+                # Chief failed — default to REWORK (safer than DISCARD)
+                consensus = "REWORK"
+        else:
+            consensus = "DISCARD"
     else:
         avg_score = 0
         consensus = "DISCARD"
@@ -1125,8 +1114,8 @@ async def run_parallel_judges(
         "verdicts": verdicts,
         "consensus": consensus,
         "consensus_score": round(avg_score, 3),
-        "total_agents": len(results),
-        "completed": sum(1 for r in results if r.status == "completed"),
+        "total_agents": len(profiles),
+        "completed": completed_count,
         "parsed": parsed_count,
         "chief_called": chief_verdict is not None,
     }

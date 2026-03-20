@@ -1,3 +1,21 @@
+## Experiment 195 — Streaming text buffer for smoother chat rendering
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **requestAnimationFrame batching** — `text` and `assistant` streaming events batch `chatTick++` via rAF. Instead of 10-30 Alpine.js `renderChatHTML()` calls/sec, now max 60/sec (display refresh).
+2. **Smart scroll coalescing** — `smartScroll()` inside rAF callback, eliminating separate `setTimeout(50ms)` per text event.
+3. **Cleanup guards** — `_streamRafPending` cleared on `stream_end` and `ws.onclose`.
+4. **Committed uncommitted changes**: serial judge execution in `parallel.py`.
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` (+18/-6 lines)
+- `agents/parallel.py` (serial judges, rate limit fix)
+
+---
+
 ## Experiment 187 — Session grace period on WebSocket disconnect
 
 **Date:** 2026-03-20
@@ -4151,5 +4169,45 @@ Results
    - Первое сообщение: `connect(prompt)` — создаёт клиент и подключается
    - Последующие: `query(prompt)` — переиспользует существующее соединение
    - `interrupt()` — т
+
+
+## Experiment 192 — Fix SDK event format — yield tool events from AssistantMessage
+
+**Time:** 2026-03-20 22:42:53
+
+**Files:** `agents/session.py` (+25/-5 lines: SDK type-aware event decomposition), `ui/static/js/modules/chat.js` (+13 lines: error event handler within claude_event block), `agents/parallel.py` (+6/-3 lines: disallowed_tools for judges, verbose filtering, serial execution), `ui/static/modules/cat.js` (+8 lines: setSpeechText helper), `ui/static/js/modules/lab.js` (+2/-2 lines: skip verbose agent events from debug log)
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **Root cause найден**: После миграции exp190 на ClaudeSDKClient, `AssistantMessage` содержит ToolUseBlock в массиве `content`. Клиентский обработчик `assistant` извлекает только `text` и `thinking` — tool calls молча терялись. Пользователь видел текст агента, но НЕ видел какие инструменты он использует.
+2. **session.py**: Декомпозиция событий — `isinstance` проверки для AssistantMessage/ResultMessage. AssistantMessage → полный event (type="assistant") + отдельные t
+
+
+## Experiment 193 — Untitled
+
+**Time:** 2026-03-20 22:48:13
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.2725
+**Conflicts:** None
+
+**Per-task Results:**
 
 

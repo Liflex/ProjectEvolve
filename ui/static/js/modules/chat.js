@@ -326,7 +326,16 @@ window.AppChat = (function() {
                                     _app._incrementUnread(tab);
                                 }
                                 tab.is_streaming = true;
-                                _app.chatTick++;
+                                // Batch chatTick via requestAnimationFrame — one DOM update per frame
+                                // instead of one per text event (can be 10-30/sec)
+                                if (!tab._streamRafPending) {
+                                    tab._streamRafPending = true;
+                                    requestAnimationFrame(() => {
+                                        tab._streamRafPending = false;
+                                        _app.chatTick++;
+                                        _app.smartScroll(tab);
+                                    });
+                                }
                                 // Cat: start long-stream patience timer (30s)
                                 if (!tab._catStreamPatienceTimer && window.CatModule && CatModule.isActive()) {
                                     tab._catStreamPatienceTimer = setTimeout(function checkPatience() {
@@ -400,7 +409,15 @@ window.AppChat = (function() {
                                 }
                                 tab._thinkingBuffer = '';
                                 tab.is_streaming = true;
-                                _app.chatTick++;
+                                // Batch chatTick via rAF (same as 'text' handler)
+                                if (!tab._streamRafPending) {
+                                    tab._streamRafPending = true;
+                                    requestAnimationFrame(() => {
+                                        tab._streamRafPending = false;
+                                        _app.chatTick++;
+                                        _app.smartScroll(tab);
+                                    });
+                                }
                             }
                         } else if (etype === 'tool') {
                             const name = data.name || (data.tool_name ? data.tool_name : 'tool_call');
@@ -546,6 +563,7 @@ window.AppChat = (function() {
                         tab.is_streaming = false;
                         tab._catThinking = false;
                         tab._regenerating = false;
+                        tab._streamRafPending = false; // clear pending rAF
                         this.stopTurnTimer(tab);
                         // Cat: clear patience timer on stream end
                         if (tab._catStreamPatienceTimer) {
@@ -624,6 +642,7 @@ window.AppChat = (function() {
             ws.onclose = (e) => {
                 console.log('[ws] closed:', tab.session_id, 'code:', e.code, 'reason:', e.reason);
                 tab.is_streaming = false;
+                tab._streamRafPending = false; // clear pending rAF
                 _app.stopTurnTimer(tab);
                 // Clear patience timer on disconnect
                 if (tab._catStreamPatienceTimer) { clearTimeout(tab._catStreamPatienceTimer); tab._catStreamPatienceTimer = null; }

@@ -5,6 +5,24 @@
 
 ---
 
+## Experiment 195 — Streaming text buffer for smoother chat rendering
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **requestAnimationFrame batching** — `text` and `assistant` streaming events now batch `chatTick++` via rAF instead of triggering per-event. Reduces Alpine.js `renderChatHTML()` calls from 10-30/sec to max 60/sec (display refresh rate).
+2. **Smart scroll coalescing** — `smartScroll()` moved inside rAF callback alongside chatTick, eliminating the separate `setTimeout(50ms)` scroll per text event.
+3. **Cleanup guards** — `_streamRafPending` flag cleared on `stream_end` and `ws.onclose` to prevent stale rAF callbacks after disconnect.
+4. **Committed uncommitted changes**: serial judge execution in `parallel.py` (rate limit fix).
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` (+18/-6 lines)
+- `agents/parallel.py` (serial judges, previously uncommitted)
+
+---
+
 ## Experiment 192 — Fix SDK event format — yield tool events from AssistantMessage
 
 **Date:** 2026-03-20
@@ -329,6 +347,64 @@ Results
    - Первое сообщение: `connect(prompt)` — создаёт клиент и подключается
    - Последующие: `query(prompt)` — переиспользует существующее соединение
    - `interrupt()` — т
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 192 — Fix SDK event format — yield tool events from AssistantMessage
+
+**Date:** 2026-03-20 22:42:53
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- `agents/session.py` (+25/-5 lines: SDK type-aware event decomposition)
+- `ui/static/js/modules/chat.js` (+13 lines: error event handler within claude_event block)
+- `agents/parallel.py` (+6/-3 lines: disallowed_tools for judges, verbose filtering, serial execution)
+- `ui/static/modules/cat.js` (+8 lines: setSpeechText helper)
+- `ui/static/js/modules/lab.js` (+2/-2 lines: skip verbose agent events from debug log)
+
+### Results
+
+Results
+
+**What was done:**
+1. **Root cause найден**: После миграции exp190 на ClaudeSDKClient, `AssistantMessage` содержит ToolUseBlock в массиве `content`. Клиентский обработчик `assistant` извлекает только `text` и `thinking` — tool calls молча терялись. Пользователь видел текст агента, но НЕ видел какие инструменты он использует.
+2. **session.py**: Декомпозиция событий — `isinstance` проверки для AssistantMessage/ResultMessage. AssistantMessage → полный event (type="assistant") + отдельные t
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 193 — Untitled
+
+**Date:** 2026-03-20 22:48:13
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.2725
+**Conflicts:** None
+
+**Per-task Results:**
 
 ### Notes for Next
 

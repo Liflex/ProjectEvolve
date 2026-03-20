@@ -1,30 +1,30 @@
 # Last Experiment Summary
 
-**Experiment #192** — Fix SDK event format — yield tool events from AssistantMessage
+**Experiment #195** — Streaming text buffer for smoother chat rendering
 **Date:** 2026-03-20
 
 ## What Was Done
 
-1. Root cause: After exp190 migration to ClaudeSDKClient, AssistantMessage contains ToolUseBlock in its content array. Client's assistant handler extracts only text and thinking — ToolUseBlocks were silently dropped.
-2. session.py: decompose AssistantMessage into separate events — assistant event for text/thinking, individual tool events for each ToolUseBlock.
-3. chat.js: added handler for etype==='error' within claude_event block.
-4. parallel.py: disallowed_tools for judge agents, verbose event filtering, serial execution.
-5. cat.js: new internal setSpeechText helper.
+1. **requestAnimationFrame batching for text streaming** — replaced per-event `chatTick++` with rAF-based batching for `text` and `assistant` event types. Reduces DOM re-renders from 10-30/sec to max 60/sec (display refresh rate).
+2. **Smart scroll coalescing** — `smartScroll()` now called inside the rAF callback instead of separate `setTimeout(50ms)` per event, eliminating scroll jitter.
+3. **Cleanup on stream_end and ws.onclose** — `_streamRafPending` flag cleared to prevent stale callbacks.
+4. **Committed uncommitted changes** from previous sessions: serial judge execution in parallel.py (rate limit fix), experiment logs.
 
 ## Files Modified
 
-- agents/session.py
-- ui/static/js/modules/chat.js
-- agents/parallel.py
-- ui/static/modules/cat.js
-- ui/static/js/modules/lab.js
+- `ui/static/js/modules/chat.js` (+18/-6 lines: rAF batching for text/assistant events)
+- `agents/parallel.py` (serial judge execution, rate limit fix — previously uncommitted)
+- `.autoresearch/experiments/accumulation_context.md`
+- `.autoresearch/experiments/last_experiment.md`
+- `.autoresearch/experiments/changes_log.md`
 
 ## Key Results
 
-**Working:** yes (tests pass, imports verified)
-**Tests:** skipped (trivial transformation, existing tests cover session lifecycle)
+- All 21 tests pass
+- JS syntax valid
+- No visual regression expected (same content, fewer renders)
 
 ## For Next Iteration
 
-- Consider enabling `include_partial_messages=True` for streaming text (currently full response arrives at once)
-- Consider handling SystemMessage type in client for SDK system notifications
+- Monitor streaming performance in production
+- Consider extending rAF batching to `thinking` events if needed
