@@ -266,6 +266,73 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
 /* Theme-specific chat bubbles */
 .chat-bubble-user { background: var(--chat-user-bg, rgba(180,74,255,0.1)); border: 1px solid var(--chat-user-border, var(--v-dim)); }
 .chat-bubble-asst { background: var(--chat-asst-bg, var(--bg2)); border: 1px solid var(--chat-asst-border, var(--v-dim)); }
+/* Structured system messages (ERROR, INFO, WARNING) */
+.chat-sys-block {
+    border: 1px solid var(--v-dim);
+    padding: 8px 12px;
+    font-size: 0.75rem;
+    line-height: 1.5;
+}
+.chat-sys-error {
+    background: rgba(255, 60, 60, 0.06);
+    border-color: rgba(255, 60, 60, 0.25);
+}
+.chat-sys-error .chat-sys-icon { color: var(--red); }
+.chat-sys-error .chat-sys-label { color: var(--red); }
+.chat-sys-error .chat-sys-text { color: var(--ng2); }
+.chat-sys-info {
+    background: rgba(0, 229, 255, 0.04);
+    border-color: rgba(0, 229, 255, 0.15);
+}
+.chat-sys-info .chat-sys-icon { color: var(--cyan); }
+.chat-sys-info .chat-sys-label { color: var(--cyan); }
+.chat-sys-info .chat-sys-text { color: var(--v3); }
+.chat-sys-warning {
+    background: rgba(255, 180, 0, 0.06);
+    border-color: rgba(255, 180, 0, 0.2);
+}
+.chat-sys-warning .chat-sys-icon { color: var(--amber); }
+.chat-sys-warning .chat-sys-label { color: var(--amber); }
+.chat-sys-warning .chat-sys-text { color: var(--ng2); }
+.chat-sys-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+.chat-sys-icon { font-size: 0.875rem; flex-shrink: 0; }
+.chat-sys-label {
+    font-size: 0.5625rem;
+    font-family: 'Press Start 2P', monospace;
+    letter-spacing: 0.15em;
+}
+.chat-sys-text {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.6875rem;
+    word-break: break-word;
+}
+.chat-sys-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+}
+.chat-sys-actions button {
+    font-size: 0.5rem;
+    font-family: 'Press Start 2P', monospace;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    border: 1px solid var(--v-dim);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    border-radius: 2px;
+}
+.chat-sys-error .chat-sys-actions button { color: var(--red); border-color: rgba(255,60,60,0.3); }
+.chat-sys-error .chat-sys-actions button:hover { background: rgba(255,60,60,0.1); border-color: var(--red); }
+.chat-sys-info .chat-sys-actions button { color: var(--cyan); border-color: rgba(0,229,255,0.3); }
+.chat-sys-info .chat-sys-actions button:hover { background: rgba(0,229,255,0.1); border-color: var(--cyan); }
+.chat-sys-warning .chat-sys-actions button { color: var(--amber); border-color: rgba(255,180,0,0.3); }
+.chat-sys-warning .chat-sys-actions button:hover { background: rgba(255,180,0,0.1); border-color: var(--amber); }
 /* Message metadata badge (response time, tokens, cost) */
 .msg-meta-badge {
     font-size: 0.5rem;

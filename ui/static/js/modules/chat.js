@@ -1,5 +1,8 @@
 // === AppChat — Chat sessions, WebSocket, messages, slash commands, search, render, bottom panel ===
 // Loaded before app.js, spread into Alpine data object
+var _AVATAR_USER = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+var _AVATAR_ASST = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+var _AVATAR_TOOL = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>';
 window.AppChat = (function() {
     return {
         // ========== CHAT: SIDEBAR HELPERS ==========
@@ -1688,6 +1691,58 @@ window.AppChat = (function() {
             return { title, conclusion, summary: parts.join(' · ') };
         },
 
+        // ========== CHAT: SYSTEM BLOCK RENDERER ==========
+        _renderSystemBlock(msg, idx, tab) {
+            const content = msg.content || '';
+            // Match [ERROR], [INFO], [WARNING], [RECONNECT FAILED] prefixes
+            const sysMatch = content.match(/^\[(ERROR|INFO|WARNING|RECONNECT FAILED)\]\s*(.*)/s);
+            if (!sysMatch) return null;
+            let sysType = sysMatch[1]; // ERROR, INFO, WARNING, RECONNECT FAILED
+            const sysText = sysMatch[2].trim();
+            if (!sysText) return null;
+            // Normalize RECONNECT FAILED → ERROR
+            if (sysType === 'RECONNECT FAILED') sysType = 'ERROR';
+            const typeMap = {
+                ERROR:   { icon: '&#x26A0;', cssClass: 'chat-sys-error',   label: 'ERROR',   color: 'var(--red)' },
+                INFO:    { icon: '&#x2139;', cssClass: 'chat-sys-info',     label: 'INFO',    color: 'var(--cyan)' },
+                WARNING: { icon: '&#x26A0;', cssClass: 'chat-sys-warning',  label: 'WARNING', color: 'var(--amber)' },
+            };
+            const cfg = typeMap[sysType] || typeMap.INFO;
+            // ERROR: escape HTML (from server, potentially untrusted)
+            // INFO/WARNING: render markdown (often contain **bold** or links)
+            const textHtml = sysType === 'ERROR'
+                ? this.escHtml(sysText)
+                : '<div class="md">' + this.renderMarkdown(sysText) + '</div>';
+            const aTime = this.fmtTime(msg.ts);
+            const aTimeHtml = aTime ? ' <span class="msg-ts" title="' + this.escHtml(this.fmtFullTime(msg.ts)) + '" style="color:var(--v3);font-weight:normal;cursor:help">' + aTime + '</span>' : '';
+            const aRefBadge = ' <span class="msg-ref-badge" onclick="event.stopPropagation();window._app.copyMsgRef(\'' + tab.tab_id + '\',' + idx + ')" title="Click to copy #' + idx + ' reference">#' + idx + '</span>';
+            // Build action buttons based on error type
+            let actionsHtml = '';
+            if (sysType === 'ERROR') {
+                const isConnection = /connect|reconnect|session.*end|not connected|socket/i.test(sysText);
+                if (isConnection) {
+                    actionsHtml += '<button onclick="event.stopPropagation();window._app.reconnectTab(\'' + tab.tab_id + '\')" title="Reconnect WebSocket">RECONNECT</button>';
+                }
+                actionsHtml += '<button onclick="event.stopPropagation();navigator.clipboard.writeText(' + JSON.stringify(sysText) + ').then(function(){window._app&&window._app.showToast(\'Error copied\')})" title="Copy error text">COPY</button>';
+            }
+            return '<div class="msg-wrap chat-msg-fadein chat-msg-row" data-msg-idx="' + idx + '">'
+                + '<div class="chat-avatar chat-avatar-asst" style="opacity:0.6">' + _AVATAR_ASST + '</div>'
+                + '<div class="chat-body">'
+                + '<div class="msg-actions">'
+                + '<button class="act-copy" onclick="event.stopPropagation();window._app.copyChatMsg(\'' + tab.tab_id + '\',' + idx + ')" title="Copy">COPY</button>'
+                + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + idx + ')" title="Delete">DEL</button>'
+                + '</div>'
+                + '<div class="chat-role" style="color:' + cfg.color + '">' + cfg.label + '_' + aRefBadge + aTimeHtml + '</div>'
+                + '<div class="chat-sys-block ' + cfg.cssClass + '">'
+                + '<div class="chat-sys-header">'
+                + '<span class="chat-sys-icon">' + cfg.icon + '</span>'
+                + '<span class="chat-sys-label">' + cfg.label + '</span>'
+                + '</div>'
+                + '<div class="chat-sys-text">' + textHtml + '</div>'
+                + (actionsHtml ? '<div class="chat-sys-actions">' + actionsHtml + '</div>' : '')
+                + '</div></div></div>';
+        },
+
         // ========== CHAT: RENDER ==========
         renderChatHTML(tab) {
             const _ = this.chatTick;
@@ -1699,9 +1754,9 @@ window.AppChat = (function() {
             const colors = { read: 'var(--cyan)', edit: 'var(--yellow)', write: 'var(--ng)', bash: 'var(--pink)', search: 'var(--amber)', other: 'var(--v3)' };
             const labels = { read: 'READ', edit: 'EDIT', write: 'WRITE', bash: 'BASH', search: 'SEARCH', other: 'TOOL' };
             const cf = this.chatFilters; // message type filters
-            const avatarUser = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
-            const avatarAsst = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
-            const avatarTool = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>';
+            const avatarUser = _AVATAR_USER;
+            const avatarAsst = _AVATAR_ASST;
+            const avatarTool = _AVATAR_TOOL;
             const msgs = tab.messages;
             let i = 0;
             let turnCount = 0;
@@ -1716,6 +1771,11 @@ window.AppChat = (function() {
                         + '<span style="margin-right:6px">&#x21bb;</span> Regenerating response...'
                         + '<span class="streaming-cursor"></span>'
                         + '</div></div></div>';
+                }
+                // System messages (ERROR/INFO/WARNING) — structured block rendering
+                if (!msg.is_streaming) {
+                    const sysBlock = this._renderSystemBlock(msg, idx, tab);
+                    if (sysBlock) return sysBlock;
                 }
                 const msgId = tab.tab_id + '-' + idx;
                 const cursorHtml = msg.is_streaming ? '<span class="streaming-cursor"></span>' : '';
