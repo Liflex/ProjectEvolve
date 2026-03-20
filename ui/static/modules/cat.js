@@ -91,6 +91,34 @@
         ], 17, 18)
     };
 
+    // Body — lying down, horizontal (26×10)
+    const BODY_LYING = {
+        w: 26, h: 10,
+        outline: decode([
+            0x20,0x00,0x00,0x01, 0x40,0x00,0x80,0x00, 0x40,0x00,0x80,0x00,
+            0x40,0x00,0x80,0x00, 0x40,0x00,0x80,0x00, 0x40,0x00,0x80,0x00,
+            0x20,0x00,0x00,0x01, 0x10,0x00,0x02,0x00, 0x08,0x00,0x04,0x00,
+            0x02,0x00,0x10,0x00
+        ], 26, 10),
+        fill: decode([
+            0x3F,0xFF,0xFF,0x00, 0x7F,0xFF,0xFF,0x80, 0x7F,0xFF,0xFF,0x80,
+            0x7F,0xFF,0xFF,0x80, 0x7F,0xFF,0xFF,0x80, 0x7F,0xFF,0xFF,0x80,
+            0x3F,0xFF,0xFF,0x00, 0x1F,0xFF,0xFE,0x00, 0x0F,0xFF,0xFC,0x00,
+            0x03,0xFF,0xF0,0x00
+        ], 26, 10)
+    };
+
+    // Front paws — lying down (13×4)
+    const PAWS_LYING = {
+        w: 13, h: 4,
+        outline: decode([
+            0x60,0x06, 0x70,0x0E, 0x38,0x1C, 0x1F,0x00
+        ], 13, 4),
+        fill: decode([
+            0x60,0x06, 0x70,0x0E, 0x38,0x1C, 0x1F,0x00
+        ], 13, 4)
+    };
+
     // Eyes — front, neutral with blink (17×4, 6 frames)
     const EYES_NEUTRAL = [
         decode([0x60,0x03,0x00, 0xe8,0x0b,0x80, 0xe4,0x19,0x80, 0x38,0x0e,0x00], 17, 4),
@@ -208,6 +236,12 @@
     const HEAD_POS = { x: 5 + OX, y: -5 + OY };
     const BODY_POS = { x: 0 + OX, y: 0 + OY };
     const TAIL_POS = { x: -8 + OX, y: -15 + OY };
+
+    // Lying pose positions — head at top, body horizontal below, paws between
+    const LIE_HEAD_POS = { x: 13, y: 1 };
+    const LIE_BODY_POS = { x: 1, y: 25 };
+    const LIE_PAWS_POS = { x: 10, y: 22 };
+    const LIE_TAIL_POS = { x: 0, y: 14 };
 
     // Eye positions depend on expression (different anchor/size)
     // color: per-expression eye color (null = default white)
@@ -513,6 +547,21 @@
             '*прижался* Мне грустно...',
             'Мяу... *вздыхает*',
             '*обнял лапкой* Не грусти...',
+        ],
+        lying_down: [
+            '*ложится* Мурр...',
+            '*растянулся* Уютно_',
+            '*сворачивается* Спать...',
+            '*зевает* Лягу_',
+            '*укладывается* Мррр...',
+            '*принюхался* Мягкое место_',
+        ],
+        standing_up: [
+            '*встаёт* Мяу!',
+            '*потянулся* Ох...',
+            '*поднимается* Готов!',
+            '*расправляется* Ну вот_',
+            '*встряхнулся* Проснулся!',
         ],
     };
 
@@ -974,6 +1023,8 @@
     let _mouseTracking = false;            // is mousemove listener active
     let _userTyping = false;               // user is typing in chat input
     let _userTypingTimer = null;           // debounce timer for typing stop
+    let _pose = 'sitting';                 // 'sitting' | 'lying'
+    let _poseTransition = 0;               // ticks remaining for pose transition animation
 
     // Mouse move handler for eye tracking
     function _onMouseMove(e) {
@@ -1149,16 +1200,20 @@
         const fillColor = '#1e1430';
         const cfg = EYE_CFG[expression] || EYE_CFG.neutral;
         const eyeColor = cfg.color || '#ffffff';
+        const isLying = _pose === 'lying';
 
-        // Stretch offsets
+        // Select positions based on pose
+        const headBase = isLying ? LIE_HEAD_POS : HEAD_POS;
+        const bodyBase = isLying ? LIE_BODY_POS : BODY_POS;
+        const tailBase = isLying ? LIE_TAIL_POS : TAIL_POS;
+
+        // Stretch offsets (sitting only — lying cats don't stretch the same way)
         let bodyOffX = 0, bodyOffY = 0, headExtraY = 0;
-        if (_stretchTicks > 0) {
+        if (_stretchTicks > 0 && !isLying) {
             if (_stretchPhase === 1 || _stretchPhase === 2) {
-                // Stretching: body shifts down, head up
                 bodyOffY = 1;
                 headExtraY = -2;
             } else if (_stretchPhase === 0) {
-                // Preparing: slight compression
                 bodyOffY = -1;
                 headExtraY = 1;
             }
@@ -1169,98 +1224,107 @@
             bodyOffX += Math.random() < 0.5 ? -1 : 1;
         }
 
-        // Z-order: tail → body → head → paw → eyes → particles
         // Tail position adjustment based on expression/mood
         let tailOffX = 0, tailOffY = 0;
         if (expression === 'happy' || _mood === 'happy') {
-            tailOffY = -1; // raised tail
+            tailOffY = -1;
         } else if (expression === 'angry') {
-            tailOffX = 1; tailOffY = -1; // puffed
-        } else if (expression === 'sleepy' || _idleLevel >= 2) {
+            tailOffX = 1; tailOffY = -1;
+        } else if (expression === 'sleepy' || _idleLevel >= 2 || isLying) {
             tailOffX = 2; tailOffY = 1; // curled forward
         } else if (expression === 'thinking') {
-            tailOffY = 1; // low, contemplative
+            tailOffY = 1;
         } else if (expression === 'love') {
-            tailOffY = -2; // very raised, excited
-            tailOffX = -1; // curled up
+            tailOffY = -2;
+            tailOffX = -1;
         } else if (expression === 'sad') {
-            tailOffX = 3; // very curled forward (hiding)
-            tailOffY = 2; // low
+            tailOffX = 3;
+            tailOffY = 2;
         }
-        const tailPos = { x: TAIL_POS.x + tailOffX, y: TAIL_POS.y + tailOffY };
+        const tailPos = { x: tailBase.x + tailOffX, y: tailBase.y + tailOffY };
+
+        // Z-order differs by pose:
+        // Sitting: tail → body → head → paw → eyes → whiskers → particles
+        // Lying:  tail → body → paws → head → eyes → whiskers → particles
         drawFilled(TAIL_OUTLINES[tailFrame], TAIL_FILLS[tailFrame], tailPos, outlineColor, fillColor, true);
-        drawFilled(BODY.outline, BODY.fill,
-            { x: BODY_POS.x + bodyOffX, y: BODY_POS.y + bodyOffY },
-            outlineColor, fillColor);
+
+        if (isLying) {
+            // Lying body (horizontal)
+            drawFilled(BODY_LYING.outline, BODY_LYING.fill,
+                { x: bodyBase.x + bodyOffX, y: bodyBase.y + bodyOffY },
+                outlineColor, fillColor);
+            // Front paws between head and body
+            drawGrid(PAWS_LYING.outline, LIE_PAWS_POS.x, LIE_PAWS_POS.y, outlineColor);
+        } else {
+            // Sitting body (vertical)
+            drawFilled(BODY.outline, BODY.fill,
+                { x: bodyBase.x + bodyOffX, y: bodyBase.y + bodyOffY },
+                outlineColor, fillColor);
+        }
+
         // Head with ear twitch + stretch offset
         drawFilled(HEAD.outline, HEAD.fill,
-            { x: HEAD_POS.x + _headOffX, y: HEAD_POS.y + _headOffY + headExtraY },
+            { x: headBase.x + _headOffX, y: headBase.y + _headOffY + headExtraY },
             outlineColor, fillColor);
 
-        // Paw wave animation
-        if (_pawWaveTicks > 0 && (_pawWavePhase === 1 || _pawWavePhase === 2)) {
-            // Paw position: right side of body, near front
-            const pawX = BODY_POS.x + 12 + bodyOffX;
-            const pawBaseY = BODY_POS.y + 14 + bodyOffY;
+        // Paw wave animation (sitting only)
+        if (!isLying && _pawWaveTicks > 0 && (_pawWavePhase === 1 || _pawWavePhase === 2)) {
+            const pawX = bodyBase.x + 12 + bodyOffX;
+            const pawBaseY = bodyBase.y + 14 + bodyOffY;
             const pawLift = _pawWavePhase === 2 ? 3 : 2;
             drawFilled(PAW_OUTLINE, PAW_FILL,
                 { x: pawX, y: pawBaseY - pawLift },
                 outlineColor, fillColor);
         }
 
-        // Eyes on top (follow head offset)
+        // Eyes — compute position relative to head base (works for both poses)
+        const eyeRelX = cfg.x - HEAD_POS.x;
+        const eyeRelY = cfg.y - HEAD_POS.y;
+        const eyeAbsX = headBase.x + _headOffX + eyeRelX;
+        const eyeAbsY = headBase.y + _headOffY + headExtraY + eyeRelY;
+
         const frames = cfg.frames;
         if (frames && frames.length > 0 && frames[eyeFrame]) {
-            drawGrid(frames[eyeFrame], cfg.x + _headOffX, cfg.y + _headOffY + headExtraY, eyeColor);
+            drawGrid(frames[eyeFrame], eyeAbsX, eyeAbsY, eyeColor);
         }
 
-        // Cursor-tracking eye glints (bright pixel that follows mouse)
+        // Cursor-tracking eye glints
         const glintCfg = EYE_GLINT[expression];
-        if (glintCfg && _mouseTracking && _idleLevel < 2) {
-            // Skip during blink frames
+        if (glintCfg && _mouseTracking && _idleLevel < 2 && !isLying) {
             const isBlinking = expression === 'neutral' && eyeFrame === 1;
             const isSleepyBlink = expression === 'sleepy' && (eyeFrame === 2 || eyeFrame === 0);
             if (!isBlinking && !isSleepyBlink) {
                 const rect = canvas.getBoundingClientRect();
                 const catScreenX = rect.left + rect.width / 2;
-                const catScreenY = rect.top + rect.height * 0.4; // eyes are in upper portion
+                const catScreenY = rect.top + rect.height * (isLying ? 0.15 : 0.4);
                 const dx = _mouseX - catScreenX;
                 const dy = _mouseY - catScreenY;
                 const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                // Target offset: max ±1 pixel in each direction
                 const targetX = (dx / dist);
                 const targetY = (dy / dist);
-                // Smooth interpolation
                 _glintX += (targetX - _glintX) * 0.12;
                 _glintY += (targetY - _glintY) * 0.12;
                 const gx = Math.round(_glintX);
                 const gy = Math.round(_glintY);
-                // Draw glint on each eye
                 const eox = _headOffX;
                 const eoy = _headOffY + headExtraY;
                 ctx.fillStyle = '#ffffff';
-                // Left eye glint
-                const lx = cfg.x + glintCfg.left[0] + gx + eox;
-                const ly = cfg.y + glintCfg.left[1] + gy + eoy;
+                const lx = eyeAbsX + glintCfg.left[0] + gx;
+                const ly = eyeAbsY + glintCfg.left[1] + gy;
                 ctx.fillRect(lx * ps, ly * ps, ps, ps);
-                // Right eye glint
-                const rx = cfg.x + glintCfg.right[0] + gx + eox;
-                const ry = cfg.y + glintCfg.right[1] + gy + eoy;
+                const rx = eyeAbsX + glintCfg.right[0] + gx;
+                const ry = eyeAbsY + glintCfg.right[1] + gy;
                 ctx.fillRect(rx * ps, ry * ps, ps, ps);
             }
         }
 
-        // Head position for whiskers/mouth (follows head offset)
-        const hx = HEAD_POS.x + _headOffX;
-        const hy = HEAD_POS.y + _headOffY + headExtraY;
+        // Head position for whiskers/mouth
+        const hx = headBase.x + _headOffX;
+        const hy = headBase.y + _headOffY + headExtraY;
 
-        // Mouth (below eyes)
         renderMouth(hx, hy);
-
-        // Whiskers (on sides of face)
         renderWhiskers(hx, hy);
 
-        // Floating particles (Zzz, hearts, sparkles) — rendered on top
         renderParticles();
     }
 
@@ -1417,14 +1481,23 @@
                     triggerStretch();
                     if (!currentSpeech) setSpeechText(pickRandom(IDLE_SPEECH[2]), 5000);
                 } else if (newIdleLevel === 3 && prevLevel < 3) {
+                    // Deep sleep → lie down
                     setExpression('sleepy');
                     _tailSpeed = 6; // almost still
-                    setSpeechText(pickRandom(IDLE_SPEECH[3]), 6000);
+                    _pose = 'lying';
+                    if (!currentSpeech) {
+                        setSpeechText(pickRandom(SPEECH.lying_down), 5000);
+                    }
                 } else if (newIdleLevel === 1 && prevLevel < 1) {
-                    // Just restless — subtle hint
                     if (!currentSpeech) setSpeechText(pickRandom(IDLE_SPEECH[1]), 5000);
                 } else if (newIdleLevel === 0 && prevLevel > 0) {
-                    // Woke up from idle
+                    // Woke up from idle — stand up if lying
+                    if (_pose === 'lying') {
+                        _pose = 'sitting';
+                        if (!currentSpeech) {
+                            setSpeechText(pickRandom(SPEECH.standing_up), 4000);
+                        }
+                    }
                     setExpression('neutral');
                     _tailSpeed = 2;
                     if (prevLevel >= 3 && !currentSpeech) {
@@ -1553,6 +1626,7 @@
             _tickCount = 0;
             _glintX = 0;
             _glintY = 0;
+            _pose = 'sitting';
             animating = true;
             _mouseTracking = true;
             document.addEventListener('mousemove', _onMouseMove);
@@ -1955,6 +2029,11 @@
             if (!animating) return;
             _lastInteractionTime = Date.now();
 
+            // Stand up from lying when user types
+            if (_pose === 'lying') {
+                _pose = 'sitting';
+            }
+
             // Wake from idle
             if (_idleLevel > 0) {
                 _idleLevel = 0;
@@ -2031,6 +2110,30 @@
             return expression;
         },
 
+        /** Get current pose ('sitting' | 'lying'). */
+        getPose() {
+            return _pose;
+        },
+
+        /** Set pose ('sitting' | 'lying'). Triggers speech. */
+        setPose(pose) {
+            if (!animating) return;
+            if (pose !== 'sitting' && pose !== 'lying') return;
+            if (_pose === pose) return;
+            _pose = pose;
+            _lastInteractionTime = Date.now();
+            if (pose === 'lying') {
+                setExpression('sleepy');
+                _tailSpeed = 5;
+                setSpeechText(pickRandom(SPEECH.lying_down), 4000);
+            } else {
+                setExpression('neutral');
+                _tailSpeed = 2;
+                setSpeechText(pickRandom(SPEECH.standing_up), 3000);
+            }
+            if (animating) render();
+        },
+
         /** Get current mood name. */
         getMoodName() {
             return _mood;
@@ -2044,6 +2147,19 @@
             if (!animating) return;
             const now = Date.now();
             _lastInteractionTime = now;
+
+            // Stand up from lying pose
+            if (_pose === 'lying') {
+                _pose = 'sitting';
+                _idleLevel = 0;
+                _tailSpeed = 2;
+                setExpression('surprised');
+                triggerEarTwitch();
+                setSpeechText('*подпрыгнул* Мяу?!', 3000);
+                setTimeout(() => { if (animating) setExpression('neutral'); }, 3000);
+                _clickCount = 0;
+                return;
+            }
 
             // Wake up from idle
             if (_idleLevel > 0) {
@@ -2140,6 +2256,16 @@
             _isHovering = isHovering;
             if (isHovering) {
                 _lastInteractionTime = Date.now();
+                // Stand up from lying on hover
+                if (_pose === 'lying') {
+                    _pose = 'sitting';
+                    _idleLevel = 1;
+                    _tailSpeed = 2;
+                    setExpression('neutral');
+                    setSpeechText('*встал* Мяу? Ты тут!', 3000);
+                    triggerEarTwitch();
+                    return;
+                }
                 // Wake from deep sleep
                 if (_idleLevel >= 3) {
                     _idleLevel = 1;
@@ -2162,6 +2288,9 @@
          */
         resetIdle() {
             _lastInteractionTime = Date.now();
+            if (_pose === 'lying') {
+                _pose = 'sitting';
+            }
             if (_idleLevel > 0) {
                 _idleLevel = 0;
                 _tailSpeed = 2;
@@ -2181,12 +2310,14 @@
             const p = page || _currentPage || 'dashboard';
             const c = ctx || {};
 
-            // Idle state overrides — cat is sleeping
-            if (_idleLevel >= 3) {
+            // Idle state overrides — cat is sleeping/lying
+            if (_idleLevel >= 3 || _pose === 'lying') {
                 return pickRandom([
                     '*храпит* zZzZ...',
-                    '*свернулся* ...zzz...',
+                    '*лежит* ...zzz...',
                     '*сонно* Мурр... zzz',
+                    '*свернулся калачиком*',
+                    '*мурчит во сне*...',
                 ]);
             }
             if (_idleLevel >= 2) {

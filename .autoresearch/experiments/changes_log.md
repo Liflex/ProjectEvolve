@@ -3537,3 +3537,26 @@ Results
 2. **Self-adjustment logic** — если check всегда pass (>95%) → reduce weight; если discriminative >0.7 → increase weight; если fail rate >50% → lower threshold; если discriminative <0.3 → red
 
 
+## Experiment 166 — Cat "love" and "sad" expressions — heart eyes on deep petting, sad face on DISCARD
+
+**Time:** 2026-03-20 19:39:17
+
+**Files:** Files Modified:** `ui/static/modules/cat.js` (+88/-13)
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **EYES_LOVE** — пиксельный спрайт сердечек вместо глаз (17x4, 1 frame). Триггерится при глубоком поглаживании (7+ быстрых кликов).
+2. **EYES_SAD** — пиксельный спрайт грустных опущенных глаз с нахмуренными бровями (17x4, 1 frame). Триггерится при DISCARD эксперимента.
+3. **MOUTH_LOVE** — "w"-образный кошачий рот (7x2).
+4. **MOUTH_SAD** — перевёрнутая улыбка/гримаса (7x2).
+5. **Конфигурации** — EYE_CFG, MOUTH_CFG, WHISKER_CFG, EYE_GLINT для обоих новых выражений.
+6.
+
+
