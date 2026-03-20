@@ -1,3 +1,23 @@
+## Experiment 185 — Structured system messages in chat with actionable buttons
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`_renderSystemBlock()`** — новый helper для рендеринга `[ERROR]`, `[INFO]`, `[WARNING]`, `[RECONNECT FAILED]` сообщений как структурированных блоков вместо обычных assistant bubbles.
+2. **CSS стили** — `.chat-sys-block`, `.chat-sys-error/info/warning` с цветовой кодировкой, `.chat-sys-actions` для кнопок действий.
+3. **ERROR блоки** — красный фон, иконка предупреждения, текст ошибки, кнопки RECONNECT (для connection errors) + COPY.
+4. **INFO блоки** — cyan фон, markdown рендеринг (для текста с **bold**), иконка информации.
+5. **WARNING блоки** — amber фон, markdown рендеринг, иконка предупреждения.
+6. **Avatar SVG константы** — вынесены `_AVATAR_USER`, `_AVATAR_ASST`, `_AVATAR_TOOL` на уровень модуля для переиспользования в `_renderSystemBlock`.
+
+### Files Modified
+
+- `ui/static/css/main.css` (+67 lines)
+- `ui/static/js/modules/chat.js` (+66 lines, -3 lines)
+
+---
+
 ## Experiment 177 — Cat expression overlays + yawn mouth sprite
 
 **Date:** 2026-03-20
@@ -3921,6 +3941,67 @@ N/A
 
 **Completed:** 3/3
 **Cost:** $1.2556
+**Conflicts:** None
+
+**Per-task Results:**
+
+
+## Experiment 182 — WebSocket auto-reconnect with exponential backoff
+
+**Time:** 2026-03-20 21:02:10
+
+**Files:** `ui/static/js/modules/chat.js` (+70/-35 lines), `ui/static/templates/chat-section.js` (+8/-6 lines), `ui/static/css/main.css` (+1 line)
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**Quality Gate Score:** N/A (improvement, no quality gate)
+**Tests:** 13/13 pass (0 new tests — JS improvement, verification by syntax check)
+**Build:** success (node -c passes on all modified JS files)
+
+
+## Experiment 183 — Untitled
+
+**Time:** 2026-03-20 21:05:36
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.0144
+**Conflicts:** None
+
+**Per-task Results:**
+
+
+## Experiment 184 — Untitled
+
+**Time:** 2026-03-20 21:07:34
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.1903
 **Conflicts:** None
 
 **Per-task Results:**

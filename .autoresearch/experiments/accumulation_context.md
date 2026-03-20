@@ -1,4 +1,24 @@
 
+## Experiment 185 — Structured system messages in chat with actionable buttons
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`_renderSystemBlock()`** — новый helper для рендеринга `[ERROR]`, `[INFO]`, `[WARNING]`, `[RECONNECT FAILED]` сообщений как структурированных блоков вместо обычных assistant bubbles.
+2. **CSS стили** — `.chat-sys-block`, `.chat-sys-error/info/warning` с цветовой кодировкой, `.chat-sys-actions` для кнопок действий.
+3. **ERROR блоки** — красный фон, иконка предупреждения, текст ошибки, кнопки RECONNECT (для connection errors) + COPY.
+4. **INFO блоки** — cyan фон, markdown рендеринг (для текста с **bold**), иконка информации.
+5. **WARNING блоки** — amber фон, markdown рендеринг, иконка предупреждения.
+6. **Avatar SVG константы** — вынесены `_AVATAR_USER`, `_AVATAR_ASST`, `_AVATAR_TOOL` на уровень модуля.
+
+### Files Modified
+
+- `ui/static/css/main.css` (+67 lines)
+- `ui/static/js/modules/chat.js` (+66 lines, -3 lines)
+
+---
+
 ## Experiment 182 — WebSocket auto-reconnect with exponential backoff
 
 **Date:** 2026-03-20
@@ -7163,6 +7183,99 @@ N/A
 
 **Completed:** 3/3
 **Cost:** $1.2556
+**Conflicts:** None
+
+**Per-task Results:**
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 182 — WebSocket auto-reconnect with exponential backoff
+
+**Date:** 2026-03-20 21:02:10
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` (+70/-35 lines)
+- `ui/static/templates/chat-section.js` (+8/-6 lines)
+- `ui/static/css/main.css` (+1 line)
+
+### Results
+
+Results
+
+**Quality Gate Score:** N/A (improvement, no quality gate)
+**Tests:** 13/13 pass (0 new tests — JS improvement, verification by syntax check)
+**Build:** success (node -c passes on all modified JS files)
+
+### Notes for Next
+
+Decision
+
+**Result:** KEEP
+**Reason:**
+1. Реальный UX баг — при обрыве WebSocket пользователь терял сессию без возможности восстановления
+2. Auto-reconnect с exponential backoff (1s→30s, 10 attempts) — стандартный паттерн для production WebSocket клиентов
+3. Устранён pre-existing syntax error (double `},` после `toggleSendMode()`)
+4. Устранён баг с дублированием "[ERROR] WebSocket connection failed" (onerror + onclose оба пушали)
+5. `reconnectTab()` обобщён для всех вкладок, не только restored
+6
+
+---
+
+## Experiment 183 — Untitled
+
+**Date:** 2026-03-20 21:05:36
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.0144
+**Conflicts:** None
+
+**Per-task Results:**
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 184 — Untitled
+
+**Date:** 2026-03-20 21:07:34
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.1903
 **Conflicts:** None
 
 **Per-task Results:**
