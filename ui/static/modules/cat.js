@@ -1566,7 +1566,7 @@
                 _sneezePhase = 0;
                 // Return to neutral after sneeze
                 if (expression === 'surprised' && _idleLevel === 0) {
-                    setTimeout(() => { if (animating) setExpression('neutral'); }, 1500);
+                    setTimeout(() => { if (animating) CatModule.setExpression('neutral'); }, 1500);
                 }
             } else if (_sneezeTicks < 3) {
                 _sneezePhase = 3; // recovery shake
@@ -1708,13 +1708,13 @@
             // Don't override non-neutral expressions set by external events
             if (expression === 'neutral' || expression === 'sleepy') {
                 if (newIdleLevel === 2 && prevLevel < 2) {
-                    setExpression('sleepy');
+                    CatModule.setExpression('sleepy');
                     _tailSpeed = 5; // very slow, peaceful
-                    triggerStretch();
+                    CatModule.triggerStretch();
                     if (!currentSpeech) setSpeechText(pickRandom(IDLE_SPEECH[2]), 5000);
                 } else if (newIdleLevel === 3 && prevLevel < 3) {
                     // Deep sleep → lie down
-                    setExpression('sleepy');
+                    CatModule.setExpression('sleepy');
                     _tailSpeed = 6; // almost still
                     _pose = 'lying';
                     if (!currentSpeech) {
@@ -1730,7 +1730,7 @@
                             setSpeechText(pickRandom(SPEECH.standing_up), 4000);
                         }
                     }
-                    setExpression('neutral');
+                    CatModule.setExpression('neutral');
                     _tailSpeed = 2;
                     if (prevLevel >= 3 && !currentSpeech) {
                         setSpeechText('*проснулся* Мяу? Ты вернулся!', 4000);
@@ -1748,7 +1748,7 @@
         // Hover ear twitch (increased frequency when mouse is over cat)
         if (_isHovering && _hoverReactionCooldown === 0 && expression === 'neutral' && _earTwitchTicks === 0) {
             if (Math.random() < 0.04) {
-                triggerEarTwitch();
+                CatModule.triggerEarTwitch();
                 _hoverReactionCooldown = 15; // ~1.8s cooldown
             }
         }
@@ -1848,9 +1848,9 @@
         if (_sneezeTicks > 0 || !animating) return;
         _sneezeTicks = 8;
         _sneezePhase = 1;
-        setExpression('surprised');
+        CatModule.setExpression('surprised');
         setSpeechText(pickRandom(SPEECH.sneeze), 3000);
-        triggerEarTwitch();
+        CatModule.triggerEarTwitch();
         // Small particle burst from nose area
         for (let s = 0; s < 4; s++) {
             spawnParticle({
@@ -1938,7 +1938,7 @@
             // Purr when happy
             if (expr === 'happy') _purrrTicks = 20;
             // Head tilt when thinking (curious look)
-            if (expr === 'thinking') triggerHeadTilt();
+            if (expr === 'thinking') this.triggerHeadTilt();
             if (animating) render();
         },
 
@@ -2040,12 +2040,12 @@
             // Milestone: every 10 experiments
             if (expNum && expNum % 10 === 0 && expNum !== _lastMilestone) {
                 _lastMilestone = expNum;
-                setExpression('surprised');
+                this.setExpression('surprised');
                 const milestoneText = pickRandom(SPEECH.milestone).replace('{n}', expNum);
                 setSpeechText(milestoneText, 5000);
-                triggerPawWave();
+                this.triggerPawWave();
                 _bounceTicks = 20; // celebration bounce
-                triggerHeadTilt();
+                this.triggerHeadTilt();
                 // Celebration sparkles
                 for (let s = 0; s < 5; s++) {
                     spawnParticle({
@@ -2061,8 +2061,8 @@
                         wobbleSpeed: 0.18,
                     });
                 }
-                setTimeout(() => { if (animating) setExpression('happy'); }, 2000);
-                setTimeout(() => { if (animating) setExpression('neutral'); }, 5000);
+                setTimeout(() => { if (animating) this.setExpression('happy'); }, 2000);
+                setTimeout(() => { if (animating) this.setExpression('neutral'); }, 5000);
                 return;
             }
 
@@ -2074,17 +2074,17 @@
                     else break;
                 }
                 if (streak >= 5) {
-                    setExpression('happy');
+                    this.setExpression('happy');
                     setSpeechText(pickRandom(SPEECH.streak_keep).replace('{n}', streak), 5000);
                     _purrrTicks = 30;
                     _bounceTicks = 15; // excited bounce
-                    setTimeout(() => { if (animating) setExpression('neutral'); }, 5000);
+                    setTimeout(() => { if (animating) this.setExpression('neutral'); }, 5000);
                     return;
                 }
                 if (streak >= 3) {
-                    setExpression('happy');
+                    this.setExpression('happy');
                     setSpeechText(pickRandom(SPEECH.streak_keep).replace('{n}', streak), 4000);
-                    setTimeout(() => { if (animating) setExpression('neutral'); }, 4000);
+                    setTimeout(() => { if (animating) this.setExpression('neutral'); }, 4000);
                     return;
                 }
             }
@@ -2097,39 +2097,39 @@
                     else break;
                 }
                 if (streak >= 3) {
-                    setExpression('angry');
-                    setMood('grumpy');
+                    this.setExpression('angry');
+                    this.setMood('grumpy');
                     setSpeechText(pickRandom(SPEECH.streak_discard).replace('{n}', streak), 5000);
                     _tailSpeed = 4; // erratic
-                    setTimeout(() => { if (animating) { setExpression('neutral'); _tailSpeed = 2; } }, 5000);
+                    setTimeout(() => { if (animating) { this.setExpression('neutral'); _tailSpeed = 2; } }, 5000);
                     return;
                 }
                 // Single discard — sad expression with encouraging phrase
-                setExpression('sad');
+                this.setExpression('sad');
                 const discardMsg = pickRandom(SPEECH.discard_single);
                 setSpeechText(discardMsg, 4000);
-                triggerEarTwitch();
-                setTimeout(() => { if (animating) setExpression('neutral'); }, 4000);
+                this.triggerEarTwitch();
+                setTimeout(() => { if (animating) this.setExpression('neutral'); }, 4000);
                 return;
             }
 
             // High score celebration (>= 0.9)
             if (score >= 0.9 && isKeep) {
-                setExpression('happy');
+                this.setExpression('happy');
                 const scoreText = (score * 100).toFixed(0);
                 setSpeechText(pickRandom(SPEECH.high_score).replace('{s}', scoreText), 4000);
                 _purrrTicks = 25;
-                triggerPawWave();
-                setTimeout(() => { if (animating) setExpression('neutral'); }, 4000);
+                this.triggerPawWave();
+                setTimeout(() => { if (animating) this.setExpression('neutral'); }, 4000);
                 return;
             }
 
             // Error reaction
             if (isError) {
-                setExpression('surprised');
+                this.setExpression('surprised');
                 setSpeechText(pickRandom(SPEECH.error), 4000);
-                triggerEarTwitch();
-                setTimeout(() => { if (animating) setExpression('neutral'); }, 4000);
+                this.triggerEarTwitch();
+                setTimeout(() => { if (animating) this.setExpression('neutral'); }, 4000);
                 return;
             }
         },
@@ -2160,9 +2160,9 @@
                     const patternKey = 'many_' + (toolType === 'read' ? 'reads' : toolType === 'edit' ? 'edits' : toolType === 'bash' ? 'bash' : null);
                     if (patternKey && TOOL_PATTERN_REACTIONS[patternKey]) {
                         setSpeechText(pickRandom(TOOL_PATTERN_REACTIONS[patternKey]), 4000);
-                        if (toolType === 'bash') { setExpression('surprised'); triggerEarTwitch(); }
-                        else if (toolType === 'edit') { setExpression('thinking'); }
-                        else { setExpression('sleepy'); }
+                        if (toolType === 'bash') { this.setExpression('surprised'); triggerEarTwitch(); }
+                        else if (toolType === 'edit') { this.setExpression('thinking'); }
+                        else { this.setExpression('sleepy'); }
                         _toolReactCooldown = 15; // 15 ticks (~1.8s) cooldown after pattern
                         return true;
                     }
@@ -2174,19 +2174,19 @@
                     const prev2 = recent.length >= 3 ? recent[recent.length - 3] : null;
                     if (prev.type === 'write' && toolType === 'edit' && Math.random() < 0.4) {
                         setSpeechText(pickRandom(TOOL_PATTERN_REACTIONS.edit_after_write), 4000);
-                        setExpression('surprised');
+                        this.setExpression('surprised');
                         _toolReactCooldown = 10;
                         return true;
                     }
                     if (prev.type === 'edit' && toolType === 'bash' && Math.random() < 0.5) {
                         setSpeechText(pickRandom(TOOL_PATTERN_REACTIONS.bash_after_edit), 4000);
-                        setExpression('happy');
+                        this.setExpression('happy');
                         _toolReactCooldown = 10;
                         return true;
                     }
                     if (prev.type === 'search' && toolType === 'read' && Math.random() < 0.3) {
                         setSpeechText(pickRandom(TOOL_PATTERN_REACTIONS.search_then_read), 4000);
-                        setExpression('thinking');
+                        this.setExpression('thinking');
                         _toolReactCooldown = 8;
                         return true;
                     }
@@ -2209,17 +2209,17 @@
                 message = pickRandom(cfg.generic);
             }
 
-            setExpression(pickRandom(cfg.expressions));
+            this.setExpression(pickRandom(cfg.expressions));
             setSpeechText(message, 3500);
             _toolReactCooldown = 6; // ~0.7s cooldown
 
             // Occasional ear twitch for edits and bash
             if ((toolType === 'edit' || toolType === 'bash') && Math.random() < 0.4) {
-                triggerEarTwitch();
+                this.triggerEarTwitch();
             }
             // Paw wave for writes (new files are exciting!)
             if (toolType === 'write' && Math.random() < 0.3) {
-                triggerPawWave();
+                this.triggerPawWave();
             }
 
             return true;
@@ -2243,7 +2243,7 @@
                     if (Math.random() < 0.4) {
                         const tip = pickRandom(tips);
                         setSpeechText(tip, 6000, extractSlashAction(tip));
-                        if (Math.random() < 0.5) triggerEarTwitch();
+                        if (Math.random() < 0.5) this.triggerEarTwitch();
                         return true;
                     }
                 }
@@ -2273,7 +2273,7 @@
                     const tip = pickRandom(group.tips);
                     const skill = pickRandom(group.skills);
                     setSpeechText(tip, 6000, skill);
-                    if (Math.random() < 0.5) setExpression('thinking');
+                    if (Math.random() < 0.5) this.setExpression('thinking');
                     return;
                 }
             }
@@ -2281,7 +2281,7 @@
             // Priority 2: structural analysis (existing behavior)
             if (hasCode >= 2) {
                 setSpeechText(pickRandom(AGENT_RESPONSE_TIPS.code_block), 5000);
-                if (Math.random() < 0.4) setExpression('happy');
+                if (Math.random() < 0.4) this.setExpression('happy');
             } else if (hasToolCalls) {
                 setSpeechText(pickRandom(AGENT_RESPONSE_TIPS.tool_call), 5000);
             } else if (isLong) {
@@ -2340,7 +2340,7 @@
             if (_idleLevel > 0) {
                 _idleLevel = 0;
                 _tailSpeed = 2;
-                if (expression === 'sleepy') setExpression('neutral');
+                if (expression === 'sleepy') this.setExpression('neutral');
             }
 
             // First keystroke after not typing — initial reaction
@@ -2348,11 +2348,11 @@
                 _userTyping = true;
                 // Only react ~30% of the time to avoid spam
                 if (Math.random() < 0.3 && !currentSpeech) {
-                    setExpression('thinking');
+                    this.setExpression('thinking');
                     setSpeechText(pickRandom(SPEECH.typing_start), 3000);
                     setTimeout(() => {
                         if (animating && expression === 'thinking' && _userTyping) {
-                            setExpression('neutral');
+                            this.setExpression('neutral');
                         }
                     }, 3000);
                 }
@@ -2364,7 +2364,7 @@
             // Long message reaction (>200 chars while still typing)
             if (textLength > 200 && textLength % 100 < 5 && !currentSpeech && Math.random() < 0.2) {
                 setSpeechText(pickRandom(SPEECH.typing_long), 3000);
-                if (Math.random() < 0.3) triggerEarTwitch();
+                if (Math.random() < 0.3) this.triggerEarTwitch();
             }
 
             // Set debounce timer: after 3s of no typing, assume stopped
@@ -2425,11 +2425,11 @@
             _pose = pose;
             _lastInteractionTime = Date.now();
             if (pose === 'lying') {
-                setExpression('sleepy');
+                this.setExpression('sleepy');
                 _tailSpeed = 5;
                 setSpeechText(pickRandom(SPEECH.lying_down), 4000);
             } else {
-                setExpression('neutral');
+                this.setExpression('neutral');
                 _tailSpeed = 2;
                 setSpeechText(pickRandom(SPEECH.standing_up), 3000);
             }
@@ -2455,10 +2455,10 @@
                 _pose = 'sitting';
                 _idleLevel = 0;
                 _tailSpeed = 2;
-                setExpression('surprised');
-                triggerEarTwitch();
+                this.setExpression('surprised');
+                this.triggerEarTwitch();
                 setSpeechText('*подпрыгнул* Мяу?!', 3000);
-                setTimeout(() => { if (animating) setExpression('neutral'); }, 3000);
+                setTimeout(() => { if (animating) this.setExpression('neutral'); }, 3000);
                 _clickCount = 0;
                 return;
             }
@@ -2468,10 +2468,10 @@
                 _idleLevel = 0;
                 _tailSpeed = 2;
                 if (expression === 'sleepy') {
-                    setExpression('surprised');
-                    triggerEarTwitch();
+                    this.setExpression('surprised');
+                    this.triggerEarTwitch();
                     setSpeechText('*проснулся!* Мяу?!', 3000);
-                    setTimeout(() => { if (animating) setExpression('neutral'); }, 3000);
+                    setTimeout(() => { if (animating) this.setExpression('neutral'); }, 3000);
                     _clickCount = 0;
                     return;
                 }
@@ -2489,7 +2489,7 @@
             if (_clickCount >= 3) {
                 // Deep petting (7+ clicks) triggers love expression with heart eyes
                 if (_clickCount >= 7) {
-                    setExpression('love');
+                    this.setExpression('love');
                     setSpeechText(pickRandom(SPEECH.love), 5000);
                     _purrrTicks = 35;
                     _tailSpeed = 1;
@@ -2516,7 +2516,7 @@
                     return;
                 }
                 // Normal petting (3-6 clicks) — happy expression
-                setExpression('happy');
+                this.setExpression('happy');
                 setSpeechText(pickRandom(PETTING_REACTIONS), 4000);
                 _purrrTicks = 25;
                 _tailSpeed = 1; // fast happy tail
@@ -2540,18 +2540,18 @@
 
             // Normal single/double click reaction
             const reaction = pickRandom(CLICK_REACTIONS);
-            setExpression(reaction.expr);
+            this.setExpression(reaction.expr);
             setSpeechText(reaction.speech, 4000);
 
-            if (reaction.anim === 'earTwitch') triggerEarTwitch();
-            else if (reaction.anim === 'pawWave') triggerPawWave();
+            if (reaction.anim === 'earTwitch') this.triggerEarTwitch();
+            else if (reaction.anim === 'pawWave') this.triggerPawWave();
             else if (reaction.anim === 'purr') _purrrTicks = 15;
-            else if (reaction.anim === 'headTilt') triggerHeadTilt();
+            else if (reaction.anim === 'headTilt') this.triggerHeadTilt();
 
             // Return to neutral after delay
             setTimeout(() => {
                 if (animating && (expression === reaction.expr) && _idleLevel === 0) {
-                    setExpression('neutral');
+                    this.setExpression('neutral');
                 }
             }, 4000);
         },
@@ -2569,18 +2569,18 @@
                     _pose = 'sitting';
                     _idleLevel = 1;
                     _tailSpeed = 2;
-                    setExpression('neutral');
+                    this.setExpression('neutral');
                     setSpeechText('*встал* Мяу? Ты тут!', 3000);
-                    triggerEarTwitch();
+                    this.triggerEarTwitch();
                     return;
                 }
                 // Wake from deep sleep
                 if (_idleLevel >= 3) {
                     _idleLevel = 1;
-                    setExpression('neutral');
+                    this.setExpression('neutral');
                     _tailSpeed = 2;
                     setSpeechText('*проснулся* Мяу?', 3000);
-                    triggerEarTwitch();
+                    this.triggerEarTwitch();
                     return;
                 }
                 // Occasional greeting on first hover
@@ -2602,7 +2602,7 @@
             if (_idleLevel > 0) {
                 _idleLevel = 0;
                 _tailSpeed = 2;
-                if (expression === 'sleepy') setExpression('neutral');
+                if (expression === 'sleepy') this.setExpression('neutral');
             }
         },
 

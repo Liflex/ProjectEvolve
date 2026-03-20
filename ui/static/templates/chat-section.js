@@ -628,8 +628,8 @@
                                 <div x-show="tab._quotedMsg" x-transition.duration.150ms
                                      class="reply-bar">
                                     <span class="reply-bar-icon">&#x21A9;</span>
-                                    <span class="reply-bar-label" x-text="'Replying to ' + (tab._quotedMsg.role || '?') + ' #' + (tab._quotedMsg.msgIdx ?? '?')"></span>
-                                    <span class="reply-bar-preview" x-text="(tab._quotedMsg.text || '').slice(0, 50) + ((tab._quotedMsg.text || '').length > 50 ? '...' : '')"></span>
+                                    <span class="reply-bar-label" x-text="'Replying to ' + (tab._quotedMsg?.role || '?') + ' #' + (tab._quotedMsg?.msgIdx ?? '?')"></span>
+                                    <span class="reply-bar-preview" x-text="(tab._quotedMsg?.text || '').slice(0, 50) + ((tab._quotedMsg?.text || '').length > 50 ? '...' : '')"></span>
                                     <button class="reply-bar-dismiss" @click.stop="clearQuote(tab.tab_id)" title="Cancel reply">&#x2715;</button>
                                 </div>
                                 <textarea x-model="tab.input_text"

@@ -345,7 +345,7 @@
                                  :class="'live-log-type-' + entry.type">
                                 <span class="text-[0.5625rem] text-[var(--v3)] shrink-0 w-14 text-right tabular-nums" x-text="entry.ts"></span>
                                 <span class="shrink-0 w-3 text-center" :style="'color:' + entry.color" x-text="entry.icon"></span>
-                                <span class="break-all" :style="'color:' + entry.color" x-text="entry.text"></span>
+                                <span class="break-all whitespace-pre-wrap" :style="'color:' + entry.color" x-text="entry.text"></span>
                             </div>
                         </template>
                         <!-- Paused indicator -->

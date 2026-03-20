@@ -40,6 +40,8 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+from agents.revert_analytics import RevertAnalytics
+
 
 # ---------------------------------------------------------------------------
 # Token tracking
@@ -168,6 +170,7 @@ class ResearchRunner:
         decompose: bool = False,
     ):
         self.project_dir = project_dir.resolve()
+        self.revert_analytics = RevertAnalytics(self.project_dir)
         self.strategy = strategy
         self.max_turns = max_turns
         self.parallel_judges = parallel_judges
@@ -446,11 +449,25 @@ class ResearchRunner:
 
         runner._listeners = [_forward_with_context]
 
+        # Snapshot current git state BEFORE sub-tasks run
+        import subprocess as _sp_run
+        try:
+            _snap = _sp_run.run(
+                ["git", "diff", "--name-only", "HEAD"],
+                capture_output=True, text=True, timeout=10,
+                cwd=str(self.project_dir),
+                encoding="utf-8", errors="replace",
+            )
+            files_before = set((_snap.stdout or "").strip().split("\n"))
+            files_before.discard("")
+        except Exception:
+            files_before = set()
+
         completed = await runner.run(sub_tasks, concurrency=len(sub_tasks))
 
-        # Aggregate results
+        # Aggregate results — only check files that changed during THIS run
         aggregator = ResultAggregator(self.project_dir)
-        aggregated = aggregator.aggregate(sub_tasks, completed)
+        aggregated = aggregator.aggregate(sub_tasks, completed, files_before=files_before)
 
         await self._emit(_make_event(
             EVENT_LOG,
@@ -548,6 +565,42 @@ class ResearchRunner:
                 ))
                 return False
 
+            # Collect changed files from the experiment commit
+            files_changed = []
+            try:
+                diff_result = _sp.run(
+                    ["git", "diff-tree", "--no-commit-id", "--name-status", "-r", "HEAD"],
+                    capture_output=True, text=True, timeout=10,
+                    cwd=str(self.project_dir),
+                    encoding="utf-8", errors="replace",
+                )
+                for line in (diff_result.stdout or "").strip().split("\n"):
+                    line = line.strip()
+                    if line:
+                        parts = line.split("\t", 1)
+                        status = parts[0] if parts else "?"
+                        fname = parts[1] if len(parts) > 1 else line
+                        files_changed.append({"file": fname, "status": status})
+            except Exception as diff_err:
+                logger.debug("Failed to collect changed files for revert log: %s", diff_err)
+
+            # Collect per-profile scores
+            profile_scores = {}
+            for pname, pdata in verdict.get("profiles", {}).items():
+                profile_scores[pname] = {
+                    "recommendation": pdata.get("recommendation", "?"),
+                    "score": pdata.get("score"),
+                }
+
+            # Build revert reason from judge profiles
+            reasons = []
+            for pname, pdata in verdict.get("profiles", {}).items():
+                if pdata.get("recommendation") == "DISCARD":
+                    reason = pdata.get("reason", "")
+                    if reason:
+                        reasons.append(f"[{pname}] {reason[:120]}")
+            revert_reason_str = "; ".join(reasons[:3]) if reasons else f"DISCARD consensus (score={score:.2f})"
+
             # Record the revert
             revert_msg = f"exp #{experiment_number}(discard): auto-reverted by judge"
             await self._emit(_make_event(
@@ -567,6 +620,26 @@ class ResearchRunner:
                 "Auto-reverted exp %d: DISCARD consensus (score=%.2f)",
                 experiment_number, score,
             )
+
+            # --- Accumulate structured revert event for analytics ---
+            conflict_reason = ""
+            conflict_info = verdict.get("conflict_resolution")
+            if conflict_info:
+                conflict_reason = (
+                    f"{conflict_info.get('resolution_method', '')}: "
+                    f"{conflict_info.get('resolved', '')}"
+                )
+
+            self._log_revert_event(
+                experiment_number=experiment_number,
+                consensus=consensus,
+                score=score,
+                reason=revert_reason_str,
+                profile_scores=profile_scores,
+                files_changed=files_changed,
+                conflict_reason=conflict_reason,
+            )
+
             return True
 
         except Exception as e:
@@ -576,6 +649,68 @@ class ResearchRunner:
                 message=f"Auto-revert error for exp #{experiment_number}: {e}",
             ))
             return False
+
+    def _log_revert_event(
+        self,
+        experiment_number: int,
+        consensus: str,
+        score: float,
+        reason: str,
+        profile_scores: Dict[str, Any],
+        files_changed: List[Dict[str, str]],
+        conflict_reason: str = "",
+    ) -> None:
+        """Append a structured auto-revert event to the analytics JSON file.
+
+        Stores each revert as a JSON object in
+        ``.autoresearch/auto_revert_events.json`` for offline analysis of
+        judge effectiveness, common rejection reasons, and file-level impact.
+        """
+        import json as _json
+
+        events_file = self.project_dir / ".autoresearch" / "auto_revert_events.json"
+
+        event = {
+            "experiment_number": experiment_number,
+            "timestamp": datetime.now().isoformat(),
+            "consensus": consensus,
+            "score": round(score, 4),
+            "reason": reason,
+            "profile_scores": profile_scores,
+            "files_changed": files_changed,
+        }
+
+        if conflict_reason:
+            event["conflict_reason"] = conflict_reason
+
+        try:
+            # Read existing events (or start fresh)
+            if events_file.exists():
+                try:
+                    events = _json.loads(events_file.read_text(encoding="utf-8"))
+                    if not isinstance(events, list):
+                        events = []
+                except (_json.JSONDecodeError, OSError):
+                    events = []
+            else:
+                events = []
+
+            events.append(event)
+
+            # Write back atomically
+            events_file.write_text(
+                _json.dumps(events, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            logger.info(
+                "Logged revert event for exp %d (%d total events)",
+                experiment_number, len(events),
+            )
+        except Exception as log_err:
+            logger.warning(
+                "Failed to log revert event for exp %d: %s",
+                experiment_number, log_err,
+            )
 
     async def run_experiment(
         self,
@@ -783,6 +918,12 @@ class ResearchRunner:
 
                 # --- Auto-judge: evaluate experiment after completion ---
                 if result.get("status") == "success":
+                    # Wait for experiment session to fully exit before spawning
+                    # judge sessions — otherwise SDK gets
+                    # "Control request timeout: initialize".
+                    logger.info("Waiting for experiment session to fully exit before judging...")
+                    await asyncio.sleep(5)
+
                     judge_verdict = await self._run_judge(i, result.get("output", ""))
                     if judge_verdict:
                         result["judge"] = judge_verdict
@@ -850,4 +991,112 @@ class ResearchRunner:
             "tokens": self.tokens.to_dict(),
             "parallel_judges": self.parallel_judges,
             "decompose": self.decompose,
+        }
+
+    # -- revert analytics --
+
+    def get_revert_stats(self) -> Dict[str, Any]:
+        """Compute summary statistics from accumulated auto-revert events.
+
+        Reads ``.autoresearch/auto_revert_events.json`` and returns:
+        - total_reverts, total_experiments, revert_rate
+        - avg_score, min_score, max_score
+        - common_reasons (top 5 by frequency)
+        - affected_files (sorted by frequency)
+        - per_profile_discard_rate
+        - recent_reverts (last 10)
+        """
+        import json as _json
+        from collections import Counter
+
+        events_file = self.project_dir / ".autoresearch" / "auto_revert_events.json"
+
+        try:
+            if events_file.exists():
+                events = _json.loads(events_file.read_text(encoding="utf-8"))
+                if not isinstance(events, list):
+                    events = []
+            else:
+                events = []
+        except Exception:
+            events = []
+
+        if not events:
+            return {
+                "total_reverts": 0,
+                "total_experiments": self.total_experiments or 0,
+                "revert_rate": 0.0,
+                "avg_score": None,
+                "min_score": None,
+                "max_score": None,
+                "common_reasons": [],
+                "affected_files": [],
+                "per_profile_discard_rate": {},
+                "recent_reverts": [],
+            }
+
+        total_reverts = len(events)
+        total_exp = max(self.total_experiments or total_reverts, total_reverts)
+        revert_rate = round(total_reverts / total_exp, 4) if total_exp else 0.0
+
+        scores = [e.get("score", 0) for e in events if e.get("score") is not None]
+        avg_score = round(sum(scores) / len(scores), 4) if scores else None
+
+        # Common reasons — normalize by taking first 80 chars as key
+        reason_counter = Counter()
+        for e in events:
+            r = e.get("reason", "unknown")
+            reason_counter[r[:80]] += 1
+        common_reasons = [
+            {"reason": r, "count": c}
+            for r, c in reason_counter.most_common(5)
+        ]
+
+        # Affected files
+        file_counter = Counter()
+        for e in events:
+            for fc in e.get("files_changed", []):
+                fname = fc.get("file", "") if isinstance(fc, dict) else str(fc)
+                if fname:
+                    file_counter[fname] += 1
+        affected_files = [
+            {"file": f, "count": c}
+            for f, c in file_counter.most_common(20)
+        ]
+
+        # Per-profile discard rate
+        profile_total = Counter()
+        profile_discard = Counter()
+        for e in events:
+            for pname, pdata in e.get("profile_scores", {}).items():
+                profile_total[pname] += 1
+                if pdata.get("recommendation") == "DISCARD":
+                    profile_discard[pname] += 1
+        per_profile_discard_rate = {
+            p: round(profile_discard[p] / profile_total[p], 4) if profile_total[p] else 0.0
+            for p in profile_total
+        }
+
+        # Recent reverts (last 10)
+        recent_reverts = [
+            {
+                "experiment_number": e.get("experiment_number"),
+                "timestamp": e.get("timestamp"),
+                "score": e.get("score"),
+                "reason": e.get("reason", "")[:120],
+            }
+            for e in events[-10:]
+        ][::-1]  # newest first
+
+        return {
+            "total_reverts": total_reverts,
+            "total_experiments": total_exp,
+            "revert_rate": revert_rate,
+            "avg_score": avg_score,
+            "min_score": round(min(scores), 4) if scores else None,
+            "max_score": round(max(scores), 4) if scores else None,
+            "common_reasons": common_reasons,
+            "affected_files": affected_files,
+            "per_profile_discard_rate": per_profile_discard_rate,
+            "recent_reverts": recent_reverts,
         }

@@ -305,7 +305,8 @@
         </div>
 
         <!-- Judge Analytics -->
-        <div x-show="judgeAnalytics && judgeAnalytics.total_verdicts > 0" class="mt-3 pixel-border bg-[var(--bg2)] p-4">
+        <template x-if="judgeAnalytics && judgeAnalytics.total_verdicts > 0">
+        <div class="mt-3 pixel-border bg-[var(--bg2)] p-4">
             <div class="flex items-center justify-between mb-3">
                 <div class="text-[0.5625rem] tracking-widest text-[var(--v3)]">JUDGE_ANALYTICS_</div>
                 <div class="flex items-center gap-3">
@@ -376,6 +377,91 @@
                              :class="pt.consensus === 'KEEP' ? 'bg-[var(--ng)]' : pt.consensus === 'DISCARD' ? 'bg-[var(--red)]' : 'bg-[var(--amber)]'"
                              :style="'height:' + Math.max(2, (pt.consensus_score || 0) * 28) + 'px'"
                              :title="'Exp #' + pt.experiment + ': ' + pt.consensus + ' (' + pt.consensus_score + ')'">
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+        </template>
+
+        <!-- Revert Analytics -->
+        <div x-data="revertAnalytics(judgeAnalytics)" x-show="totalReverts > 0 || _loading" class="mt-3 pixel-border bg-[var(--bg2)] p-4">
+            <div class="flex items-center justify-between mb-3 cursor-pointer select-none" @click="_open = !_open">
+                <div class="flex items-center gap-3">
+                    <span class="text-[0.5625rem] tracking-widest text-[var(--v3)]">AUTO_REVERT_ANALYTICS_</span>
+                    <span x-show="_loading" class="thinking-spinner" style="width:10px;height:10px;border-width:1.5px;border-color:var(--red)"></span>
+                    <span class="text-[0.5rem] px-1.5 py-px bg-[rgba(255,60,60,0.12)] text-[var(--red)]" x-text="totalReverts + ' REVERT' + (totalReverts !== 1 ? 'S' : '')"></span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-sm text-[var(--red)]" style="font-family:'Press Start 2P',monospace" x-text="revertRate + '%'"></span>
+                    <span class="text-[0.5rem] text-[var(--v3)] transition-transform duration-200" :class="_open && 'rotate-180'" x-text="'&#x25BC;'"></span>
+                </div>
+            </div>
+
+            <div x-show="_open" x-transition>
+                <!-- Summary cards -->
+                <div class="grid grid-cols-3 gap-2 mb-3">
+                    <div class="p-2 bg-[var(--bg)]" style="border:1px solid var(--v-dim)">
+                        <div class="text-[0.4375rem] tracking-widest text-[var(--v3)]">TOTAL_REVERTS</div>
+                        <div class="text-xl text-[var(--red)] mt-0.5" style="font-family:'Press Start 2P',monospace" x-text="totalReverts"></div>
+                    </div>
+                    <div class="p-2 bg-[var(--bg)]" style="border:1px solid var(--v-dim)">
+                        <div class="text-[0.4375rem] tracking-widest text-[var(--v3)]">AUTO_REVERTS</div>
+                        <div class="text-xl text-[var(--red)] mt-0.5" style="font-family:'Press Start 2P',monospace" x-text="autoReverts"></div>
+                    </div>
+                    <div class="p-2 bg-[var(--bg)]" style="border:1px solid var(--v-dim)">
+                        <div class="text-[0.4375rem] tracking-widest text-[var(--v3)]">MANUAL_REVERTS</div>
+                        <div class="text-xl text-[var(--amber)] mt-0.5" style="font-family:'Press Start 2P',monospace" x-text="manualReverts"></div>
+                    </div>
+                </div>
+
+                <!-- Revert rate bar -->
+                <div class="mb-3">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[0.4375rem] tracking-widest text-[var(--v3)]">REVERT_RATE</span>
+                        <span class="text-[0.5rem] text-[var(--v3)]" x-text="totalReverts + '/' + totalJudged + ' judged experiments'"></span>
+                    </div>
+                    <div class="h-2 bg-[var(--bg)] overflow-hidden" style="border:1px solid var(--v-dim)">
+                        <div class="h-full bg-[var(--red)] transition-all duration-500"
+                             :style="'width:' + Math.min(100, parseFloat(revertRate)) + '%'"></div>
+                    </div>
+                </div>
+
+                <!-- Top Revert Reasons -->
+                <div x-show="topReasons.length > 0" class="mb-3">
+                    <div class="text-[0.4375rem] tracking-widest text-[var(--v3)] mb-2">TOP_REVERT_REASONS_</div>
+                    <div class="space-y-1.5">
+                        <template x-for="item in topReasons" :key="item.reason">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[0.5625rem] text-[var(--ng2)] truncate w-40" x-text="item.reason"></span>
+                                <div class="flex-1 h-1.5 bg-[var(--bg)] overflow-hidden">
+                                    <div class="h-full bg-[var(--red)] transition-all duration-500"
+                                         :style="'width:' + reasonBarWidth(item.count)"></div>
+                                </div>
+                                <span class="text-[0.5625rem] text-[var(--v3)] tabular-nums w-5 text-right" x-text="item.count"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Recent Revert Events Timeline -->
+                <div class="text-[0.4375rem] tracking-widest text-[var(--v3)] mb-2">RECENT_REVERTS_</div>
+                <div class="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                    <template x-for="ev in revertEvents" :key="ev.experiment">
+                        <div class="flex items-start gap-2 p-2 bg-[var(--bg)]" style="border:1px solid var(--v-dim)">
+                            <span class="text-[0.5625rem] text-[var(--v3)] mt-0.5 shrink-0" style="font-family:'Press Start 2P',monospace"
+                                  x-text="'#' + String(ev.experiment || 0).padStart(2,'0')"></span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="text-[0.625rem] text-[var(--ng2)] truncate" x-text="ev.title || 'Untitled'"></span>
+                                    <span class="text-[0.4375rem] px-1 py-px" :class="revertTypeCls(ev)" x-text="revertReason(ev)"></span>
+                                </div>
+                                <div class="flex items-center gap-2 mt-0.5">
+                                    <span class="text-[0.4375rem] text-[var(--v3)]" x-text="'Consensus: ' + (ev.consensus || 'N/A')"></span>
+                                    <span class="text-[0.4375rem] text-[var(--v-dim)]" x-text="'Score: ' + (ev.consensus_score != null ? ev.consensus_score : 'N/A')"></span>
+                                </div>
+                            </div>
+                            <span class="text-[0.4375rem] text-[var(--v-dim)] shrink-0 tabular-nums" x-text="formatTimestamp(ev.reverted_at || ev.timestamp)"></span>
                         </div>
                     </template>
                 </div>

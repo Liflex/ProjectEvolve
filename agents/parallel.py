@@ -111,8 +111,10 @@ class ParallelAgentRunner:
         results = await runner.run(tasks, concurrency=2)
     """
 
-    def __init__(self, max_concurrency: int = 3):
+    def __init__(self, max_concurrency: int = 3, delay_between_tasks: float = 0):
         self.max_concurrency = max_concurrency
+        self.delay_between_tasks = delay_between_tasks
+        """Seconds to wait between tasks (inside semaphore) to let SDK subprocesses exit."""
         self._listeners: List[Callable[[dict], Any]] = []
         self._running = False
         self._cancelled = False
@@ -171,7 +173,12 @@ class ParallelAgentRunner:
             max_turns=task.max_turns,
             permission_mode=task.permission_mode,
             env=clean_env,
-            disallowed_tools=["Bash", "Write", "Edit", "WebFetch", "WebSearch"],
+            # Only restrict tools for judge agents — sub-task agents need Write/Edit
+            disallowed_tools=(
+                ["Bash", "Write", "Edit", "WebFetch", "WebSearch"]
+                if task.label.startswith("judge-")
+                else []
+            ),
         )
 
         if task.model:
@@ -277,6 +284,14 @@ class ParallelAgentRunner:
                     agent_label=task.label,
                 ))
                 result = await self._run_single_agent(task)
+                # Build a brief summary of agent output for the live log
+                output_summary = ""
+                if result.output:
+                    if len(result.output) <= 600:
+                        output_summary = result.output.strip()
+                    else:
+                        output_summary = result.output[:400].strip() + "\n...\n" + result.output[-150:].strip()
+
                 await self._emit(_make_event(
                     EVENT_PARALLEL_AGENT_END,
                     run_id=self._run_id,
@@ -285,7 +300,12 @@ class ParallelAgentRunner:
                     status=result.status,
                     output_length=len(result.output),
                     cost=result.cost,
+                    output_summary=output_summary,
                 ))
+                # Delay before releasing semaphore — ensures next task waits
+                # for SDK subprocess to fully exit
+                if self.delay_between_tasks > 0:
+                    await asyncio.sleep(self.delay_between_tasks)
                 return result
 
         try:
@@ -605,6 +625,7 @@ class ResultAggregator:
         self,
         original_tasks: List[AgentTask],
         completed_tasks: List[AgentTask],
+        files_before: Optional[set] = None,
     ) -> AggregatedResult:
         """Merge results from parallel execution.
 
@@ -624,7 +645,7 @@ class ResultAggregator:
             total_cost_usd=sum(t.cost or 0 for t in completed_tasks),
         )
 
-        # Check for file conflicts via git status
+        # Check for file changes — only NEW changes since files_before snapshot
         try:
             git_result = _sp.run(
                 ["git", "diff", "--name-only", "HEAD"],
@@ -650,6 +671,10 @@ class ResultAggregator:
             modified_files.update(staged_files)
         except Exception:
             pass
+
+        # Filter to only NEW changes (ignore pre-existing modifications)
+        if files_before is not None:
+            modified_files -= files_before
 
         # Build per-task summaries
         summaries = []
@@ -743,6 +768,182 @@ class ResultAggregator:
             lines.append("**ACTION REQUIRED:** Resolve merge conflicts before committing.")
 
         return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Revert analytics — log conflict reverts from parallel execution
+# ---------------------------------------------------------------------------
+
+def log_conflict_revert(
+    project_dir: Path,
+    experiment_number: int,
+    conflicts: List[Dict[str, Any]],
+    task_labels: List[str],
+) -> None:
+    """Log a conflict-based revert event from parallel sub-task execution.
+
+    When parallel sub-tasks produce merge conflicts, this records the event
+    for analytics — allowing analysis of which files are conflict-prone and
+    which task combinations clash.
+
+    Args:
+        project_dir: Project root path.
+        experiment_number: Current experiment number.
+        conflicts: List of conflict dicts from AggregatedResult.
+        task_labels: Labels of parallel sub-tasks that ran.
+    """
+    import json as _json
+
+    events_file = Path(project_dir) / ".autoresearch" / "auto_revert_events.json"
+
+    event = {
+        "experiment_number": experiment_number,
+        "timestamp": datetime.now().isoformat(),
+        "consensus": "CONFLICT",
+        "score": 0.0,
+        "reason": f"Parallel conflict between: {', '.join(task_labels)}",
+        "profile_scores": {},
+        "files_changed": [
+            {"file": c.get("file", ""), "status": "conflict"}
+            for c in conflicts
+        ],
+        "conflict_reason": f"{len(conflicts)} merge conflict(s) from parallel execution",
+        "conflicting_tasks": task_labels,
+    }
+
+    try:
+        if events_file.exists():
+            try:
+                events = _json.loads(events_file.read_text(encoding="utf-8"))
+                if not isinstance(events, list):
+                    events = []
+            except (_json.JSONDecodeError, OSError):
+                events = []
+        else:
+            events = []
+
+        events.append(event)
+
+        events_file.write_text(
+            _json.dumps(events, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        logger.info(
+            "Logged conflict revert for exp %d: %d file(s) affected",
+            experiment_number, len(conflicts),
+        )
+    except Exception as log_err:
+        logger.warning(
+            "Failed to log conflict revert for exp %d: %s",
+            experiment_number, log_err,
+        )
+
+
+def get_revert_stats_from_file(project_dir: Path) -> Dict[str, Any]:
+    """Load revert events from file and compute summary statistics.
+
+    Standalone version that doesn't require a ResearchRunner instance.
+    Useful for API endpoints and external tools.
+
+    Returns the same structure as ResearchRunner.get_revert_stats().
+    """
+    import json as _json
+    from collections import Counter
+
+    events_file = Path(project_dir) / ".autoresearch" / "auto_revert_events.json"
+
+    try:
+        if events_file.exists():
+            events = _json.loads(events_file.read_text(encoding="utf-8"))
+            if not isinstance(events, list):
+                events = []
+        else:
+            events = []
+    except Exception:
+        events = []
+
+    if not events:
+        return {
+            "total_reverts": 0,
+            "revert_rate": 0.0,
+            "avg_score": None,
+            "min_score": None,
+            "max_score": None,
+            "common_reasons": [],
+            "affected_files": [],
+            "per_profile_discard_rate": {},
+            "recent_reverts": [],
+            "conflict_reverts": 0,
+            "discard_reverts": 0,
+        }
+
+    total_reverts = len(events)
+    conflict_reverts = sum(1 for e in events if e.get("consensus") == "CONFLICT")
+    discard_reverts = total_reverts - conflict_reverts
+
+    scores = [e.get("score", 0) for e in events if e.get("score") is not None]
+    avg_score = round(sum(scores) / len(scores), 4) if scores else None
+
+    # Common reasons
+    reason_counter = Counter()
+    for e in events:
+        r = e.get("reason", "unknown")
+        reason_counter[r[:80]] += 1
+    common_reasons = [
+        {"reason": r, "count": c}
+        for r, c in reason_counter.most_common(5)
+    ]
+
+    # Affected files
+    file_counter = Counter()
+    for e in events:
+        for fc in e.get("files_changed", []):
+            fname = fc.get("file", "") if isinstance(fc, dict) else str(fc)
+            if fname:
+                file_counter[fname] += 1
+    affected_files = [
+        {"file": f, "count": c}
+        for f, c in file_counter.most_common(20)
+    ]
+
+    # Per-profile discard rate
+    profile_total = Counter()
+    profile_discard = Counter()
+    for e in events:
+        for pname, pdata in e.get("profile_scores", {}).items():
+            profile_total[pname] += 1
+            if pdata.get("recommendation") == "DISCARD":
+                profile_discard[pname] += 1
+    per_profile_discard_rate = {
+        p: round(profile_discard[p] / profile_total[p], 4) if profile_total[p] else 0.0
+        for p in profile_total
+    }
+
+    # Recent reverts (newest first)
+    recent_reverts = [
+        {
+            "experiment_number": e.get("experiment_number"),
+            "timestamp": e.get("timestamp"),
+            "consensus": e.get("consensus"),
+            "score": e.get("score"),
+            "reason": e.get("reason", "")[:120],
+        }
+        for e in events[-10:]
+    ][::-1]
+
+    return {
+        "total_reverts": total_reverts,
+        "revert_rate": 0.0,  # no experiment total available in standalone mode
+        "avg_score": avg_score,
+        "min_score": round(min(scores), 4) if scores else None,
+        "max_score": round(max(scores), 4) if scores else None,
+        "common_reasons": common_reasons,
+        "affected_files": affected_files,
+        "per_profile_discard_rate": per_profile_discard_rate,
+        "recent_reverts": recent_reverts,
+        "conflict_reverts": conflict_reverts,
+        "discard_reverts": discard_reverts,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -909,32 +1110,25 @@ async def _run_chief_judge(
     )
 
     try:
-        from claude_code_sdk import ClaudeCodeOptions, query
-
-        clean_env = {}
-        for var in ("CLAUDECODE", "CLAUDE_SESSION_ID"):
-            if var in os.environ:
-                clean_env[var] = ""
-
-        options = ClaudeCodeOptions(
+        # Use ParallelAgentRunner (same infrastructure as regular judges) to avoid
+        # "Control request timeout: initialize" errors from raw SDK calls.
+        chief_task = AgentTask(
+            label="judge-chief",
+            prompt=prompt,
             cwd=str(project_dir),
             max_turns=1,
-            permission_mode="bypassPermissions",
-            env=clean_env,
             append_system_prompt=system_prompt,
-            disallowed_tools=["Bash", "Write", "Edit", "WebFetch", "WebSearch"],
         )
 
-        output_parts: list[str] = []
-        async for message in query(prompt=[{"type": "user", "message": {"role": "user", "content": prompt}}], options=options):
-            event_dict = asdict(message)
-            msg_type = type(message).__name__
-            if msg_type == "AssistantMessage":
-                for block in event_dict.get("content", []):
-                    if isinstance(block, dict) and block.get("text"):
-                        output_parts.append(block["text"])
+        runner = ParallelAgentRunner(max_concurrency=1, delay_between_tasks=3)
+        results = await runner.run([chief_task])
+        result = results[0]
 
-        output = "\n".join(output_parts).strip()
+        if result.status != "completed":
+            logger.warning("Chief judge agent failed: %s", result.status)
+            return None
+
+        output = result.output.strip()
         if not output:
             return None
 
@@ -960,12 +1154,14 @@ async def run_parallel_judges(
     report_text: str,
     profiles: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """Run judge evaluation sequentially using separate agent sessions.
+    """Run judge evaluation using the same ParallelAgentRunner infrastructure as sub-tasks.
 
-    Each judge runs in its own Claude Code SDK session, one at a time.
-    After all 3 profiles finish, a 4th chief judge may run if verdicts disagree.
+    All judge profiles are created as AgentTask instances upfront and run through
+    a single ParallelAgentRunner with concurrency=1 and delay_between_tasks=3s.
+    This ensures proper SDK subprocess cleanup between sessions, avoiding
+    "Control request timeout: initialize" errors.
 
-    This approach respects rate limits (only 1 active session at a time).
+    After all profiles finish, a 4th chief judge may run if verdicts disagree.
 
     Args:
         project_dir: Project root path.
@@ -1000,10 +1196,8 @@ async def run_parallel_judges(
         ),
     }
 
-    # Run judges SEQUENTIALLY — one session at a time to respect rate limits
-    verdicts = {}
-    parsed_count = 0
-    completed_count = 0
+    # Build all judge tasks upfront
+    judge_tasks: List[AgentTask] = []
     for profile in profiles:
         system = profile_prompts.get(profile, profile_prompts["balanced"])
         prompt = (
@@ -1034,31 +1228,41 @@ async def run_parallel_judges(
             max_turns=1,
             append_system_prompt=system,
         )
+        judge_tasks.append(task)
 
-        logger.info("Running judge-%s...", profile)
-        runner = ParallelAgentRunner(max_concurrency=1)
-        results = await runner.run([task])
+    # Run all judges through a SINGLE runner — same infrastructure as sub-tasks.
+    # Concurrency=1 with delay_between_tasks ensures sequential execution with
+    # proper SDK subprocess cleanup between sessions.
+    logger.info("Running %d judges through single runner (delay=%.0fs)...", len(judge_tasks), 3)
+    runner = ParallelAgentRunner(max_concurrency=1, delay_between_tasks=3)
+    results = await runner.run(judge_tasks)
 
-        # Parse verdict from agent output
-        result = results[0]
+    # Parse verdicts from all results
+    verdicts: Dict[str, Any] = {}
+    parsed_count = 0
+    completed_count = 0
+
+    for result in results:
+        profile = result.label.replace("judge-", "")
         if result.status != "completed":
-            verdicts[task.label] = {
+            verdicts[result.label] = {
                 "verdict": "DISCARD",
                 "score": 0.0,
                 "reason": f"Agent failed: {result.status}",
                 "_agent_failed": True,
             }
+            logger.warning("Judge-%s: agent failed with status %s", profile, result.status)
             continue
 
         completed_count += 1
         output = result.output.strip()
         parsed = _try_parse_judge_json(output)
         if parsed:
-            verdicts[task.label] = parsed
+            verdicts[result.label] = parsed
             parsed_count += 1
             logger.info("Judge-%s: %s (score=%.2f)", profile, parsed["verdict"], parsed.get("score", 0))
         else:
-            verdicts[task.label] = {
+            verdicts[result.label] = {
                 "verdict": "DISCARD",
                 "score": 0.0,
                 "reason": "Could not parse judge output",

@@ -1013,6 +1013,29 @@ async def _research_event_handler(event: dict) -> None:
         total = event.get("total_run", 0)
         cost = event.get("total_cost_usd", 0)
         _log_append(f"[DONE] Завершено: {ok}/{total} успешно | Total cost: ${cost:.4f}")
+    elif etype == "parallel_agent_start":
+        label = event.get("agent_label", "?")
+        _log_append(f"[SUB] Agent '{label}' started")
+    elif etype == "parallel_agent_end":
+        label = event.get("agent_label", "?")
+        status = event.get("status", "?")
+        cost = event.get("cost")
+        summary = event.get("output_summary", "")
+        msg = f"[SUB] Agent '{label}': {status}"
+        if cost is not None:
+            msg += f" | ${cost:.4f}"
+        if summary:
+            brief = summary.replace("\n", " ").strip()[:300]
+            msg += f"\n  → {brief}"
+        _log_append(msg)
+    elif etype == "parallel_end":
+        ok = event.get("completed", 0)
+        tot = event.get("total_tasks", 0)
+        cost = event.get("total_cost_usd")
+        msg = f"[SUB] Parallel run: {ok}/{tot} completed"
+        if cost is not None:
+            msg += f" | ${cost:.4f}"
+        _log_append(msg)
 
     # Broadcast to WebSocket subscribers
     dead: list[int] = []
@@ -1409,7 +1432,17 @@ def _parallel_event_handler(event: dict) -> None:
     if etype == "parallel_agent_start":
         _log_append(f"[PARALLEL] Agent '{event.get('agent_label')}' started")
     elif etype == "parallel_agent_end":
-        _log_append(f"[PARALLEL] Agent '{event.get('agent_label')}' {event.get('status')}")
+        label = event.get("agent_label", "?")
+        status = event.get("status", "?")
+        cost = event.get("cost")
+        summary = event.get("output_summary", "")
+        msg = f"[PARALLEL] Agent '{label}' {status}"
+        if cost is not None:
+            msg += f" | ${cost:.4f}"
+        if summary:
+            brief = summary.replace("\n", " ").strip()[:300]
+            msg += f"\n  → {brief}"
+        _log_append(msg)
     elif etype == "parallel_end":
         _log_append(f"[PARALLEL] Run {event.get('run_id')} complete: "
                      f"{event.get('completed')}/{event.get('total_tasks')} completed, "

@@ -4211,3 +4211,64 @@ N/A
 **Per-task Results:**
 
 
+## Experiment 195 — Streaming text buffer for smoother chat rendering via requestAnimationFrame batching
+
+**Time:** 2026-03-20 23:14:31
+
+**Files:** `ui/static/js/modules/chat.js` (+18/-6 lines), `agents/parallel.py` (serial judges — uncommitted changes from previous session), `.autoresearch/experiments/accumulation_context.md`, `.autoresearch/experiments/changes_log.md`, `.autoresearch/experiments/last_experiment.md`
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **requestAnimationFrame batching** для `text` и `assistant` streaming events. Вместо `chatTick++` на каждый text event (10-30/sec → столько же Alpine.js `renderChatHTML()` вызовов), теперь один rAF callback на кадр (max 60/sec). Текст продолжает аккумулироваться в `message.content` мгновенно, но DOM обновляется batched.
+2. **Smart scroll coalescing** — `smartScroll()` перенесён внутрь rAF callback вместо отдельного `setTimeout(50ms)` на каждый event. Устраняет scro
+
+
+## Experiment 203 — Untitled
+
+**Time:** 2026-03-21 00:13:56
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.0459
+**Conflicts:** None
+
+**Per-task Results:**
+
+
+## Experiment 204 — Untitled
+
+**Time:** 2026-03-21 00:15:59
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.2778
+**Conflicts:** None
+
+**Per-task Results:**
+
+

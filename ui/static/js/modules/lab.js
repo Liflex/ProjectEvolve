@@ -618,6 +618,25 @@ window.AppLab = (function() {
                 return { ts, type: 'info', icon: '·', color: 'var(--v3)', text: event.message || '' };
             } else if (etype === 'error') {
                 return { ts, type: 'error', icon: '✕', color: 'var(--red)', text: event.message || 'Unknown error' };
+            } else if (etype === 'parallel_agent_start') {
+                return { ts, type: 'exp', icon: '⇒', color: 'var(--cyan)', text: `Agent "${event.agent_label || '?'}" started` };
+            } else if (etype === 'parallel_agent_end') {
+                const label = event.agent_label || '?';
+                const status = event.status || '?';
+                const cost = event.cost != null ? ` | $${event.cost.toFixed(4)}` : '';
+                const summary = event.output_summary || '';
+                const icon = status === 'completed' ? '✓' : status === 'error' ? '✕' : '○';
+                const color = status === 'completed' ? 'var(--ng)' : status === 'error' ? 'var(--red)' : 'var(--amber)';
+                let text = `Agent "${label}": ${status}${cost}`;
+                if (summary) {
+                    const brief = summary.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+                    text += `\n  ${brief.length > 400 ? brief.slice(0, 400) + '...' : brief}`;
+                }
+                return { ts, type: 'agent', icon, color, text };
+            } else if (etype === 'parallel_end') {
+                const ok = event.completed || 0, tot = event.total_tasks || 0;
+                const cost = event.total_cost_usd != null ? ` | $${event.total_cost_usd.toFixed(4)}` : '';
+                return { ts, type: 'exp', icon: '◆', color: 'var(--v)', text: `Parallel run: ${ok}/${tot} completed${cost}` };
             } else if (etype === 'judge_verdict') {
                 const n = event.number || 0;
                 const consensus = event.consensus || '?';
