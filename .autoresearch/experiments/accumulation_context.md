@@ -1,4 +1,26 @@
 
+## Experiment 134 — Chat — response regeneration diff view (compare original vs new)
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`regenerateResponse()`** — сохраняет оригинальный контент ответа ассистента в `tab._regenOriginalContent` перед регенерацией
+2. **Stream handler** — при создании нового регенерированного сообщения прикрепляет `_regenOriginal` с оригинальным контентом
+3. **DIFF button** — кнопка в action bar регенерированных сообщений (показывается только когда оригинал и новый ответ отличаются). Toggle: DIFF / HIDE DIFF
+4. **Context menu** — опция "SHOW DIFF" / "HIDE DIFF" в правом клике на регенерированных сообщениях
+5. **`toggleRegenDiff(tabId, msgIdx)`** — переключает отображение diff панели (`msg._showRegenDiff`)
+6. **`_renderRegenDiffHtml(msg)`** — рендерит diff панель с word-level highlighting, gutter (+/-), номерами строк, статистикой (-N/+N), truncation при >80 строк
+7. **CSS** — `.regen-diff-panel` стили: header с label и stats, scrollable body, color-coded del/ins/ctx строки, gutter styling
+8. **Persistence** — `_regenOriginal` и `regenerated` сохраняются в localStorage при сериализации сообщений
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` — regenerateResponse(), stream handlers, renderAssistantMsg(), toggleRegenDiff(), _renderRegenDiffHtml(), saveChatState(), context menu
+- `ui/static/css/main.css` — .regen-diff-panel styles, .act-diff button styles
+
+---
+
 ## Experiment 133 — Chat — activity sparkline in status bar (token output per response)
 
 **Date:** 2026-03-20
@@ -5321,6 +5343,33 @@ Results
 1. **`goalProgressData()`** — вычисляет прогресс целей: total/active/completed, процент, классификация активных целей по статусу (WIP/TODO/BACKEND/NOTED)
 2. **`goalStatusIcon()` / `goalStatusColor()` / `goalStatusWeight()`** — иконки и цвета для каждого статуса цели: ◉ cyan = in-progress, ○ gray = pending, ◇ amber = needs-backend, ✓ green = done-note
 3. **Goal Progress Tracker panel** — прогресс-бар с процентом (48% для текущего проекта), информация о проекте (name, d
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 133 — Chat — activity sparkline in status bar
+
+**Date:** 2026-03-20 04:31:31
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- Target:** chat.js, chat-section.js
+- Files Modified:** `ui/static/js/modules/chat.js`, `ui/static/templates/chat-section.js`
+
+### Results
+
+Results
+
+**What was done:**
+1. **`renderActivitySparkline(tab)`** — генерирует SVG sparkline по одному bar на каждое assistant сообщение с токен-статистикой. Максимум 20 последних ответов. Высота bar'а пропорциональна output tokens относительно максимального значения в выборке. Цвет кодирует относительную нагрузку: green (<33%), cyan (33-66%), amber (66-90%), red (>90%).
+2. **Sparkline в IDE status bar** — мини-график вставлен после cost indicator (`$X.XXXX`). Показывается только при 2+ ответах 
 
 ### Notes for Next
 
