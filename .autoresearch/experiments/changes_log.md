@@ -1,3 +1,26 @@
+## Experiment 167 — Cat lying down pose — horizontal body, front paws, auto-lie on deep sleep
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **BODY_LYING sprite** — Горизонтальное тело (26×10 пикселей) для позы lying down, outline + fill.
+2. **PAWS_LYING sprite** — Передние лапы (13×4 пикселя) между головой и телом.
+3. **Lying pose positions** — Отдельные константы позиций для head, body, paws, tail в lying pose.
+4. **Pose state** — Переменная `_pose` ('sitting' | 'lying'), управляет выбором спрайтов и позиций.
+5. **Render refactor** — Функция render() теперь динамически выбирает спрайты и позиции в зависимости от pose. Глаза вычисляются относительно позиции головы (работает для обеих поз).
+6. **Auto-lie on deep sleep** — При idle level 3 (3+ мин бездействия) кот автоматически ложится.
+7. **Auto-stand on interaction** — Клик, hover, typing, resetIdle — кот встаёт из lying pose.
+8. **Speech messages** — Новые категории SPEECH.lying_down и SPEECH.standing_up (6 фраз каждая, на русском).
+9. **Public API** — CatModule.setPose('sitting'|'lying') и CatModule.getPose().
+10. **Tooltip update** — getContextTooltip() показывает lying-specific подсказки.
+
+### Files Modified
+
+- `ui/static/modules/cat.js` (+233/-61)
+
+---
+
 ## Experiment 159 — Chat streaming thinking preview — live-updating thinking content display
 
 **Date:** 2026-03-20

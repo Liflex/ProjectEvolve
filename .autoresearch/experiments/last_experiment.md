@@ -1,28 +1,33 @@
 # Last Experiment Summary
 
-**Experiment #166** — Cat "love" and "sad" expressions — heart eyes on deep petting, sad face on DISCARD
-**Date:** 2026-03-20 19:39:17
+**Experiment #167** — Cat lying down pose — horizontal body, front paws, auto-lie on deep sleep
+**Date:** 2026-03-20
 
 ## What Was Done
 
-N/A
+1. **BODY_LYING sprite** — Horizontal body (26x10 pixels) for lying down pose, outline + fill 1bpp encoded.
+2. **PAWS_LYING sprite** — Front paws (13x4 pixels) positioned between head and body.
+3. **Lying pose positions** — Separate position constants (LIE_HEAD_POS, LIE_BODY_POS, LIE_PAWS_POS, LIE_TAIL_POS).
+4. **Pose state** — `_pose` variable ('sitting' | 'lying') controls sprite/position selection.
+5. **Render refactor** — render() dynamically selects sprites and positions based on pose. Eye positions computed relative to head base.
+6. **Auto-lie on deep sleep** — Cat lies down at idle level 3 (3+ min inactivity).
+7. **Auto-stand on interaction** — Click, hover, typing, resetIdle cause cat to stand up.
+8. **Speech messages** — New SPEECH.lying_down (6 phrases) and SPEECH.standing_up (6 phrases), all in Russian.
+9. **Public API** — CatModule.setPose('sitting'|'lying'), CatModule.getPose().
+10. **Tooltip update** — getContextTooltip() shows lying-specific tooltips.
 
 ## Files Modified
 
-- Files Modified:** `ui/static/modules/cat.js` (+88/-13)
+- `ui/static/modules/cat.js` (+233/-61)
 
 ## Key Results
 
-Results
-
-**What was done:**
-1. **EYES_LOVE** — пиксельный спрайт сердечек вместо глаз (17x4, 1 frame). Триггерится при глубоком поглаживании (7+ быстрых кликов).
-2. **EYES_SAD** — пиксельный спрайт грустных опущенных глаз с нахмуренными бровями (17x4, 1 frame). Триггерится при DISCARD эксперимента.
-3. **MOUTH_LOVE** — "w"-образный кошачий рот (7x2).
-4. **MOUTH_SAD** — перевёрнутая улыбка/гримаса (7x2).
-5. **Конфигурации** — EYE_CFG, MOUTH_CFG, WHISKER_CFG, EYE_GLINT для обоих новых выражений.
-6.
+- Cat now lies down when idle for 3+ minutes (deep sleep)
+- Standing up on any user interaction (click, hover, typing)
+- API available for external pose control
+- All speech in Russian
 
 ## For Next Iteration
 
-N/A
+- More animations for lying pose (tail curl, breathing)
+- Lying pose could have different ear twitch behavior
