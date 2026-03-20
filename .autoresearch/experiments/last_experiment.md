@@ -1,25 +1,24 @@
 # Last Experiment Summary
 
-**Experiment #132** — Dashboard — Goal Progress Tracker with status classification
-**Date:** 2026-03-20 04:28:27
+**Experiment #133** — Chat — activity sparkline in status bar (token output per response)
+**Date:** 2026-03-20
 
 ## What Was Done
 
-N/A
+1. **`renderActivitySparkline(tab)`** — генерирует SVG sparkline: по одному bar на каждое assistant сообщение с msgTokens. Максимум 20 последних bars. Высота bar пропорциональна output tokens относительно максимума. Цвет: green (<33%), cyan (33-66%), amber (66-90%), red (>90%).
+2. **Sparkline в status bar** — мини-график вставлен после cost indicator в IDE status bar. Показывается только при 2+ ответах с токенами. Tooltip с общей статистикой.
+3. **SVG sparkline** — чистый SVG без зависимостей, width/height динамические, cursor=help с title tooltip.
 
 ## Files Modified
 
-- Target:** lab.js, lab-dashboard.js, main.css, app.js
-- Files Modified:** `ui/static/js/modules/lab.js`, `ui/static/templates/lab-dashboard.js`, `ui/static/css/main.css`, `ui/static/js/app.js`
+- `ui/static/js/modules/chat.js` — renderActivitySparkline() method
+- `ui/static/templates/chat-section.js` — sparkline HTML in status bar
 
 ## Key Results
 
-Results
-
-**What was done:**
-1. **`goalProgressData()`** — вычисляет прогресс целей: total/active/completed, процент, классификация активных целей по статусу (WIP/TODO/BACKEND/NOTED)
-2. **`goalStatusIcon()` / `goalStatusColor()` / `goalStatusWeight()`** — иконки и цвета для каждого статуса цели: ◉ cyan = in-progress, ○ gray = pending, ◇ amber = needs-backend, ✓ green = done-note
-3. **Goal Progress Tracker panel** — прогресс-бар с процентом (48% для текущего проекта), информация о проекте (name, d
+- Sparkline появляется в status bar при 2+ ответах с токен-статистикой
+- Визуально показывает интенсивность использования API по ответам
+- Цвет кодирует относительную нагрузку каждого ответа
 
 ## For Next Iteration
 

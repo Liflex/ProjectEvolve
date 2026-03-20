@@ -1,4 +1,21 @@
 
+## Experiment 133 — Chat — activity sparkline in status bar (token output per response)
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`renderActivitySparkline(tab)`** — generates SVG sparkline: one bar per assistant message with msgTokens. Max 20 recent bars. Bar height proportional to output tokens relative to max. Color: green (<33%), cyan (33-66%), amber (66-90%), red (>90%).
+2. **Sparkline in status bar** — mini chart inserted after cost indicator in IDE status bar. Only shown when 2+ responses have token stats. Tooltip with aggregate stats.
+3. **Pure SVG** — no dependencies, dynamic width/height, cursor=help with title tooltip.
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` — renderActivitySparkline() method
+- `ui/static/templates/chat-section.js` — sparkline HTML in status bar
+
+---
+
 ## Experiment 130 — Chat — message minimap sidebar (IDE-style)
 
 **Date:** 2026-03-20
