@@ -1,7 +1,12 @@
 """Claude Code SDK session wrapper.
 
-Wraps claude-code-sdk query() with async lifecycle management,
+Wraps claude-code-sdk ClaudeSDKClient with async lifecycle management,
 status tracking, and stream-json output parsing.
+
+Uses ClaudeSDKClient (persistent bidirectional connection) for proper
+multi-turn conversation support, instead of the stateless query() function.
+The SDK documentation explicitly states: "For interactive, stateful
+conversations, use ClaudeSDKClient instead" of query().
 """
 
 from __future__ import annotations
@@ -27,7 +32,19 @@ class SessionStatus(str, Enum):
 
 
 class ClaudeSession:
-    """Wrapper around claude-code-sdk query() with lifecycle management."""
+    """Wrapper around claude-code-sdk ClaudeSDKClient with lifecycle management.
+
+    Uses ClaudeSDKClient for persistent bidirectional communication, which
+    properly maintains multi-turn conversation context across messages.
+    The first send() creates and connects the client. Subsequent send() calls
+    reuse the existing connection for true conversation continuity.
+
+    Key differences from the previous query()-based approach:
+    - Persistent connection: no subprocess spawn per message
+    - True multi-turn: SDK maintains conversation state internally
+    - interrupt(): can stop a running response mid-stream
+    - resume: first message can resume a previous conversation via resume_id
+    """
 
     def __init__(
         self,
@@ -50,8 +67,7 @@ class ClaudeSession:
         self.status = SessionStatus.STARTING
         self.created_at = datetime.now()
         self.message_count = 0
-        self._task: Optional[asyncio.Task] = None
-        self._query_result: Optional[Any] = None
+        self._client: Optional[Any] = None  # ClaudeSDKClient, lazy import
         self._output_lines: list[str] = []
         self._error: Optional[str] = None
 
@@ -67,32 +83,30 @@ class ClaudeSession:
     ) -> AsyncIterator[dict]:
         """Send a prompt to the agent and yield stream events.
 
-        Supports re-sending after COMPLETED/CANCELLED/ERROR by resetting
-        to ACTIVE and using continue_conversation for multi-turn context.
+        Uses ClaudeSDKClient for persistent multi-turn. First message creates
+        the client connection; subsequent messages reuse it via query().
 
         Args:
             prompt: str (text-only) or list of content blocks (multimodal).
                     Multimodal: [{"type":"text","text":"..."},
                                  {"type":"image","source":{"type":"base64","media_type":"image/png","data":"..."}}]
+            continue_conversation: Kept for API compat; ClaudeSDKClient always
+                                   maintains conversation context via persistent
+                                   connection. Ignored in practice.
         """
-        if self.status == SessionStatus.ACTIVE and self._task and not self._task.done():
-            raise RuntimeError(
-                f"Cannot send to session while a query is already in progress (state {self.status.value})"
-            )
         if self.status not in (SessionStatus.ACTIVE, SessionStatus.STARTING):
             logger.info(
-                "Session %s: re-activating from %s to continue conversation",
+                "Session %s: re-activating from %s",
                 self.session_id, self.status.value,
             )
-            self.status = SessionStatus.ACTIVE
 
         self.status = SessionStatus.ACTIVE
         self.message_count += 1
 
         try:
-            from claude_code_sdk import query, ClaudeCodeOptions
-
+            from claude_code_sdk import ClaudeCodeOptions, ClaudeSDKClient
             import os
+
             clean_env = {}
             for var in ("CLAUDECODE", "CLAUDE_SESSION_ID"):
                 if var in os.environ:
@@ -110,70 +124,91 @@ class ClaudeSession:
             if self.model:
                 options.model = self.model
 
+            # Resume previous conversation on first message only.
+            # After that, ClaudeSDKClient maintains context via the
+            # persistent connection — no continue_conversation flag needed.
             if self.resume_id and self.message_count == 1:
-                # Only use resume_id for the very first message.
-                # Subsequent messages must use continue_conversation
-                # to maintain multi-turn context within the same session.
                 options.resume = self.resume_id
                 self.resume_id = None
-            elif continue_conversation and self.message_count > 1:
-                options.continue_conversation = True
 
-            logger.debug(
-                "Session %s: sending query (turn %d, resume=%s, continue=%s)",
-                self.session_id, self.message_count, self.resume_id,
-                getattr(options, 'continue_conversation', False),
-            )
-
-            # Use streaming mode (AsyncIterable prompt) to avoid Windows
-            # command-line length limit when prompts are large.
-            # Support multimodal content (text + images) or plain text string.
-            async def _single_message():
-                if isinstance(prompt, list):
+            # Format prompt for ClaudeSDKClient:
+            # - str → passed directly
+            # - list (multimodal) → wrapped as async iterable message dict
+            if isinstance(prompt, list):
+                async def _multimodal_stream():
                     yield {"type": "user", "message": {"role": "user", "content": prompt}}
-                else:
-                    yield {"type": "user", "message": {"role": "user", "content": prompt}}
+                prompt_arg = _multimodal_stream()
+            else:
+                prompt_arg = prompt
 
-            self._query_result = query(prompt=_single_message(), options=options)
-            async for message in self._query_result:
-                # SDK Message types are dataclasses — convert to dict
+            # First message: create client and connect.
+            # Subsequent messages: reuse existing connection via query().
+            if self._client is None:
+                self._client = ClaudeSDKClient(options=options)
+                await self._client.connect(prompt=prompt_arg)
+                logger.info(
+                    "Session %s: connected (turn %d, resume=%s)",
+                    self.session_id, self.message_count,
+                    "yes" if options.resume else "no",
+                )
+            else:
+                await self._client.query(prompt=prompt_arg)
+                logger.info(
+                    "Session %s: queried (turn %d)",
+                    self.session_id, self.message_count,
+                )
+
+            # Stream response until ResultMessage (receive_response handles this)
+            async for message in self._client.receive_response():
                 try:
                     event = asdict(message)
                 except Exception:
                     event = {"type": str(type(message).__name__), "data": str(message)}
-                # Tag with message type name for the WebSocket protocol
                 event.setdefault("type", type(message).__name__.removesuffix("Message").lower())
                 self._output_lines.append(json.dumps(event, default=str))
                 yield event
 
             self.status = SessionStatus.COMPLETED
-            logger.info("Session %s: query completed", self.session_id)
+            logger.info("Session %s: turn %d completed", self.session_id, self.message_count)
 
         except asyncio.CancelledError:
             self.status = SessionStatus.CANCELLED
-            logger.info("Session %s: cancelled", self.session_id)
+            logger.info("Session %s: cancelled on turn %d", self.session_id, self.message_count)
             raise
         except Exception as e:
             self.status = SessionStatus.ERROR
             self._error = str(e)
-            logger.error("Session %s: error: %s", self.session_id, e)
+            logger.error("Session %s: error on turn %d: %s", self.session_id, self.message_count, e)
             yield {"type": "error", "message": str(e)}
 
     async def cancel(self) -> None:
-        """Cancel any running query task."""
-        if self._task and not self._task.done():
-            self._task.cancel()
+        """Interrupt the running query via ClaudeSDKClient.interrupt().
+
+        Sends an interrupt signal to the SDK subprocess, causing it to
+        stop the current response and produce a ResultMessage.
+        """
+        if self._client is not None:
             try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
+                await self._client.interrupt()
+                logger.info("Session %s: interrupted", self.session_id)
+            except Exception as e:
+                logger.debug("Session %s: interrupt failed: %s", self.session_id, e)
         self.status = SessionStatus.CANCELLED
 
     async def cleanup(self) -> None:
-        """Release all resources held by this session."""
+        """Release all resources held by this session.
+
+        Interrupts any running query, disconnects the SDK client,
+        and clears output buffers.
+        """
         await self.cancel()
+        if self._client is not None:
+            try:
+                await self._client.disconnect()
+            except Exception as e:
+                logger.debug("Session %s: disconnect error: %s", self.session_id, e)
+            self._client = None
         self._output_lines.clear()
-        self._query_result = None
         logger.info("Session %s: cleaned up", self.session_id)
 
     def get_output(self) -> str:
