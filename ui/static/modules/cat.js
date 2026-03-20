@@ -141,6 +141,16 @@
         decode([0x60,0x03,0x00, 0x64,0x06,0x00, 0x70,0x18,0x00, 0x38,0x18,0x00], 17, 4),
     ];
 
+    // Eyes - love: heart-shaped eyes (17x4, 1 frame)
+    const EYES_LOVE = [
+        decode([0x60,0x18,0x00, 0x78,0x1E,0x00, 0x7C,0x3E,0x00, 0x38,0x1C,0x00], 17, 4),
+    ];
+
+    // Eyes - sad: droopy narrow eyes with angled brows (17x4, 1 frame)
+    const EYES_SAD = [
+        decode([0x30,0x0C,0x00, 0x70,0x1C,0x00, 0x30,0x0C,0x00, 0x30,0x0C,0x00], 17, 4),
+    ];
+
     // Tail — neutral wagging (15×21, 16 frames)
     const TAIL_OUTLINES = [
         decode([0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00, 0x00,0x00, 0x78,0x00, 0x86,0x00, 0x71,0x00, 0x08,0x80, 0x04,0x40, 0x02,0x20, 0x01,0x20, 0x01,0x20, 0x01,0x20, 0x01,0x20, 0x06,0x20, 0x38,0x40, 0x00,0x80, 0x01,0x00, 0x06,0x00, 0x38,0x00], 15, 21),
@@ -209,6 +219,8 @@
         surprised: { frames: EYES_SURPRISED, x: 9 + OX,  y: 10 + OY, color: '#ffff00', blinkSpeed: 0 },
         angry:     { frames: EYES_ANGRY,     x: 9 + OX,  y: 11 + OY, color: '#ff3355', blinkSpeed: 0 },
         thinking:  { frames: EYES_THINKING,  x: 9 + OX,  y: 10 + OY, color: '#88aaff', blinkSpeed: 0 },
+        love:      { frames: EYES_LOVE,     x: 9 + OX,  y: 10 + OY, color: '#ff69b4', blinkSpeed: 0 },
+        sad:       { frames: EYES_SAD,      x: 9 + OX,  y: 11 + OY, color: '#6688bb', blinkSpeed: 0 },
     };
 
     // Eye glint centers for cursor tracking — [leftEyeCenter, rightEyeCenter] relative to EYE_CFG position
@@ -218,6 +230,8 @@
         surprised: { left: [3, 2], right: [12, 2] },
         angry:     { left: [2, 1], right: [12, 1] },
         thinking:  { left: [3, 2], right: [12, 2] },
+        sad:       { left: [3, 1], right: [12, 1] },
+        // love has no glint — heart sprites cover the eyes
     };
 
     // Paw sprite for wave animation (3×4)
@@ -240,6 +254,10 @@
     const MOUTH_THINKING = decode([0x0C, 0x02], 5, 2);
     // Sleepy: small (3×1)
     const MOUTH_SLEEPY = decode([0x02], 3, 1);
+    // Love: cat 'w' mouth (7×2)
+    const MOUTH_LOVE = decode([0x6C, 0x7C], 7, 2);
+    // Sad: frown (7×2)
+    const MOUTH_SAD = decode([0x7C, 0x38], 7, 2);
 
     // Mouth config: { sprite, x-offset from HEAD_POS, y-offset from HEAD_POS, color }
     const MOUTH_CFG = {
@@ -249,6 +267,8 @@
         angry:     { sprite: MOUTH_ANGRY,     dx: 9,  dy: 14, color: '#ff3355' },
         thinking:  { sprite: MOUTH_THINKING,  dx: 10, dy: 15, color: '#88aaff' },
         sleepy:    { sprite: MOUTH_SLEEPY,    dx: 11, dy: 16, color: '#b44aff' },
+        love:      { sprite: MOUTH_LOVE,     dx: 9,  dy: 15, color: '#ff69b4' },
+        sad:       { sprite: MOUTH_SAD,      dx: 9,  dy: 15, color: '#6688bb' },
     };
 
     // ================================================================
@@ -279,6 +299,8 @@
         angry:     { droop: 2,  spread: 0.8, color: '#ff3355', wobble: 2 },
         thinking:  { droop: 1,  spread: 0.9, color: '#88aaff', wobble: 0 },
         sleepy:    { droop: 1,  spread: 0.85, color: '#d98fff', wobble: 0 },
+        love:      { droop: -2, spread: 1.2,  color: '#ff69b4', wobble: 0 },
+        sad:       { droop: 3,  spread: 0.8,  color: '#6688bb', wobble: 1 },
     };
 
     const CW = 50, CH = 37;
@@ -472,6 +494,25 @@
             'Ну? Отправляй! Мяу!',
             '*нетерпеливо* Жду-у-у...',
             'Enter нажми! =^.^=',
+        ],
+        love: [
+            '*мурррр...* ♥ =^_^=',
+            'Ты самый лучший! Мурр!',
+            '*трётся о руку* Люблю!',
+            '*довольно жмурится* Мяу~',
+            'Ещё! Не останавливайся! ♥',
+            '*счастливый писк* =^._.^=',
+            'Мур-мур-мур! Ты волшебник!',
+            '*переворачивается* Чешешь идеально!',
+        ],
+        sad: [
+            '*грустно смотрит* Мяу...',
+            'Не расстраивай меня...',
+            '*опустил уши* Мрр...',
+            '*тихое мурчание* Всё будет хорошо...',
+            '*прижался* Мне грустно...',
+            'Мяу... *вздыхает*',
+            '*обнял лапкой* Не грусти...',
         ],
     };
 
@@ -864,6 +905,7 @@
             'Agent готов к работе_',
             'Попробуй задать задачу!',
             'Набери / для меню скиллов!',
+            'Погладь меня! *надеется* =^._.^=',
         ],
         settings: [
             'Попробуй другую тему!',
@@ -1138,6 +1180,12 @@
             tailOffX = 2; tailOffY = 1; // curled forward
         } else if (expression === 'thinking') {
             tailOffY = 1; // low, contemplative
+        } else if (expression === 'love') {
+            tailOffY = -2; // very raised, excited
+            tailOffX = -1; // curled up
+        } else if (expression === 'sad') {
+            tailOffX = 3; // very curled forward (hiding)
+            tailOffY = 2; // low
         }
         const tailPos = { x: TAIL_POS.x + tailOffX, y: TAIL_POS.y + tailOffY };
         drawFilled(TAIL_OUTLINES[tailFrame], TAIL_FILLS[tailFrame], tailPos, outlineColor, fillColor, true);
@@ -1307,21 +1355,22 @@
             setSpeech('idle'); // yawn
         }
 
-        // Purr vibration: body micro-shake when happy (triggered externally or by mood)
+        // Purr vibration: body micro-shake when happy/love (triggered externally or by mood)
         if (_purrrTicks > 0) {
             _purrrTicks--;
             // Spawn heart/sparkle particles during purr
             if (_tickCount % 5 === 0) {
+                const isLove = expression === 'love';
                 spawnParticle({
                     x: BODY_POS.x + 3 + Math.random() * 12,
                     y: BODY_POS.y + 2 + Math.random() * 4,
-                    vx: (Math.random() - 0.5) * 0.15,
-                    vy: -0.08 - Math.random() * 0.06,
-                    life: 25 + Math.floor(Math.random() * 15),
-                    char: Math.random() < 0.4 ? '♥' : '✦',
-                    color: Math.random() < 0.4 ? '#ff69b4' : '#ffd700',
-                    fontSize: 6 + Math.floor(Math.random() * 2),
-                    wobble: 0.1,
+                    vx: (Math.random() - 0.5) * (isLove ? 0.25 : 0.15),
+                    vy: -0.08 - Math.random() * (isLove ? 0.1 : 0.06),
+                    life: 25 + Math.floor(Math.random() * (isLove ? 20 : 15)),
+                    char: isLove ? (Math.random() < 0.7 ? '♥' : '✦') : (Math.random() < 0.4 ? '♥' : '✦'),
+                    color: isLove ? (Math.random() < 0.7 ? '#ff69b4' : '#ff1493') : (Math.random() < 0.4 ? '#ff69b4' : '#ffd700'),
+                    fontSize: 6 + Math.floor(Math.random() * (isLove ? 3 : 2)),
+                    wobble: isLove ? 0.15 : 0.1,
                     wobbleSpeed: 0.15,
                 });
             }
@@ -1487,7 +1536,7 @@
         /**
          * Start animation on a canvas element.
          * @param {HTMLCanvasElement} el - canvas element
-         * @param {string} expr - 'neutral'|'happy'|'sleepy'|'surprised'|'angry'|'thinking'
+         * @param {string} expr - 'neutral'|'happy'|'sleepy'|'surprised'|'angry'|'thinking'|'love'|'sad'
          */
         start(el, expr, pixelSize) {
             if (animating) this.stop();
@@ -1536,7 +1585,7 @@
             // Adjust tail speed based on expression
             const tailSpeeds = {
                 neutral: 2, happy: 1, sleepy: 5, surprised: 1,
-                angry: 3, thinking: 3,
+                angry: 3, thinking: 3, love: 1, sad: 4,
             };
             _tailSpeed = tailSpeeds[expr] || 2;
             // Purr when happy
@@ -1679,9 +1728,11 @@
                     setTimeout(() => { if (animating) { setExpression('neutral'); _tailSpeed = 2; } }, 5000);
                     return;
                 }
-                // Single discard — encouraging phrase
-                setExpression('neutral');
-                setSpeechText(pickRandom(SPEECH.discard_single), 4000);
+                // Single discard — sad expression with encouraging phrase
+                setExpression('sad');
+                const discardMsg = pickRandom(SPEECH.discard_single);
+                setSpeechText(discardMsg, 4000);
+                triggerEarTwitch();
                 setTimeout(() => { if (animating) setExpression('neutral'); }, 4000);
                 return;
             }
@@ -2018,6 +2069,30 @@
 
             // Petting mode (3+ rapid clicks)
             if (_clickCount >= 3) {
+                // Deep petting (7+ clicks) triggers love expression with heart eyes
+                if (_clickCount >= 7) {
+                    setExpression('love');
+                    setSpeechText(pickRandom(SPEECH.love), 5000);
+                    _purrrTicks = 35;
+                    _tailSpeed = 1;
+                    // Extra heart burst for deep petting
+                    for (let h = 0; h < 6; h++) {
+                        spawnParticle({
+                            x: HEAD_POS.x + 5 + Math.random() * 16,
+                            y: HEAD_POS.y - 3 + Math.random() * 8,
+                            vx: (Math.random() - 0.5) * 0.35,
+                            vy: -0.15 - Math.random() * 0.1,
+                            life: 25 + Math.floor(Math.random() * 15),
+                            char: Math.random() < 0.6 ? '♥' : '✦',
+                            color: Math.random() < 0.6 ? '#ff69b4' : '#ff1493',
+                            fontSize: 7 + Math.floor(Math.random() * 3),
+                            wobble: 0.15,
+                            wobbleSpeed: 0.2,
+                        });
+                    }
+                    return;
+                }
+                // Normal petting (3-6 clicks) — happy expression
                 setExpression('happy');
                 setSpeechText(pickRandom(PETTING_REACTIONS), 4000);
                 _purrrTicks = 25;
