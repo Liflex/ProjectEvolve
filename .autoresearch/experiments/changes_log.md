@@ -1,3 +1,23 @@
+## Experiment 218 — Test experiment + fix failing chief judge test + commit pending process cleanup
+
+**Date:** 2026-03-21
+
+### What Was Done
+
+1. **Fixed test_authority_weighted_discard** in `tests/test_chief_judge.py` — test used score 0.4 for all profiles, but weighted_score=0.4 doesn't meet <=0.35 threshold. Changed to guardian=0.2, architect=0.4, pragmatist=0.2 (weighted≈0.267) to correctly test the authority_weighted_discard path.
+2. **Committed pending changes** from previous sessions:
+   - `agents/parallel.py`: Process cleanup before judges — kill lingering Claude CLI processes via wmic + taskkill, remove lock files, health check
+   - `agents/research.py`: `_kill_lingering_claude_processes()` async method, 3s+2s wait before judging instead of 5s sleep
+3. All 89 tests pass (including 30 judge_history tests).
+
+### Files Modified
+
+- `tests/test_chief_judge.py` (fixed test_authority_weighted_discard)
+- `agents/parallel.py` (+43/-14: process cleanup before judges)
+- `agents/research.py` (+54/-6: async process cleanup method)
+
+---
+
 ## Experiment 195 — Streaming text buffer for smoother chat rendering
 
 **Date:** 2026-03-20
@@ -4438,5 +4458,69 @@ N/A
 **Results:**
 
 N/A
+
+
+## Experiment 215 — Judge system redesign: specialist profiles with research-backed skills
+
+**Time:** 2026-03-21 01:36:56
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **Исследование** — изучены лучшие практики code review (Fagan Inspection, DORA metrics, adversarial review, multi-perspective reviewing)
+2. **Редизайн профилей** — 3 универсальных профиля (strict/balanced/lenient) заменены на 3 специалистов:
+   - **Guardian** — Security & Safety expert (adversarial review, test_safety weight 2.5)
+   - **Architect** — Structure & Maintainability expert (diff_size 2.0, report_quality 2.0)
+   - **Pragmatist** — Functionality & Deliver
+
+
+## Experiment 216 — Untitled
+
+**Time:** 2026-03-21 01:44:27
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.3490
+**Conflicts:** None
+
+**Per-task Results:**
+
+
+## Experiment 217 — Untitled
+
+**Time:** 2026-03-21 01:48:49
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.3614
+**Conflicts:** None
+
+**Per-task Results:**
 
 

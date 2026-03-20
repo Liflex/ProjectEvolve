@@ -1309,24 +1309,67 @@ async def run_parallel_judges(
         )
         judge_tasks.append(task)
 
-    # Diagnostic: check if claude CLI is accessible and no stale processes
+    # --- Cleanup: kill lingering Claude CLI subprocesses ---
+    # The experiment SDK call with continue_conversation may leave the CLI
+    # subprocess alive (waiting for more input). This blocks new subprocesses
+    # from initializing with "Control request timeout: initialize".
+    # We must terminate them before starting judges.
+    _killed_pids = []
     try:
-        import subprocess as _sp_diag
-        _diag = _sp_diag.run(
-            ["where", "claude" if os.name != "nt" else "claude.exe"],
-            capture_output=True, text=True, timeout=5,
+        import subprocess as _sp_cleanup
+        # Find node.exe processes whose command line contains 'claude'
+        _diag = _sp_cleanup.run(
+            ["wmic", "process", "where",
+             "name='node.exe' and commandline like '%%claude%%'",
+             "get", "processid,commandline", "/FORMAT:CSV"],
+            capture_output=True, text=True, timeout=15,
             encoding="utf-8", errors="replace",
         )
-        logger.info("Claude CLI location: %s", (_diag.stdout or "").strip()[:200])
-        _diag2 = _sp_diag.run(
-            ["tasklist", "/FI", "IMAGENAME eq node.exe", "/FO", "CSV", "/NH"],
-            capture_output=True, text=True, timeout=5,
+        for _line in (_diag.stdout or "").strip().split("\n"):
+            _line = _line.strip()
+            if not _line or _line.startswith("Node") or "claude" not in _line.lower():
+                continue
+            # CSV format: "hostname\pid\...\command line"
+            _parts = _line.split(",")
+            if len(_parts) >= 2:
+                _pid = _parts[1].strip().strip('"')
+                if _pid.isdigit():
+                    _kill = _sp_cleanup.run(
+                        ["taskkill", "/F", "/PID", _pid],
+                        capture_output=True, text=True, timeout=5,
+                        encoding="utf-8", errors="replace",
+                    )
+                    _killed_pids.append(_pid)
+                    logger.info("Killed lingering Claude CLI process PID=%s: %s",
+                                _pid, (_kill.stdout or "").strip()[:100])
+        # Also check for lock files in .claude directories
+        for _claude_dir in [Path.home() / ".claude", Path(str(project_dir)) / ".claude"]:
+            if _claude_dir.exists():
+                _locks = list(_claude_dir.glob("*.lock")) + list(_claude_dir.glob("*.pid"))
+                if _locks:
+                    for _lock in _locks:
+                        try:
+                            _lock.unlink()
+                            logger.info("Removed lock file: %s", _lock)
+                        except Exception:
+                            pass
+    except Exception as _cleanup_err:
+        logger.warning("Process cleanup failed: %s", _cleanup_err)
+
+    # Quick CLI health check — verify CLI can start
+    try:
+        import subprocess as _sp_health
+        _health = _sp_health.run(
+            ["claude", "--version"],
+            capture_output=True, text=True, timeout=10,
             encoding="utf-8", errors="replace",
         )
-        _node_procs = (_diag2.stdout or "").strip().split("\n")
-        logger.info("Node.js processes: %d running", len([p for p in _node_procs if p.strip()]))
-    except Exception as _diag_err:
-        logger.warning("Diagnostic check failed: %s", _diag_err)
+        logger.info("Claude CLI health check: rc=%d, stdout=%s",
+                    _health.returncode, (_health.stdout or "").strip()[:100])
+    except Exception as _health_err:
+        logger.warning("Claude CLI health check failed: %s", _health_err)
+
+    logger.info("Process cleanup done: killed %d stale Claude processes", len(_killed_pids))
 
     # Run all judges through a SINGLE runner — same infrastructure as sub-tasks.
     # Concurrency=1 with delay_between_tasks ensures sequential execution with

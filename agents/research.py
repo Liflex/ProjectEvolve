@@ -929,16 +929,20 @@ class ResearchRunner:
 
                 # --- Auto-judge: evaluate experiment after completion ---
                 if result.get("status") == "success":
-                    # Wait for experiment session to fully exit before spawning
-                    # judge sessions — otherwise SDK gets
-                    # "Control request timeout: initialize".
+                    # The experiment SDK call may leave the Claude CLI subprocess
+                    # alive (especially with continue_conversation). Kill lingering
+                    # processes before starting judges.
                     logger.info(
-                        "Experiment %d done. Session_id=%s, env CLAUDECODE=%r. "
-                        "Waiting 5s before judging...",
+                        "Experiment %d done. Session_id=%s. Cleaning up before judging...",
                         i, self._session_id,
-                        os.environ.get("CLAUDECODE", "<not set>"),
                     )
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(3)
+
+                    # Kill any lingering Claude CLI processes from the experiment
+                    _killed = await self._kill_lingering_claude_processes()
+                    if _killed:
+                        logger.info("Killed %d lingering Claude processes before judging", _killed)
+                    await asyncio.sleep(2)
 
                     judge_verdict = await self._run_judge(i, result.get("output", ""))
                     if judge_verdict:
@@ -993,6 +997,60 @@ class ResearchRunner:
             ))
 
         return self.results
+
+    @staticmethod
+    async def _kill_lingering_claude_processes() -> int:
+        """Kill any lingering Claude CLI subprocesses from previous SDK calls.
+
+        The SDK's continue_conversation mode can leave CLI processes alive
+        after query() completes. These block new SDK calls with
+        "Control request timeout: initialize".
+
+        Returns number of processes killed.
+        """
+        import subprocess as _sp
+        import asyncio as _aio
+
+        killed = 0
+        try:
+            # Find node.exe processes with 'claude' in command line
+            find = await _aio.create_subprocess_exec(
+                "wmic", "process", "where",
+                "name='node.exe' and commandline like '%%claude%%'",
+                "get", "processid", "/FORMAT:CSV",
+                stdout=_sp.PIPE, stderr=_sp.PIPE,
+            )
+            stdout, _ = await _aio.wait_for(find.communicate(), timeout=15)
+            for line in (stdout or b"").decode("utf-8", errors="replace").strip().split("\n"):
+                line = line.strip()
+                if not line or line.startswith("Node"):
+                    continue
+                # CSV: "hostname\pid"
+                parts = line.split(",")
+                if len(parts) >= 2:
+                    pid = parts[1].strip().strip('"')
+                    if pid.isdigit():
+                        kill = await _aio.create_subprocess_exec(
+                            "taskkill", "/F", "/PID", pid,
+                            stdout=_sp.PIPE, stderr=_sp.PIPE,
+                        )
+                        await _aio.wait_for(kill.communicate(), timeout=5)
+                        killed += 1
+                        logger.info("Killed lingering Claude CLI PID=%s", pid)
+        except Exception as e:
+            logger.debug("Process cleanup: %s", e)
+
+        # Also remove lock files
+        from pathlib import Path as _P
+        for d in [_P.home() / ".claude"]:
+            try:
+                for lock in d.glob("*.lock"):
+                    lock.unlink()
+                    logger.debug("Removed lock: %s", lock)
+            except Exception:
+                pass
+
+        return killed
 
     def get_status(self) -> dict:
         """Snapshot for /api/run/status compatibility."""

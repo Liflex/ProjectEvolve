@@ -5,6 +5,43 @@
 
 ---
 
+## Experiment 218 — Test experiment + fix chief judge test + commit process cleanup
+
+**Date:** 2026-03-21
+
+### What Was Done
+
+1. **Fixed failing test** `test_authority_weighted_discard` — test scores were 0.4 for all profiles, but 0.4 > 0.35 threshold so code took `avg_score_discard` path instead. Fixed with asymmetric scores (guardian=0.2, architect=0.4, pragmatist=0.2) so weighted_score≈0.267 triggers `authority_weighted_discard`.
+2. **Committed pending process cleanup** from previous sessions: `parallel.py` kills lingering Claude CLI processes before judging; `research.py` has async `_kill_lingering_claude_processes()` method.
+3. All 89 tests pass.
+
+### Files Modified
+
+- `tests/test_chief_judge.py` (fixed test)
+- `agents/parallel.py` (+43/-14: process cleanup)
+- `agents/research.py` (+54/-6: async process cleanup)
+
+---
+
+## Experiment 217 — Judge system test experiment
+
+**Date:** 2026-03-21
+
+### What Was Done
+
+1. **Тестовый запуск судей** — проверка работоспособности судейской системы после редизайна в exp215 (guardian/architect/pragmatist профили).
+2. Эксперимент не вносил изменений в код проекта — исключительно проверка пайплайна судейства и логирования.
+3. Обновлены файлы трекинга: goal перемещён в completed_goals в `.autoresearch.json`.
+
+### Files Modified
+
+- `.autoresearch.json` (goals tracking)
+- `.autoresearch/experiments/accumulation_context.md`
+- `.autoresearch/experiments/changes_log.md`
+- `.autoresearch/experiments/last_experiment.md`
+
+---
+
 ## Experiment 215 — Judge system redesign: specialist profiles with research-backed skills
 
 **Date:** 2026-03-21
@@ -745,6 +782,91 @@ N/A
 ### Results
 
 N/A
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 215 — Judge system redesign: specialist profiles with research-backed skills
+
+**Date:** 2026-03-21 01:36:56
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+Results
+
+**What was done:**
+1. **Исследование** — изучены лучшие практики code review (Fagan Inspection, DORA metrics, adversarial review, multi-perspective reviewing)
+2. **Редизайн профилей** — 3 универсальных профиля (strict/balanced/lenient) заменены на 3 специалистов:
+   - **Guardian** — Security & Safety expert (adversarial review, test_safety weight 2.5)
+   - **Architect** — Structure & Maintainability expert (diff_size 2.0, report_quality 2.0)
+   - **Pragmatist** — Functionality & Deliver
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 216 — Untitled
+
+**Date:** 2026-03-21 01:44:27
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.3490
+**Conflicts:** None
+
+**Per-task Results:**
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 217 — Untitled
+
+**Date:** 2026-03-21 01:48:49
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.3614
+**Conflicts:** None
+
+**Per-task Results:**
 
 ### Notes for Next
 
