@@ -71,6 +71,8 @@ window.AppChat = (function() {
                     _turnToolCount: 0,
                     _editDiffOpen: false,
                     _collapsedTurns: new Set(),
+                    _mmTop: 0,
+                    _mmHeight: 100,
                 };
                 this.chatTabs.push(tab);
                 this.activeChatTab = tab.tab_id;
@@ -2129,6 +2131,14 @@ window.AppChat = (function() {
             const el = event.target;
             tab._distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
             tab.scrolledUp = tab._distFromBottom > 100;
+            // Minimap viewport tracking
+            if (el.scrollHeight > el.clientHeight) {
+                tab._mmTop = (el.scrollTop / el.scrollHeight) * 100;
+                tab._mmHeight = (el.clientHeight / el.scrollHeight) * 100;
+            } else {
+                tab._mmTop = 0;
+                tab._mmHeight = 100;
+            }
         },
         smartScroll(tab) {
             if (!tab.scrolledUp) {
@@ -2141,6 +2151,48 @@ window.AppChat = (function() {
             if (el) el.scrollTop = el.scrollHeight;
             tab.scrolledUp = false;
             tab._distFromBottom = 0;
+        },
+
+        // ========== CHAT: MINIMAP ==========
+        renderMinimap(tab) {
+            if (!tab || !tab.messages || tab.messages.length === 0) return '';
+            // Force reactivity on chatTick
+            void this.chatTick;
+            const msgs = tab.messages;
+            // Weight per message based on content length
+            const weights = msgs.map(function(msg) {
+                var len = (msg.content || '').length;
+                if (msg.role === 'tool') return Math.max(1, Math.min(4, Math.ceil(len / 150)));
+                if (msg.role === 'system') return 1;
+                return Math.max(2, Math.min(10, Math.ceil(len / 80)));
+            });
+            var totalWeight = weights.reduce(function(a, b) { return a + b; }, 0);
+            if (totalWeight === 0) totalWeight = 1;
+            var html = '';
+            var roleColors = {
+                user: 'var(--ng)',
+                assistant: 'var(--cyan)',
+                tool: 'var(--pink)',
+                system: 'var(--v3)',
+            };
+            for (var i = 0; i < msgs.length; i++) {
+                var role = msgs[i].role || 'system';
+                var color = roleColors[role] || 'var(--v3)';
+                var pct = (weights[i] / totalWeight * 100).toFixed(2);
+                var opacity = msgs[i].is_streaming ? 0.35 : (msgs[i].collapsed ? 0.25 : 0.65);
+                html += '<div style="height:' + pct + '%;background:' + color + ';opacity:' + opacity + ';min-height:1px"></div>';
+            }
+            return html;
+        },
+        minimapClick(tab, event) {
+            var el = event.currentTarget;
+            var rect = el.getBoundingClientRect();
+            var y = event.clientY - rect.top;
+            var fraction = Math.max(0, Math.min(1, y / rect.height));
+            var container = document.getElementById('chat-messages-' + tab.tab_id);
+            if (container) {
+                container.scrollTop = fraction * container.scrollHeight;
+            }
         },
 
         // ========== CHAT: MESSAGE ACTIONS ==========

@@ -326,6 +326,49 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     background: var(--thinking-bg-hover) !important;
 }
 
+/* === CHAT MINIMAP === */
+.chat-minimap {
+    position: absolute;
+    right: 4px;
+    top: 6px;
+    bottom: 6px;
+    width: 28px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+    overflow: hidden;
+    cursor: pointer;
+    z-index: 5;
+    opacity: 0.3;
+    transition: opacity 0.25s ease;
+    border: 1px solid transparent;
+}
+.chat-minimap:hover {
+    opacity: 0.85;
+    border-color: var(--v-dim);
+    background: rgba(0, 0, 0, 0.4);
+}
+.minimap-content {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5px;
+    padding: 2px;
+}
+.minimap-content > div {
+    width: 100%;
+    border-radius: 1px;
+}
+.minimap-viewport {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 2px;
+    pointer-events: none;
+    transition: top 0.08s linear, height 0.08s linear;
+}
+
 /* === IDE STATUS BAR === */
 .chat-status-bar {
     display: flex; align-items: center; justify-content: space-between;

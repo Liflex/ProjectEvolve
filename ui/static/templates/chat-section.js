@@ -297,12 +297,21 @@
                         <button @click="reconnectTab(tab.tab_id)" class="chat-restored-reconnect-btn">&#x21bb; RECONNECT</button>
                         <button @click="tab._restored = false" class="chat-restored-dismiss-btn" title="Dismiss">&#x2715;</button>
                     </div>
-                    <!-- Messages area -->
-                    <div class="flex-1 overflow-y-auto p-4 space-y-3" :id="'chat-messages-' + tab.tab_id"
-                         x-html="renderChatHTML(tab)"
-                         @click="onChatClick($event)"
-                         @contextmenu="onChatContextMenu(tab, $event)"
-                         @scroll="onChatScroll(tab, $event)">
+                    <!-- Messages area with minimap -->
+                    <div class="flex-1 overflow-hidden relative" style="min-height:0">
+                        <div class="absolute inset-0 overflow-y-auto p-4 space-y-3" :id="'chat-messages-' + tab.tab_id"
+                             x-html="renderChatHTML(tab)"
+                             @click="onChatClick($event)"
+                             @contextmenu="onChatContextMenu(tab, $event)"
+                             @scroll="onChatScroll(tab, $event)">
+                        </div>
+                        <!-- Minimap overlay -->
+                        <div class="chat-minimap" x-show="tab.messages.length > 5"
+                             @click="minimapClick(tab, $event)"
+                             :title="tab.messages.length + ' messages \u2014 click to navigate'">
+                            <div class="minimap-content" x-html="renderMinimap(tab)"></div>
+                            <div class="minimap-viewport" :style="'top:' + (tab._mmTop||0) + '%;height:' + (tab._mmHeight||100) + '%'"></div>
+                        </div>
                     </div>
                     <!-- Scroll-to-bottom FAB -->
                     <button x-show="tab.scrolledUp" x-cloak
