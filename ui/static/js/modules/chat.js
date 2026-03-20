@@ -121,6 +121,10 @@ window.AppChat = (function() {
                 tab._unread = 0;
                 tab._agentDone = false;
                 this._updateDocTitle();
+                // Cat: update chat context for idle tips
+                if (window.CatModule && CatModule.setChatContext) {
+                    CatModule.setChatContext(tab.messages);
+                }
             }
             if (window.refitTerminal) refitTerminal(tabId);
             this.resizeInputForTab(tab);
@@ -528,8 +532,19 @@ window.AppChat = (function() {
                             }
                         }
                         if (window.CatModule && CatModule.isActive()) {
-                            // Cat: analyze agent response for contextual comment
-                            if (CatModule.analyzeAgentResponse && lastMsg && lastMsg.content) {
+                            // Cat: update context + contextual skill suggestion
+                            if (CatModule.setChatContext) CatModule.setChatContext(tab.messages);
+                            if (CatModule.getContextualSkillSuggestion) {
+                                const suggestion = CatModule.getContextualSkillSuggestion(tab.messages);
+                                if (suggestion) {
+                                    CatModule.setExpression('thinking');
+                                    CatModule.setSpeechText(suggestion.tip, 6000, suggestion.skill);
+                                } else if (CatModule.analyzeAgentResponse && lastMsg && lastMsg.content) {
+                                    CatModule.analyzeAgentResponse(lastMsg.content);
+                                } else {
+                                    CatModule.setExpression('happy');
+                                }
+                            } else if (CatModule.analyzeAgentResponse && lastMsg && lastMsg.content) {
                                 CatModule.analyzeAgentResponse(lastMsg.content);
                             } else {
                                 CatModule.setExpression('happy');

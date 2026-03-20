@@ -644,6 +644,98 @@
         ],
     };
 
+    // Agent response keyword-based skill suggestions (analyzes text content for context)
+    const AGENT_CONTEXT_SKILL_TIPS = [
+        {
+            keywords: ['commit', 'коммит', 'git add', 'git commit', 'git push', 'изменения зафиксиров'],
+            skills: ['/commit'],
+            tips: [
+                'Изменения готовы? /commit создаст коммит! =^_^=',
+                'Пора коммитить! /commit поможет! Мяу!',
+                'Фиксируем результат? /commit — одна команда!',
+            ],
+        },
+        {
+            keywords: ['refactor', 'рефакторинг', 'refactoring', 'упростить код', 'чистота кода', 'дубликат', 'duplicate'],
+            skills: ['/simplify'],
+            tips: [
+                'Рефакторинг? /simplify проверит качество! Мурр!',
+                '/simplify найдёт дубликаты и проблемы!',
+                'Код можно лучше? /simplify подскажет_',
+            ],
+        },
+        {
+            keywords: ['тест', 'test', 'тестирован', 'unit test', 'pytest', 'assert', 'coverage'],
+            skills: ['/code-reviewer'],
+            tips: [
+                'Тесты? /code-reviewer проверит качество! =^.^=',
+                '/code-reviewer — ревью с фокусом на тесты!',
+                '*уши навострил* Тесты важны! /code-reviewer поможет_',
+            ],
+        },
+        {
+            keywords: ['security', 'безопасность', 'vulnerability', 'xss', 'sql injection', 'auth', 'уязвимость'],
+            skills: ['/code-reviewer'],
+            tips: [
+                'Безопасность? /code-reviewer найдёт уязвимости!',
+                '*тревожно* Security matters! /code-reviewer проверит_',
+                '/code-reviewer — security-аудит включён!',
+            ],
+        },
+        {
+            keywords: ['spec', 'спецификац', 'требован', 'feature', 'фича', 'план реализац', 'задача'],
+            skills: ['/speckit.specify', '/speckit.features'],
+            tips: [
+                'Нужна спецификация? /speckit.specify создаст!',
+                'Фича? /speckit.features для быстрого старта! =^_^=',
+                '/speckit.plan — план реализации из спецификации!',
+            ],
+        },
+        {
+            keywords: ['deploy', 'деплой', 'release', 'релиз', 'production', 'продакшн', 'ci/cd', 'pipeline'],
+            skills: ['/push'],
+            tips: [
+                'Релиз? /push автоматизирует деплой! Мяу!',
+                '/push — релиз одной командой! =^.^=',
+                'CI/CD? /push запустит пайплайн!',
+            ],
+        },
+        {
+            keywords: ['баг', 'bug', 'ошибк', 'error', 'fix', 'починить', 'исправить', 'crash', 'exception'],
+            skills: ['/simplify'],
+            tips: [
+                'Баг? /simplify поможет найти корень проблемы!',
+                '*концентрируется* /simplify проанализирует код_',
+                'Fixing bugs? /simplify проверит решение!',
+            ],
+        },
+        {
+            keywords: ['документац', 'document', 'readme', 'docstring', 'комментари', 'описан'],
+            skills: ['/code-reviewer'],
+            tips: [
+                'Документация? /code-reviewer проверит полноту!',
+                '/code-reviewer найдёт недостающие доки_',
+                '*кивает* Хорошая документация = хороший проект!',
+            ],
+        },
+        {
+            keywords: ['prompt', 'промпт', 'system prompt', 'claude', 'llm', 'ai агент', 'модель'],
+            skills: ['/speckit.clarify'],
+            tips: [
+                'Улучши промпт? /speckit.clarify найдёт пробелы!',
+                '/speckit.clarify — анализ спецификации! Мяу!',
+            ],
+        },
+        {
+            keywords: ['производительн', 'performance', 'оптимиз', 'медленн', 'slow', 'быстрее', 'ускорить'],
+            skills: ['/simplify'],
+            tips: [
+                'Оптимизация? /simplify найдёт узкие места!',
+                '/simplify — анализ производительности кода!',
+            ],
+        },
+    ];
+
     // Agent response content type tips
     const AGENT_RESPONSE_TIPS = {
         code_block: [
@@ -667,6 +759,62 @@
             '*изучает таблицу* Мурр...',
         ],
     };
+
+    // Chat context for idle tips (set from chat module)
+    let _chatContextMessages = null;
+
+    /**
+     * Internal: analyze recent messages and return contextual skill suggestion.
+     * Used by both idle tips timer and public API.
+     */
+    function _getContextualSkillSuggestion(messages) {
+        if (!messages || messages.length === 0) return null;
+        const recentText = messages
+            .slice(-6)
+            .map(m => (m.content || '').replace(/<[^>]*>/g, ''))
+            .join(' ')
+            .toLowerCase();
+
+        // Check for "completed action" patterns — suggest follow-up
+        const followUpPatterns = [
+            { pattern: /(?:создал|created|написал|wrote|добавил|added|реализовал|implemented)\s+\S+\s+(?:файл|file|модуль|module|класс|class|функци|function)/i,
+              tips: ['Файл готов! /code-reviewer проверит? =^_^=', 'Создано! /simplify для качества кода!'],
+              skill: '/code-reviewer' },
+            { pattern: /(?:исправил|fixed|починил|ремонтировал|resolved)\s+(?:баг|bug|ошибк|error|issue)/i,
+              tips: ['Баг пофиксен! /commit сохраним? Мяу!', 'Фикс готов! Не забудь /commit!'],
+              skill: '/commit' },
+            { pattern: /(?:все тест|all test|тесты прох|tests pass|тесты зелен|tests green)/i,
+              tips: ['Тесты зелёные! /commit фиксирует прогресс! =^_^='],
+              skill: '/commit' },
+            { pattern: /(?:рефакторинг|refactor|упростил|simplif|очистил|cleaned)/i,
+              tips: ['Рефакторинг завершён! /code-reviewer подтвердит качество!'],
+              skill: '/code-reviewer' },
+            { pattern: /(?:зависимость|dependenc|обновил|updated|upgrade|npm install|pip install)/i,
+              tips: ['Зависимости обновлены! /simplify проверит совместимость!'],
+              skill: '/simplify' },
+            { pattern: /(?:документац|documented|readme|docstring|комментари|comment)/i,
+              tips: ['Доки готовы! /commit сохраним? =^.^='],
+              skill: '/commit' },
+            { pattern: /(?:настроил|configured|setup|config|установил|installed)/i,
+              tips: ['Настройка завершена! /commit для фиксации!'],
+              skill: '/commit' },
+        ];
+
+        for (const { pattern, tips, skill } of followUpPatterns) {
+            if (pattern.test(recentText)) {
+                return { tip: pickRandom(tips), skill };
+            }
+        }
+
+        // Fallback: keyword match from AGENT_CONTEXT_SKILL_TIPS
+        for (const group of AGENT_CONTEXT_SKILL_TIPS) {
+            if (group.keywords.some(kw => recentText.includes(kw))) {
+                return { tip: pickRandom(group.tips), skill: pickRandom(group.skills) };
+            }
+        }
+
+        return null;
+    }
 
     // Idle chat tips (when user is in chat but not typing)
     const CHAT_IDLE_TIPS = [
@@ -1291,6 +1439,16 @@
             let pool;
             if (_currentPage === 'chat' && Math.random() < 0.6) {
                 // 60% chat-specific idle tips when on chat page
+                // Try contextual skill suggestion from recent messages
+                if (_chatContextMessages && _chatContextMessages.length > 0 && Math.random() < 0.4) {
+                    const suggestion = _getContextualSkillSuggestion(_chatContextMessages);
+                    if (suggestion) {
+                        currentSpeech = suggestion.tip;
+                        _speechAction = suggestion.skill;
+                        render();
+                        return;
+                    }
+                }
                 pool = CHAT_IDLE_TIPS;
             } else {
                 const pagePool = PAGE_TIPS[_currentPage];
@@ -1681,6 +1839,19 @@
             // Only react ~30% of the time
             if (Math.random() > 0.3) return;
 
+            // Priority 1: keyword-based contextual skill suggestion (higher value for user)
+            const lower = content.toLowerCase();
+            for (const group of AGENT_CONTEXT_SKILL_TIPS) {
+                if (group.keywords.some(kw => lower.includes(kw))) {
+                    const tip = pickRandom(group.tips);
+                    const skill = pickRandom(group.skills);
+                    setSpeechText(tip, 6000, skill);
+                    if (Math.random() < 0.5) setExpression('thinking');
+                    return;
+                }
+            }
+
+            // Priority 2: structural analysis (existing behavior)
             if (hasCode >= 2) {
                 setSpeechText(pickRandom(AGENT_RESPONSE_TIPS.code_block), 5000);
                 if (Math.random() < 0.4) setExpression('happy');
@@ -1694,10 +1865,34 @@
         },
 
         /**
-         * Get a random idle chat tip (for chat page when user is idle).
+         * Analyze recent chat messages and return a contextual skill suggestion.
+         * Called after agent finishes streaming — gives a "next step" tip.
+         * @param {Array} messages - recent chat messages (last ~6)
+         * @returns {{tip: string, skill: string}|null} suggestion or null
          */
-        getChatIdleTip() {
-            return pickRandom(CHAT_IDLE_TIPS);
+        getContextualSkillSuggestion(messages) {
+            return _getContextualSkillSuggestion(messages);
+        },
+
+        /**
+         * Update chat context for idle tips.
+         * Called from chat module when messages change.
+         * @param {Array} messages - recent chat messages
+         */
+        setChatContext(messages) {
+            _chatContextMessages = messages;
+        },
+
+        /**
+         * Get a random idle chat tip (for chat page when user is idle).
+         * If messages provided, tries contextual tips first.
+         * @param {Array} [messages] - recent chat messages for context
+         * @returns {string} tip text
+         */
+        getChatIdleTip(messages) {
+            return _getContextualSkillSuggestion(messages)
+                ? _getContextualSkillSuggestion(messages).tip
+                : pickRandom(CHAT_IDLE_TIPS);
         },
 
         /**
