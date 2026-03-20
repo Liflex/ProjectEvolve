@@ -453,6 +453,26 @@
             'Мяу? Ты ещё тут?',
             '*проверяет часы* Долго ещё?',
         ],
+        typing_start: [
+            '*подкрался* Что пишешь?',
+            '*уши навострил* О, сообщение!',
+            'Мурр? Пишешь мне? =^.^=',
+            '*заинтересованно смотрит*',
+            '*принюхался* Что-то интересное?',
+        ],
+        typing_long: [
+            '*нетерпеливо* Длинное сообщение...',
+            'Много букав! *хвост дёргается*',
+            '*ждёт* Почти написал?',
+            'Эссе? =^.^= *уснул от скуки*',
+            '*скучает* Может уже отправишь?',
+        ],
+        typing_stop: [
+            '* ждёт отправки* ...',
+            'Ну? Отправляй! Мяу!',
+            '*нетерпеливо* Жду-у-у...',
+            'Enter нажми! =^.^=',
+        ],
     };
 
     // Chat context-aware skill tips (keyword → tips)
@@ -762,6 +782,8 @@
     let _mouseX = 0, _mouseY = 0;         // global cursor position for eye tracking
     let _glintX = 0, _glintY = 0;         // smoothed glint offset (-1..1)
     let _mouseTracking = false;            // is mousemove listener active
+    let _userTyping = false;               // user is typing in chat input
+    let _userTypingTimer = null;           // debounce timer for typing stop
 
     // Mouse move handler for eye tracking
     function _onMouseMove(e) {
@@ -1676,6 +1698,61 @@
          */
         getChatIdleTip() {
             return pickRandom(CHAT_IDLE_TIPS);
+        },
+
+        /**
+         * React to user typing in chat input.
+         * Called on each keystroke — debounced internally.
+         * Cat looks curious, may comment on long messages.
+         */
+        onUserTyping(textLength) {
+            if (!animating) return;
+            _lastInteractionTime = Date.now();
+
+            // Wake from idle
+            if (_idleLevel > 0) {
+                _idleLevel = 0;
+                _tailSpeed = 2;
+                if (expression === 'sleepy') setExpression('neutral');
+            }
+
+            // First keystroke after not typing — initial reaction
+            if (!_userTyping) {
+                _userTyping = true;
+                // Only react ~30% of the time to avoid spam
+                if (Math.random() < 0.3 && !currentSpeech) {
+                    setExpression('thinking');
+                    setSpeechText(pickRandom(SPEECH.typing_start), 3000);
+                    setTimeout(() => {
+                        if (animating && expression === 'thinking' && _userTyping) {
+                            setExpression('neutral');
+                        }
+                    }, 3000);
+                }
+            }
+
+            // Clear existing timer
+            if (_userTypingTimer) clearTimeout(_userTypingTimer);
+
+            // Long message reaction (>200 chars while still typing)
+            if (textLength > 200 && textLength % 100 < 5 && !currentSpeech && Math.random() < 0.2) {
+                setSpeechText(pickRandom(SPEECH.typing_long), 3000);
+                if (Math.random() < 0.3) triggerEarTwitch();
+            }
+
+            // Set debounce timer: after 3s of no typing, assume stopped
+            _userTypingTimer = setTimeout(() => {
+                _userTyping = false;
+                // Occasional "send it!" nudge if user stopped typing but didn't send
+                if (animating && !currentSpeech && Math.random() < 0.15) {
+                    setSpeechText(pickRandom(SPEECH.typing_stop), 2500);
+                }
+            }, 3000);
+        },
+
+        /** Check if user is currently typing. */
+        isUserTyping() {
+            return _userTyping;
         },
 
         /** Set current page for contextual tips. */

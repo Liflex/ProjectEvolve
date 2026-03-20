@@ -683,6 +683,10 @@ window.AppChat = (function() {
                 tab._msgDraft = '';
             }
             const text = (tab.input_text || '');
+            // Cat: typing awareness
+            if (window.CatModule && CatModule.isActive() && !text.startsWith('/')) {
+                CatModule.onUserTyping(text.length);
+            }
             if (text.startsWith('/')) {
                 this.mentionMenu.show = false;
                 this.mentionMenu.items = [];
