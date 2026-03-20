@@ -3734,3 +3734,27 @@ Results
 3. **`ResearchRunner.decompose`** — togg
 
 
+## Experiment 174 — Decompose toggle в lab UI + deduplicate goals
+
+**Time:** 2026-03-20 20:24:33
+
+**Files:** Target:** `ui/static/js/app.js`, `ui/static/templates/lab-run.js`, Files Modified:** `ui/static/js/app.js`, `ui/static/templates/lab-run.js`, `.autoresearch.json`
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. Добавлен `decompose: false` в `runConfig` Alpine data
+2. Добавлен toggle **DECOMPOSE_TASKS** в lab-run.js под PARALLEL_JUDGES (фиолетовый акцент)
+3. Backend уже поддерживал `decompose` — никаких серверных изменений не потребовалось
+4. Удалён дублирующийся goal "Judge" из `.autoresearch.json`
+
+**Working:** yes
+**Tests:** smoke passed (Python imports OK)
+
+

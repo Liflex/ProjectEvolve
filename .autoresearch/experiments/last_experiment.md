@@ -1,25 +1,37 @@
 # Last Experiment Summary
 
-**Experiment #173** — Multi-agent task decomposition & result aggregation
-**Date:** 2026-03-20 20:22:59
+**Experiment #175** — Cat head tilt + body bounce animations
+**Date:** 2026-03-20
 
 ## What Was Done
 
-N/A
+1. **Head tilt animation** — canvas rotation around neck pivot (3-7 degrees), smoothly interpolated
+   - Triggers during thinking/surprised expressions (3% chance per tick)
+   - Random idle trigger during neutral expression (0.5% chance per tick)
+   - Also triggered on click reactions (2 of 8 reactions use headTilt)
+   - `triggerHeadTilt()` public API method
+   - Reset when expression changes to non-thinking/surprised
+
+2. **Body bounce animation** — oscillating Y offset (±1.5 pixels, sine wave)
+   - Triggers on milestone celebrations (every 10 experiments, 20 ticks)
+   - Triggers on 5+ KEEP streak (15 ticks)
+   - Triggers on judge KEEP verdict (10 ticks)
+   - `triggerBounce(ticks)` public API method
+   - Smooth decay after animation ends
+
+3. **Integration** — head tilt + bounce wired into:
+   - `setExpression('thinking')` → auto head tilt
+   - `reactToExperiment()` milestones/streaks → bounce
+   - `CLICK_REACTIONS` array → headTilt animation type
+   - Lab judge_verdict handler → bounce on KEEP
 
 ## Files Modified
 
-- None
+- `ui/static/modules/cat.js` — head tilt state, tick logic, render transform, public API, click reactions
+- `ui/static/js/modules/lab.js` — judge KEEP verdict triggers bounce
+- `.autoresearch.json` — updated cat goal with new animations
 
 ## Key Results
 
-Results
-
-**What was done:**
-1. **`TaskDecomposer`** — LLM-based декомпозиция сложных целей в 2-4 независимых параллельных подзадач. Быстрый SDK вызов (max_turns=1) с JSON-выводом, автосбор контекста проекта, изоляционные инструкции для каждой подзадачи
-2. **`ResultAggregator`** + **`AggregatedResult`** — агрегация результатов параллельного выполнения: обнаружение merge-конфликтов через git diff markers, унифицированный summary, per-task статус и стоимость
-3. **`ResearchRunner.decompose`** — togg
-
-## For Next Iteration
-
-N/A
+**Working:** yes
+**Tests:** syntax check passed (node -c), Python smoke imports OK
