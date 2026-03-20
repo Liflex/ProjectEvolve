@@ -416,6 +416,32 @@ window.AppChat = (function() {
                             if (data.total_cost_usd) tab.tokens.cost += data.total_cost_usd;
                             // Store per-message token info for display
                             tab._msgTokens = { input: usage.input_tokens || 0, output: usage.output_tokens || 0, cost: data.total_cost_usd || 0 };
+                            // Budget warning system
+                            const budget = _app.settings.costBudget || 5.00;
+                            if (budget > 0 && tab.tokens.cost > 0) {
+                                const pct = tab.tokens.cost / budget;
+                                const prevPct = (tab.tokens.cost - (data.total_cost_usd || 0)) / budget;
+                                if (pct >= 1.0 && prevPct < 1.0 && !tab._budgetWarned100) {
+                                    tab._budgetWarned100 = true;
+                                    _app.showToast('BUDGET EXCEEDED: $' + tab.tokens.cost.toFixed(2) + ' / $' + budget.toFixed(2), 'error');
+                                    if (window.CatModule && CatModule.isActive()) {
+                                        CatModule.setExpression('angry');
+                                        CatModule.setSpeechText('Бюджет превышен! $' + tab.tokens.cost.toFixed(2) + '! *тревожно*', 5000);
+                                        setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 5000);
+                                    }
+                                } else if (pct >= 0.8 && prevPct < 0.8 && !tab._budgetWarned80) {
+                                    tab._budgetWarned80 = true;
+                                    _app.showToast('BUDGET 80%: $' + tab.tokens.cost.toFixed(2) + ' / $' + budget.toFixed(2), 'info');
+                                    if (window.CatModule && CatModule.isActive()) {
+                                        CatModule.setExpression('thinking');
+                                        CatModule.setSpeechText('Бюджет на ' + Math.round(pct * 100) + '%... Осторожно!', 4000);
+                                        setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000);
+                                    }
+                                } else if (pct >= 0.5 && prevPct < 0.5 && !tab._budgetWarned50) {
+                                    tab._budgetWarned50 = true;
+                                    _app.showToast('BUDGET 50%: $' + tab.tokens.cost.toFixed(2) + ' / $' + budget.toFixed(2), 'info');
+                                }
+                            }
                             _app.chatTick++;
                             // Cat: context window and cost warnings
                             if (window.CatModule && CatModule.isActive()) {
@@ -3183,6 +3209,18 @@ window.AppChat = (function() {
         getToolCount(tab) {
             if (!tab || !tab.messages) return 0;
             return tab.messages.filter(m => m.role === 'tool').length;
+        },
+        resetCost(tabId) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab) return;
+            tab.tokens.cost = 0;
+            tab.tokens.input = 0;
+            tab.tokens.output = 0;
+            tab._budgetWarned50 = false;
+            tab._budgetWarned80 = false;
+            tab._budgetWarned100 = false;
+            this.chatTick++;
+            this.showToast('Cost counter reset', 'success');
         },
         /** Live elapsed time while agent is streaming (updates via _clockTick). */
         getStreamingElapsed(tab) {

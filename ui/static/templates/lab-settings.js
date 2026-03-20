@@ -160,6 +160,43 @@
                          :class="settings.compactSidebar ? 'left-[26px] bg-[var(--bg2)]' : 'left-0.5 bg-[var(--v3)]'"></div>
                 </button>
             </div>
+
+            <!-- Divider: Chat Budget -->
+            <div class="flex items-center gap-2 py-1">
+                <div class="flex-1 border-t border-[var(--v-dim)]"></div>
+                <span class="text-[0.5rem] tracking-[0.3em] text-[var(--v3)]">CHAT_BUDGET</span>
+                <div class="flex-1 border-t border-[var(--v-dim)]"></div>
+            </div>
+
+            <!-- Cost budget -->
+            <div class="pixel-border bg-[var(--bg2)] p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <div class="text-sm text-[var(--ng2)] tracking-wider">COST_BUDGET</div>
+                        <div class="text-[0.625rem] text-[var(--v3)] mt-0.5">Maximum session cost before warnings (USD). Set 0 to disable.</div>
+                    </div>
+                    <span class="text-sm text-[var(--yellow)] font-mono px-2 py-0.5 bg-[var(--bg)] border border-[var(--v-dim)]"
+                          x-text="'$' + (settings.costBudget || 0).toFixed(2)"></span>
+                </div>
+                <input type="range" min="0" max="50" step="0.50"
+                       x-model.number="settings.costBudget"
+                       @input="settings.costBudget = parseFloat($event.target.value); localStorage.setItem('ar-settings', JSON.stringify(settings));"
+                       class="w-full h-1.5 bg-[var(--v-dim)] rounded-sm appearance-none cursor-pointer"
+                       style="accent-color: var(--yellow);">
+                <div class="flex justify-between text-[0.5625rem] text-[var(--v3)] mt-1">
+                    <span>$0 (off)</span>
+                    <span>$5</span>
+                    <span>$10</span>
+                    <span>$25</span>
+                    <span>$50</span>
+                </div>
+                <div class="flex items-center gap-2 mt-2">
+                    <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider">WARN_AT</span>
+                    <span class="text-[0.5625rem] text-[var(--v3)]">50%</span>
+                    <span class="text-[0.5625rem] text-[var(--amber)]">80%</span>
+                    <span class="text-[0.5625rem] text-[var(--red)]">100%</span>
+                </div>
+            </div>
         </div>
     `;
 })();

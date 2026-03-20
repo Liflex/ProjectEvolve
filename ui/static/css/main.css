@@ -433,6 +433,9 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
 .chat-status-bar .status-separator {
     width: 1px; height: 0.75rem; background: var(--v-dim);
 }
+.budget-sep {
+    width: 1px; height: 0.75rem; background: var(--v-dim); display: inline-block; vertical-align: middle;
+}
 .chat-status-bar .agent-state { color: var(--v); }
 .chat-status-bar .agent-state.streaming { color: var(--cyan); }
 .chat-status-bar .agent-state.thinking { color: var(--amber); }

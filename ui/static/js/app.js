@@ -268,7 +268,7 @@ function _buildAppData() {
         organismSVG: '',
         organismStage: 'DORMANT',
         runElapsed: '',
-        settings: JSON.parse(localStorage.getItem('ar-settings') || '{"matrixRain":true,"crtEffect":true,"catCompanion":true,"theme":"synthwave","fontSize":16,"chatDensity":"comfortable","compactSidebar":false,"showThinking":false}'),
+        settings: JSON.parse(localStorage.getItem('ar-settings') || '{"matrixRain":true,"crtEffect":true,"catCompanion":true,"theme":"synthwave","fontSize":16,"chatDensity":"comfortable","compactSidebar":false,"showThinking":false,"costBudget":5.00}'),
         _matrixRainStopped: false,
         _catHovering: false,
 
@@ -554,6 +554,7 @@ function _buildAppData() {
             if (this.settings.chatDensity === undefined) { this.settings.chatDensity = 'comfortable'; migrated = true; }
             if (this.settings.compactSidebar === undefined) { this.settings.compactSidebar = false; migrated = true; }
             if (this.settings.showThinking === undefined) { this.settings.showThinking = false; migrated = true; }
+            if (this.settings.costBudget === undefined) { this.settings.costBudget = 5.00; migrated = true; }
             if (migrated) localStorage.setItem('ar-settings', JSON.stringify(this.settings));
             this.applySettings();
             window._app = this;
@@ -948,7 +949,7 @@ function app() {
             section: 'lab', page: 'dashboard',
             stats: { score_trend: [], type_distribution: {} },
             experiments: [], runStatus: { running: false, tokens: null },
-            settings: { matrixRain: false, crtEffect: false, catCompanion: false, theme: 'synthwave', fontSize: 16, chatDensity: 'comfortable', compactSidebar: false, showThinking: false },
+            settings: { matrixRain: false, crtEffect: false, catCompanion: false, theme: 'synthwave', fontSize: 16, chatDensity: 'comfortable', compactSidebar: false, showThinking: false, costBudget: 5.00 },
             toast: { show: false, message: '', type: 'error' },
             showToast(msg) { console.error('[app-toast]', msg); },
             async init() { this.showToast('APP INIT FAILED: ' + e.message); },

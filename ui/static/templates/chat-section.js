@@ -433,7 +433,7 @@
                             </div>
                         </div>
                     </template>
-                    <!-- Token indicator -->
+                    <!-- Token + Budget indicator -->
                     <div x-show="tab.tokens.input > 0" class="border-t border-[var(--v-dim)] bg-[var(--bg)] px-3 py-1 flex items-center gap-3 shrink-0">
                         <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider">TOKENS_</span>
                         <span class="text-[0.5625rem] tabular-nums" :class="tab.tokens.input > tab.tokens.threshold * 0.8 ? 'text-[var(--amber)]' : 'text-[var(--cyan)]'"
@@ -446,8 +446,27 @@
                         </div>
                         <span class="text-[0.5625rem] tabular-nums" :class="tab.tokens.input > tab.tokens.threshold * 0.9 ? 'text-[var(--red)]' : tab.tokens.input > tab.tokens.threshold * 0.7 ? 'text-[var(--amber)]' : 'text-[var(--v3)]'"
                               x-text="Math.round((tab.tokens.input / tab.tokens.threshold) * 100) + '%'"></span>
-                        <span x-show="tab.tokens.cost > 0" class="text-[0.5625rem] text-[var(--yellow)] tabular-nums" x-text="'$'+tab.tokens.cost.toFixed(4)"></span>
                         <span x-show="tab.tokens.input > tab.tokens.threshold * 0.9" class="text-[0.5625rem] text-[var(--red)] blink tracking-wider">HIGH_CTX</span>
+                        <!-- Budget indicator -->
+                        <template x-if="settings.costBudget > 0">
+                            <span class="flex items-center gap-2">
+                                <span class="budget-sep"></span>
+                                <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider">BUDGET</span>
+                                <span class="text-[0.5625rem] tabular-nums"
+                                      :class="(tab.tokens.cost / settings.costBudget) >= 1 ? 'text-[var(--red)] blink' : (tab.tokens.cost / settings.costBudget) >= 0.8 ? 'text-[var(--amber)]' : (tab.tokens.cost / settings.costBudget) >= 0.5 ? 'text-[var(--yellow)]' : 'text-[var(--ng)]'"
+                                      x-text="'$' + (tab.tokens.cost||0).toFixed(2) + ' / $' + settings.costBudget.toFixed(2)"></span>
+                                <div class="h-1 bg-[var(--bg2)] overflow-hidden" style="width:60px">
+                                    <div class="h-full transition-all duration-300"
+                                         :class="(tab.tokens.cost / settings.costBudget) >= 1 ? 'bg-[var(--red)]' : (tab.tokens.cost / settings.costBudget) >= 0.8 ? 'bg-[var(--amber)]' : 'bg-[var(--ng)]'"
+                                         :style="'width:' + Math.min(100, ((tab.tokens.cost||0) / settings.costBudget) * 100) + '%'"></div>
+                                </div>
+                                <span class="text-[0.5625rem] tabular-nums"
+                                      :class="(tab.tokens.cost / settings.costBudget) >= 1 ? 'text-[var(--red)]' : (tab.tokens.cost / settings.costBudget) >= 0.8 ? 'text-[var(--amber)]' : 'text-[var(--v3)]'"
+                                      x-text="Math.round(((tab.tokens.cost||0) / settings.costBudget) * 100) + '%'"></span>
+                                <button class="text-[0.5rem] text-[var(--v3)] hover:text-[var(--red)] tracking-wider px-1 border border-[var(--v-dim)] hover:border-[var(--red)] transition-all"
+                                        @click="resetCost(tab.tab_id)" title="Reset cost counter">RESET</button>
+                            </span>
+                        </template>
                     </div>
                     <!-- Agent Activity Status Bar -->
                     <div x-show="tab._agentActivity && tab._agentActivity.type !== 'idle'" x-cloak

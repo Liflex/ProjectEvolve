@@ -2985,3 +2985,18 @@ Results
 **Tests:** syntax check passed (Python AST parse OK)
 
 
+## Experiment 143 — Judge — enhanced quality checks (report validation + code quality)
+
+**Time:** 2026-03-20 16:48:28
+
+**Files:** Target:** utils/judge.py, ui/server.py, app.js, lab-experiments.js, Files Modified:** utils/judge.py, ui/server.py, ui/static/js/app.js, ui/static/templates/lab-experiments.js, 5. **Pass report_text** to `judge.evaluate()` from both auto-judge (post-experiment) and manual API endpoint (`/api/judge/{n}`).
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+N/A
+
+
