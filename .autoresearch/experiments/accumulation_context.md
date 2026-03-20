@@ -1,4 +1,66 @@
 
+## Experiment 182 — WebSocket auto-reconnect with exponential backoff
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **Auto-reconnect with exponential backoff** — `ws.onclose` schedules reconnect (1s→2s→4s→...→30s max, 10 attempts). New `_scheduleWsReconnect()` method.
+2. **Fixed ws.onerror duplicate messages** — removed error push from `onerror` (onclose handles state).
+3. **`_wsIntentionalClose` flag** — prevents auto-reconnect on intentional tab close.
+4. **`reconnectTab()` generalized** — works for all tabs, not just restored ones.
+5. **UI: 'reconnecting' state** — status bar, tab dot, banner, RECONNECT button on disconnected tabs.
+6. **Fixed pre-existing syntax error** — double `},` after `toggleSendMode()`.
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` (+70/-35 lines)
+- `ui/static/templates/chat-section.js` (+8/-6 lines)
+- `ui/static/css/main.css` (+1 line)
+
+---
+
+## Experiment 180 — Security hardening — path traversal fix, secret file blocking, input validation
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`_validate_project_path()`** — centralized helper using `_is_subpath()` with `Path.relative_to()` for proper containment check. Replaced weak `".." in parts` checks in 4 endpoints.
+2. **`_is_subpath()`** — reliable subpath check that works with resolved paths (unlike string prefix matching which can be bypassed).
+3. **Path traversal fix in `/api/sessions` POST** — was completely unprotected, now validates cwd against allowed bases.
+4. **Path traversal fix in `/api/config`, `/api/setup`, `/api/run`** — replaced weak checks with centralized validation.
+5. **Secret file blocking** — `SECRET_EXTS` (.env, .pem, .key, .p12, .pfx, .jks, .keystore, .credentials, .htpasswd) and `SECRET_NAMES` (id_rsa, id_ed25519, etc.) blocked from `/api/fs/read` (403), `/api/fs/search` (skipped), `/api/fs/list` (hidden).
+6. **Removed `.env` from TEXT_EXTS** — was searchable through `/api/fs/search`.
+7. **Prompt payload size limit** — `/api/prompt` PUT now has `max_length=500_000`.
+8. **13 new tests** covering path validation and secret blocking.
+
+### Files Modified
+
+- `ui/server.py` (+55/-30 lines)
+- `tests/test_server_path_validation.py` (+117 lines, was empty)
+
+---
+
+## Experiment 179 — Scroll-to-bottom FAB with new message count indicator
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`_newMsgCount` tracker** — новый счётчик на каждом tab, инкрементируется при каждом новом сообщении пока пользователь прокручен вверх
+2. **`_trackNewMsg(tab)` helper** — метод для отслеживания новых сообщений, вызывается после каждого `messages.push()` (кроме user-сообщений)
+3. **FAB upgrade** — вместо "↓ BOTTOM" показывает "↓ N NEW" когда есть новые сообщения ниже, с cyan-цветом и пульсацией
+4. **Auto-reset** — счётчик сбрасывается при клике на FAB, при скролле вниз, при создании/restore tab
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` (+21 lines)
+- `ui/static/templates/chat-section.js` (+6 lines)
+- `ui/static/css/main.css` (+16 lines)
+
+---
+
 ## Experiment 177 — Cat expression overlays + yawn mouth sprite
 
 **Date:** 2026-03-20
@@ -7012,6 +7074,98 @@ Results
 4. **SPEECH.knead** — 7 фраз на русском ("*массажирует лапками* Мурр...", "*топчет тесто* Уютно_")
 5. **Public API:** `CatModule.triggerKnead()`
 6. **
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 179 — Scroll-to-bottom FAB with new message count indicator
+
+**Date:** 2026-03-20 20:48:02
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- Target:** chat.js, chat-section.js, main.css
+- Files Modified:** `ui/static/js/modules/chat.js`, `ui/static/templates/chat-section.js`, `ui/static/css/main.css`
+
+### Results
+
+Results
+
+**What was done:**
+1. **`_newMsgCount` tracker** — новый счётчик на каждом tab, инкрементируется при каждом новом сообщении (assistant, tool, error) пока пользователь прокручен вверх. User-сообщения не считаются — пользователь сам их отправил.
+2. **`_trackNewMsg(tab)` helper** — метод для отслеживания, вызывается после каждого `messages.push()` (6 мест в WebSocket handler + send logic)
+3. **FAB upgrade** — вместо статичного "↓ BOTTOM" показывает "↓ N NEW" когда есть непрочитанные сообще
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 180 — Security hardening — path traversal fix, secret file blocking, input validation
+
+**Date:** 2026-03-20 20:54:08
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- Files Modified:** `ui/server.py` (+55/-30), `tests/test_server_path_validation.py` (+117)
+
+### Results
+
+Results
+
+**Quality Gate Score:** N/A (security fix, manual verification)
+**Tests:** 13/13 passed
+**Build:** success (syntax check passed)
+
+### Notes for Next
+
+Decision
+
+**Result:** KEEP
+**Reason:**
+1. **Реальный баг безопасности** — `/api/sessions` POST позволял создать сессию в любом каталоге (path traversal)
+2. **Слабая защита в 4 endpoint'ах** — `".." in parts` проверка обходится через `resolve()`
+3. **Утечка секретов** — `.env` файлы были доступны через search и read API
+4. **Нет regression** — centralized helper делает то же что и раньше, только правильно
+5. **DRY** — 10 endpoint'ов используют одну и ту же валидацию вместо дублированного кода
+
+**
+
+---
+
+## Experiment 181 — Untitled
+
+**Date:** 2026-03-20 20:56:20
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.2556
+**Conflicts:** None
+
+**Per-task Results:**
 
 ### Notes for Next
 

@@ -34,9 +34,9 @@
     "Добавление выбора тем — 4 темы (synthwave, darcula, one-dark, dracula) с превью-карточками и визуальными свотчами в настройках",
     "Стилизация вывода агента под шаблоны тем — theme-aware markdown rendering (exp63), CSS переменные --md-* для каждой темы",
     "Шаблон темы Dark Dracula — добавлена тема dracula с палитрой Dracula IDE",
-    "Auto-scroll в чате и RUN — smart scroll с pause при скролле вверх, FAB для возврата, liveLogAutoScroll toggle",
+    "Auto-scroll в чате и RUN — smart scroll с pause при скролле вверх, FAB для возврата с счётчиком новых сообщений (exp179), liveLogAutoScroll toggle",
     "Skill autocomplete в чате — exp64: slash menu с локальными командами + Claude Code skills (/commit, /speckit.*, /simplify и др.)",
-    "Память сессий и чатов — exp101: localStorage persistence для sessions и tabs, auto-reconnect",
+    "Память сессий и чатов — exp101: localStorage persistence для sessions и tabs, auto-reconnect. WebSocket auto-reconnect с exponential backoff (exp182)",
     "Настройки ALT+9 глобальные — exp102: кнопка Settings перенесена в нижнюю часть sidebar, видна всегда",
     "Почистить chat от лишних функций — toolbar cleanup (exp163), removed IDE features: File Search, Global Search, Command Palette, Stats Panel (exp169). MORE dropdown now contains only chat-relevant tools."
   ]

@@ -3866,3 +3866,63 @@ Results
 6. **
 
 
+## Experiment 179 — Scroll-to-bottom FAB with new message count indicator
+
+**Time:** 2026-03-20 20:48:02
+
+**Files:** Target:** chat.js, chat-section.js, main.css, Files Modified:** `ui/static/js/modules/chat.js`, `ui/static/templates/chat-section.js`, `ui/static/css/main.css`
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **`_newMsgCount` tracker** — новый счётчик на каждом tab, инкрементируется при каждом новом сообщении (assistant, tool, error) пока пользователь прокручен вверх. User-сообщения не считаются — пользователь сам их отправил.
+2. **`_trackNewMsg(tab)` helper** — метод для отслеживания, вызывается после каждого `messages.push()` (6 мест в WebSocket handler + send logic)
+3. **FAB upgrade** — вместо статичного "↓ BOTTOM" показывает "↓ N NEW" когда есть непрочитанные сообще
+
+
+## Experiment 180 — Security hardening — path traversal fix, secret file blocking, input validation
+
+**Time:** 2026-03-20 20:54:08
+
+**Files:** Files Modified:** `ui/server.py` (+55/-30), `tests/test_server_path_validation.py` (+117)
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**Quality Gate Score:** N/A (security fix, manual verification)
+**Tests:** 13/13 passed
+**Build:** success (syntax check passed)
+
+
+## Experiment 181 — Untitled
+
+**Time:** 2026-03-20 20:56:20
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.2556
+**Conflicts:** None
+
+**Per-task Results:**
+
+

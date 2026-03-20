@@ -1,28 +1,32 @@
 # Last Experiment Summary
 
-**Experiment #178** — Paw kneading animation (making biscuits)
-**Date:** 2026-03-20 20:40:34
+**Experiment #182** — WebSocket auto-reconnect with exponential backoff
+**Date:** 2026-03-20
 
 ## What Was Done
 
-N/A
+1. **Auto-reconnect with exponential backoff** — `ws.onclose` now schedules reconnect instead of just setting 'disconnected'. Backoff: 1s, 2s, 4s, 8s, 16s, max 30s, up to 10 attempts.
+2. **Fixed ws.onerror duplicate messages** — `onerror` no longer pushes "[ERROR] WebSocket connection failed" (onclose always fires after onerror, reconnect logic handles state).
+3. **`_wsIntentionalClose` flag** — prevents auto-reconnect on intentional close (tab close, session end by server with code 1000).
+4. **`reconnectTab()` generalized** — now works for all tabs (not just restored ones). For regular tabs with session_id, just reconnects WebSocket. For restored tabs, creates new session.
+5. **UI: 'reconnecting' state** — status bar shows "RECONNECTING (N)..." with attempt count, tab dot pulses faster, banner shows "DISCONNECTED — connection lost" with RECONNECT button.
+6. **RECONNECT button on disconnected tabs** — previously only visible on restored tabs, now also on any disconnected tab.
+7. **Fixed pre-existing syntax error** — double `},` after `toggleSendMode()` in chat.js (latent bug, node -c always failed).
 
 ## Files Modified
 
-- None
+- `ui/static/js/modules/chat.js` (+70/-35 lines)
+- `ui/static/templates/chat-section.js` (+8/-6 lines)
+- `ui/static/css/main.css` (+1 line)
 
 ## Key Results
 
-Results
-
-**What was done:**
-1. **PAW_SPREAD sprite** (5×4 px) — расширенная лапка с растопыренными пальцами для фазы нажатия вниз
-2. **Kneading animation** — ритмичное чередование двух передних лап (left down → both up → right down → both up), цикл 6 тиков
-3. **Триггеры:** глубокое поглаживание (7+ кликов), случайно при happy/love idle (0.6%/tick)
-4. **SPEECH.knead** — 7 фраз на русском ("*массажирует лапками* Мурр...", "*топчет тесто* Уютно_")
-5. **Public API:** `CatModule.triggerKnead()`
-6. **
+- WebSocket now auto-recovers from transient disconnects (server restart, network glitch, laptop sleep)
+- No more duplicate "[ERROR] WebSocket connection failed" messages on temporary drops
+- Users can manually trigger reconnect from UI at any time
+- After 10 failed attempts, shows clear message with manual reconnect option
 
 ## For Next Iteration
 
-N/A
+- Consider adding notification sound on reconnect success/failure
+- Could persist reconnect state across page reloads
