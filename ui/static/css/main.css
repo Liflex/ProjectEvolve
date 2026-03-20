@@ -299,6 +299,30 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     font-weight: normal;
 }
 
+.msg-stopped-badge {
+    font-size: 0.4375rem;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    letter-spacing: 0.08em;
+    color: var(--red);
+    opacity: 0.8;
+    font-style: italic;
+    font-weight: normal;
+}
+
+/* Chat STOP button — replaces SEND during streaming */
+.chat-stop-btn {
+    animation: stop-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes stop-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+.chat-stop-btn:hover {
+    animation: none;
+}
+
 .msg-ts {
     cursor: help;
     border-bottom: 1px dotted transparent;

@@ -704,8 +704,10 @@
                                           style="min-height:2.25rem;max-height:200px;overflow-y:hidden"
                                           :disabled="tab.is_streaming"></textarea>
                                 <div class="flex items-center justify-between px-1 mt-0.5">
-                                    <span class="chat-input-hint text-[0.5rem] text-[var(--v3)] tracking-wider"
-                                          x-text="tab._editMode ? (settings.chatSendMode === 'ctrlenter' ? 'CTRL+ENTER — send edited | ESC — cancel' : 'ENTER — send edited | ESC — cancel')
+                                    <span class="chat-input-hint text-[0.5rem] tracking-wider"
+                                          :class="tab.is_streaming ? 'text-[var(--red)]' : 'text-[var(--v3)]'"
+                                          x-text="tab.is_streaming ? 'GENERATING... — ESC to stop'
+                                               : tab._editMode ? (settings.chatSendMode === 'ctrlenter' ? 'CTRL+ENTER — send edited | ESC — cancel' : 'ENTER — send edited | ESC — cancel')
                                                : tab._msgHistoryIdx >= 0 ? 'HISTORY ' + (tab._msgHistoryIdx + 1) + '/' + tab._msgHistory.length + ' — UP/DOWN navigate | ESC — exit | ENTER — send'
                                                : settings.chatSendMode === 'ctrlenter' ? 'CTRL+ENTER — send | ENTER — newline | UP/DOWN — history | ALT+UP/DOWN — turns | CTRL+SHIFT+B/I/K/C — format'
                                                : 'ENTER — send | SHIFT+ENTER — newline | UP/DOWN — history | ALT+UP/DOWN — turns | CTRL+SHIFT+B/I/K/C — format'"></span>
@@ -764,21 +766,28 @@
                                     </template>
                                 </div>
                             </div>
-                            <button @click="sendChatMessage(tab)" :disabled="tab.is_streaming"
-                                    class="px-4 py-2 border border-[var(--v)] text-[var(--v)] text-xs tracking-wider hover:bg-[rgba(180,74,255,0.1)] disabled:opacity-30 transition-all shrink-0 relative"
+                            <!-- SEND / STOP toggle button -->
+                            <button x-show="!tab.is_streaming"
+                                    @click="sendChatMessage(tab)"
+                                    class="chat-send-btn px-4 py-2 border border-[var(--v)] text-[var(--v)] text-xs tracking-wider hover:bg-[rgba(180,74,255,0.1)] transition-all shrink-0 relative"
                                     :title="tab._pendingFeedback?.length ? tab._pendingFeedback.length + ' reaction(s) queued — will be sent with next message' : 'Send message'">
                                 [> SEND]
                                 <span x-show="tab._pendingFeedback?.length > 0"
                                       x-text="tab._pendingFeedback.length"
                                       class="absolute -top-1.5 -right-1.5 bg-[var(--v)] text-[var(--bg)] rounded-full w-4 h-4 flex items-center justify-center text-[0.6rem] font-bold leading-none"></span>
                             </button>
+                            <button x-show="tab.is_streaming"
+                                    x-transition:enter="transition ease-out duration-150"
+                                    x-transition:enter-start="opacity-0 scale-95"
+                                    x-transition:enter-end="opacity-100 scale-100"
+                                    @click="cancelChatStream(tab)"
+                                    class="chat-stop-btn px-4 py-2 border border-[var(--red)] text-[var(--red)] text-xs tracking-wider hover:bg-[var(--red)] hover:text-[var(--bg)] transition-all shrink-0"
+                                    title="Stop generation (ESC)">
+                                [X] STOP
+                            </button>
                             <button @click="triggerFileAttach(tab)" :disabled="tab.is_streaming"
                                     class="px-2 py-2 border border-[var(--v-dim)] text-[var(--v3)] text-xs hover:text-[var(--v)] hover:border-[var(--v2)] disabled:opacity-30 transition-all shrink-0" title="Attach file (or paste / drop)">
                                 &#x1f4ce;
-                            </button>
-                            <button @click="cancelChatStream(tab)" x-show="tab.is_streaming"
-                                    class="px-3 py-2 border border-[var(--red)] text-[var(--red)] text-xs tracking-wider hover:bg-[rgba(255,51,51,0.1)] transition-all shrink-0">
-                                [X]
                             </button>
                         </div>
                     </div>

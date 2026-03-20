@@ -696,6 +696,16 @@ window.AppChat = (function() {
                 ws.send(JSON.stringify({ type: 'cancel' }));
             }
             tab.is_streaming = false;
+            // Mark last streaming message as stopped
+            const msgs = tab.messages;
+            if (msgs.length > 0) {
+                const last = msgs[msgs.length - 1];
+                if (last.role === 'assistant' && last.is_streaming) {
+                    last.is_streaming = false;
+                    last._stopped = true;
+                }
+            }
+            this.chatTick++;
             // Cat: react to cancel
             if (window.CatModule && CatModule.isActive()) {
                 const tips = ['Стоп! *встал на задние лапы*', 'Хватит! *прижал уши*', 'Отменил_ *облегчённо* Мяу!'];
@@ -915,6 +925,12 @@ window.AppChat = (function() {
         },
 
         handleChatKeydown(tab, e) {
+            // ESC stops streaming generation (highest priority)
+            if (e.key === 'Escape' && tab.is_streaming) {
+                e.preventDefault();
+                this.cancelChatStream(tab);
+                return;
+            }
             // @-mention menu takes priority (file autocomplete)
             if (this.mentionMenu.show && this.mentionMenu._tabId === tab.tab_id) {
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.mentionMenu.selected = Math.min(this.mentionMenu.selected + 1, Math.max(0, this.mentionMenu.items.length - 1)); return; }
@@ -1607,6 +1623,7 @@ window.AppChat = (function() {
                 const aRefBadge = ' <span class="msg-ref-badge" onclick="event.stopPropagation();window._app.copyMsgRef(\'' + tab.tab_id + '\',' + idx + ')" title="Click to copy #' + idx + ' reference">#' + idx + '</span>';
                 const aTimeHtml = aTime ? ' <span class="msg-ts" title="' + this.escHtml(aFullTime) + '" style="color:var(--v3);font-weight:normal;cursor:help">' + aTime + '</span>' : '';
                 const aRegenHtml = !msg.is_streaming && msg.regenerated ? ' <span class="msg-regen-badge" title="Response was regenerated">regen</span>' : '';
+                const aStoppedHtml = !msg.is_streaming && msg._stopped ? ' <span class="msg-stopped-badge" title="Generation was stopped by user">stopped</span>' : '';
                 const isLastAssistant = !msg.is_streaming && !tab.is_streaming && msgs.slice(idx + 1).filter(m => m.role === 'assistant').length === 0;
                 let thinkingHtml = '';
                 if (msg.thinking && msg.thinking.trim().length > 0) {
@@ -1688,7 +1705,7 @@ window.AppChat = (function() {
                     + '<button class="act-dislike' + (msg.reaction === 'down' ? ' reacted' : '') + '" onclick="event.stopPropagation();window._app.reactToMessage(\'' + tab.tab_id + '\',' + idx + ',\'down\')" title="Not helpful">&#x1F44E;</button>' : '')
                     + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + idx + ')" title="Delete">DEL</button>'
                     + '</div>'
-                    + '<div class="chat-role chat-role-assistant">CLAUDE_' + aRefBadge + (isPinned ? ' <span class="pin-indicator" title="Pinned message">&#x1F4CC;</span>' : '') + (msg.reaction === 'up' ? ' <span style="color:var(--ng);font-size:0.625rem" title="Helpful">&#x1F44D;</span>' : '') + (msg.reaction === 'down' ? ' <span style="color:var(--red);font-size:0.625rem" title="Not helpful">&#x1F44E;</span>' : '') + aTimeHtml + aRegenHtml + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + reactionHtml + '</div>'
+                    + '<div class="chat-role chat-role-assistant">CLAUDE_' + aRefBadge + (isPinned ? ' <span class="pin-indicator" title="Pinned message">&#x1F4CC;</span>' : '') + (msg.reaction === 'up' ? ' <span style="color:var(--ng);font-size:0.625rem" title="Helpful">&#x1F44D;</span>' : '') + (msg.reaction === 'down' ? ' <span style="color:var(--red);font-size:0.625rem" title="Not helpful">&#x1F44E;</span>' : '') + aTimeHtml + aRegenHtml + aStoppedHtml + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + reactionHtml + '</div>'
                     + (cf.thinking ? thinkingHtml : '')
                     + thinkingIndicatorHtml
                     + '<div class="chat-bubble-asst" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit">'
@@ -3858,6 +3875,7 @@ window.AppChat = (function() {
                             };
                             if (m.regenerated) out.regenerated = true;
                             if (m._regenOriginal) out._regenOriginal = (m._regenOriginal || '').slice(0, MAX_CONTENT_LEN);
+                            if (m._stopped) out._stopped = true;
                             if (m._hasImages) out._hasImages = true;
                             return out;
                         });
