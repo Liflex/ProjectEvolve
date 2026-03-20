@@ -1,4 +1,21 @@
 
+## Experiment 138 — Cat — typing awareness (reacts when user types in chat)
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`onUserTyping(textLength)`** — CatModule method called on each keystroke in chat input. Cat wakes from idle, changes expression to 'thinking', shows speech reaction (~30% trigger rate).
+2. **Typing speech categories** — `typing_start` (initial reaction), `typing_long` (nudge for >200 chars), `typing_stop` (3s debounce, occasional "send it!" nudge).
+3. **Chat integration** — `handleChatInput()` calls `CatModule.onUserTyping()` for non-slash input.
+
+### Files Modified
+
+- `ui/static/modules/cat.js` — onUserTyping(), isUserTyping(), typing speech categories
+- `ui/static/js/modules/chat.js` — CatModule.onUserTyping() call in handleChatInput()
+
+---
+
 ## Experiment 137 — Chat — message reference links (#N) with click-to-copy and scroll-to
 
 **Date:** 2026-03-20
@@ -5507,6 +5524,33 @@ Results
 3. **Context menu** — добавлены пункты MOVE LEFT / MOVE RIGHT для точного перемещения без drag (полезно на тачпадах)
 4. **Drag guard** — drag блокируется во время переименования таба
 5. **Keyboard shortcuts referenc
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 137 — Chat — message reference links (#N) with click-to-copy and scroll-to
+
+**Date:** 2026-03-20 04:54:43
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+Results
+
+**What was done:**
+1. **`#N` reference badge** — каждое сообщение (user/assistant) получает кликабельный бейдж `#N` в строке роли. Клик копирует ссылку в буфер обмена, fallback — вставка в поле ввода.
+2. **`linkMsgRefs(html, tabId)`** — метод рендерера, конвертирует `#N` паттерны в контенте сообщений в кликабельные ссылки (защищённые от модификации внутри code blocks и `<a>` тегов).
+3. **`scrollToMsg(tabId, msgIdx)`** — плавный скролл к целевому сообщению с 2-секундной пурпурной подсвет
 
 ### Notes for Next
 

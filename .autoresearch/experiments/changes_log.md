@@ -2799,3 +2799,45 @@ Results
 5. CSS стили: position absolute с transform translateX(-50%), тень, hover-
 
 
+## Experiment 136 — Chat — tab drag to reorder
+
+**Time:** 2026-03-20 04:50:37
+
+**Files:** Target:** chat-section.js, chat.js, app.js, main.css, Files Modified:** chat.js, app.js, chat-section.js, main.css
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **Drag & drop reorder** — табы чата можно перетаскивать мышью для изменения порядка (HTML5 Drag and Drop API)
+2. **Visual feedback** — перетаскиваемый таб становится полупрозрачным (opacity 0.4), целевой таб показывает фиолетовую левую границу-индикатор
+3. **Context menu** — добавлены пункты MOVE LEFT / MOVE RIGHT для точного перемещения без drag (полезно на тачпадах)
+4. **Drag guard** — drag блокируется во время переименования таба
+5. **Keyboard shortcuts referenc
+
+
+## Experiment 137 — Chat — message reference links (#N) with click-to-copy and scroll-to
+
+**Time:** 2026-03-20 04:54:43
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **`#N` reference badge** — каждое сообщение (user/assistant) получает кликабельный бейдж `#N` в строке роли. Клик копирует ссылку в буфер обмена, fallback — вставка в поле ввода.
+2. **`linkMsgRefs(html, tabId)`** — метод рендерера, конвертирует `#N` паттерны в контенте сообщений в кликабельные ссылки (защищённые от модификации внутри code blocks и `<a>` тегов).
+3. **`scrollToMsg(tabId, msgIdx)`** — плавный скролл к целевому сообщению с 2-секундной пурпурной подсвет
+
+
