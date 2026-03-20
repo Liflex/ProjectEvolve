@@ -1,35 +1,25 @@
 # Last Experiment Summary
 
 **Experiment #172** — Judge conflict resolution & auto-revert on DISCARD
-**Date:** 2026-03-20
+**Date:** 2026-03-20 20:18:47
 
 ## What Was Done
 
-- `_resolve_conflict()` в `ExperimentJudge`: анализ разногласий между судьями при SPLIT
-- Tiebreaker логика: agent decision → weighted score → balanced authority → conflict severity
-- `evaluate_all()` больше не возвращает SPLIT — вместо этого разрешает конфликт через `_resolve_conflict()`
-- Auto-revert в research loop: при DISCARD консенсусе с score < 0.4 автоматически `git revert --no-edit`
-- API endpoint: `POST /api/judge/revert/{n}` для ручного revert
-- UI: панель conflict resolution (diverging checks, resolution method, agent agreement)
-- UI: revert badge (↩), кнопка [REVERT] для DISCARD вердиктов
-- Live log: отображение auto-revert событий
+N/A
 
 ## Files Modified
 
-- `utils/judge.py` — `_resolve_conflict()`, обновлённый `evaluate_all()`
-- `agents/research.py` — `_auto_revert_discard()`, обновлённый `_run_judge()`
-- `agents/parallel.py` — улучшенный consensus logic с score tiebreaker
-- `ui/server.py` — `/api/judge/revert/{n}` endpoint
-- `ui/static/js/modules/lab.js` — `revertExperiment()`, live log revert display
-- `ui/static/templates/lab-experiments.js` — conflict resolution panel, revert UI
+- None
 
 ## Key Results
 
-- Конфликты между судьями теперь автоматически разрешаются вместо возврата SPLIT
-- Auto-revert защищает от накопления плохих изменений (score < 0.4)
-- Ручной revert доступен через UI для любого DISCARD вердикта
+Results
+
+**What was done:**
+1. **`_resolve_conflict()`** в `ExperimentJudge` — анализирует разногласия между 3 судьями, определяет какие checks вызвали расхождение, разрешает конфликт через каскад tiebreakers: agent decision → balanced profile score → average score → conflict severity
+2. **`evaluate_all()`** больше не возвращает SPLIT — вместо этого вызывает `_resolve_conflict()` и возвращает конкретное решение (KEEP/DISCARD/REVIEW) с подробным отчётом
+3. **`_auto_revert_discard()`** в `Research
 
 ## For Next Iteration
 
-- Накопление данных для анализа эффективности auto-revert
-- Мультиагентность: этап 3 — task decomposition
+N/A

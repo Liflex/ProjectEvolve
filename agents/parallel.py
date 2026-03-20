@@ -16,7 +16,7 @@ import asyncio
 import logging
 import os
 import uuid
-from dataclasses import asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -331,6 +331,414 @@ class ParallelAgentRunner:
             "started_at": self.started_at,
             "cancelled": self._cancelled,
         }
+
+
+# ---------------------------------------------------------------------------
+# Task Decomposer — breaks a complex goal into parallel sub-tasks
+# ---------------------------------------------------------------------------
+
+class TaskDecomposer:
+    """Decompose a research goal into independent parallel sub-tasks.
+
+    Uses a lightweight LLM call to analyze the goal and split it into
+    2-4 focused sub-tasks that can run concurrently without conflicts.
+
+    Usage::
+
+        decomposer = TaskDecomposer(project_dir="/project")
+        sub_tasks = await decomposer.decompose(
+            goal="Implement user auth with JWT and refresh tokens",
+            max_subtasks=3,
+        )
+        # sub_tasks: List[AgentTask] ready for ParallelAgentRunner.run()
+    """
+
+    def __init__(self, project_dir: Path, max_subtasks: int = 3):
+        self.project_dir = Path(project_dir).resolve()
+        self.max_subtasks = max_subtasks
+
+    async def decompose(
+        self,
+        goal: str,
+        max_subtasks: Optional[int] = None,
+        context: Optional[str] = None,
+    ) -> List[AgentTask]:
+        """Decompose *goal* into independent sub-tasks.
+
+        Args:
+            goal: The research/experiment goal to decompose.
+            max_subtasks: Override for max number of sub-tasks.
+            context: Additional context (e.g. project goals, current state).
+
+        Returns:
+            List[AgentTask] instances ready for parallel execution.
+            Empty list if decomposition fails.
+        """
+        max_sub = max_subtasks or self.max_subtasks
+
+        # Build decomposition prompt
+        project_context = context or ""
+        if not project_context:
+            # Auto-gather minimal project context
+            project_context = self._gather_project_context()
+
+        decomp_prompt = (
+            "You are a task decomposition engine. Break the following goal into "
+            f"{max_sub} INDEPENDENT sub-tasks that can be executed in parallel.\n\n"
+            "**CRITICAL RULES:**\n"
+            "1. Each sub-task must be self-contained and executable independently\n"
+            "2. Sub-tasks must NOT modify the same files (no conflicts)\n"
+            "3. Each sub-task must produce a complete, testable result\n"
+            "4. Focus on different aspects/files/components\n"
+            "5. Keep each sub-task focused and specific\n\n"
+            f"**Project:** {self.project_dir.name}\n"
+            f"**Project context:** {project_context[:2000]}\n\n"
+            f"**Goal to decompose:**\n{goal}\n\n"
+            "Respond ONLY with a JSON array. Each element must have:\n"
+            '```json\n'
+            '[\n'
+            '  {\n'
+            '    "label": "short-task-name",\n'
+            '    "prompt": "Complete, self-contained prompt for this sub-task",\n'
+            '    "files": ["list of files this sub-task will touch"]\n'
+            '  }\n'
+            ']\n'
+            "```\n"
+            "Do NOT include any explanation outside the JSON array."
+        )
+
+        # Quick LLM call for decomposition (max 1 turn — just plan, don't execute)
+        try:
+            from claude_code_sdk import ClaudeCodeOptions, query
+
+            clean_env = {}
+            for var in ("CLAUDECODE", "CLAUDE_SESSION_ID"):
+                if var in os.environ:
+                    clean_env[var] = ""
+
+            options = ClaudeCodeOptions(
+                cwd=str(self.project_dir),
+                max_turns=1,
+                permission_mode="bypassPermissions",
+                env=clean_env,
+                append_system_prompt=(
+                    "You are a task planner. Output ONLY valid JSON. "
+                    "No explanations, no markdown code fences, just the JSON array."
+                ),
+            )
+
+            output_parts: list[str] = []
+            async for message in query(
+                prompt=self._prompt_as_stream(decomp_prompt),
+                options=options,
+            ):
+                msg_type = type(message).__name__
+                if msg_type == "AssistantMessage":
+                    for block in message.content or []:
+                        if hasattr(block, "text") and block.text:
+                            output_parts.append(block.text)
+
+            raw_output = "\n".join(output_parts).strip()
+            return self._parse_decomposition(raw_output, max_sub)
+
+        except Exception as e:
+            logger.error("Task decomposition failed: %s", e)
+            return []
+
+    @staticmethod
+    async def _prompt_as_stream(text: str):
+        yield {
+            "type": "user",
+            "message": {"role": "user", "content": text},
+        }
+
+    def _gather_project_context(self) -> str:
+        """Gather minimal project context for decomposition."""
+        import subprocess as _sp
+
+        parts = []
+
+        # List main source files
+        try:
+            result = _sp.run(
+                ["git", "ls-files", "--cached"],
+                capture_output=True, text=True, timeout=5,
+                cwd=str(self.project_dir),
+                encoding="utf-8", errors="replace",
+            )
+            files = (result.stdout or "").strip().split("\n")
+            # Show top-level structure only
+            top_files = [f for f in files[:50] if "/" not in f or f.count("/") <= 1]
+            parts.append(f"Files: {', '.join(top_files[:30])}")
+        except Exception:
+            pass
+
+        # Read .autoresearch.json for goals
+        auto_file = self.project_dir / ".autoresearch.json"
+        if auto_file.exists():
+            try:
+                import json as _json
+                data = _json.loads(auto_file.read_text(encoding="utf-8"))
+                goals = data.get("goals", [])[:3]
+                if goals:
+                    parts.append(f"Goals: {'; '.join(str(g)[:100] for g in goals)}")
+            except Exception:
+                pass
+
+        return "\n".join(parts)
+
+    def _parse_decomposition(
+        self, raw_output: str, max_subtasks: int,
+    ) -> List[AgentTask]:
+        """Parse LLM JSON output into AgentTask list."""
+        import json as _json
+
+        # Strip markdown fences if present
+        text = raw_output
+        if text.startswith("```"):
+            lines = text.split("\n")
+            # Remove first and last lines (fence markers)
+            fence_start = 0
+            for i, line in enumerate(lines):
+                if line.strip().startswith("```") and i == 0:
+                    fence_start = i + 1
+                    break
+            fence_end = len(lines)
+            for i in range(len(lines) - 1, -1, -1):
+                if lines[i].strip() == "```":
+                    fence_end = i
+                    break
+            text = "\n".join(lines[fence_start:fence_end])
+
+        try:
+            items = _json.loads(text)
+        except _json.JSONDecodeError:
+            # Try to find JSON array in output
+            start = text.find("[")
+            end = text.rfind("]") + 1
+            if start >= 0 and end > start:
+                try:
+                    items = _json.loads(text[start:end])
+                except _json.JSONDecodeError:
+                    logger.warning("Could not parse decomposition JSON: %s", text[:200])
+                    return []
+            else:
+                logger.warning("No JSON array found in decomposition output")
+                return []
+
+        if not isinstance(items, list):
+            items = [items]
+
+        tasks = []
+        for i, item in enumerate(items[:max_subtasks]):
+            if not isinstance(item, dict):
+                continue
+            label = item.get("label", f"subtask-{i+1}")
+            prompt = item.get("prompt", "")
+            if not prompt:
+                continue
+
+            # Add isolation context to each sub-task prompt
+            isolation_note = (
+                "\n\n**IMPORTANT:** You are working as part of a parallel team. "
+                "Only modify files listed below. Do NOT touch files assigned to "
+                "other sub-tasks. Make a focused, complete change.\n"
+                f"**Your assigned files:** {', '.join(item.get('files', ['your component files']))}"
+            )
+            prompt += isolation_note
+
+            tasks.append(AgentTask(
+                label=label,
+                prompt=prompt,
+                cwd=str(self.project_dir),
+                max_turns=10,
+            ))
+
+        return tasks
+
+
+# ---------------------------------------------------------------------------
+# Result Aggregator — merges parallel sub-task results
+# ---------------------------------------------------------------------------
+
+@dataclass
+class AggregatedResult:
+    """Result of merging parallel sub-task outputs."""
+
+    tasks_total: int = 0
+    tasks_completed: int = 0
+    tasks_failed: int = 0
+    total_cost_usd: float = 0.0
+    conflicts: List[Dict[str, Any]] = field(default_factory=list)
+    merged_summary: str = ""
+    per_task: List[Dict[str, Any]] = field(default_factory=list)
+    has_conflicts: bool = False
+
+    def to_dict(self) -> dict:
+        return {
+            "tasks_total": self.tasks_total,
+            "tasks_completed": self.tasks_completed,
+            "tasks_failed": self.tasks_failed,
+            "total_cost_usd": round(self.total_cost_usd, 4),
+            "has_conflicts": self.has_conflicts,
+            "conflicts": self.conflicts,
+            "merged_summary": self.merged_summary,
+            "per_task": self.per_task,
+        }
+
+
+class ResultAggregator:
+    """Aggregate results from parallel sub-task execution.
+
+    Detects file conflicts between sub-tasks and produces a unified
+    summary report.
+    """
+
+    def __init__(self, project_dir: Path):
+        self.project_dir = Path(project_dir).resolve()
+
+    def aggregate(
+        self,
+        original_tasks: List[AgentTask],
+        completed_tasks: List[AgentTask],
+    ) -> AggregatedResult:
+        """Merge results from parallel execution.
+
+        Args:
+            original_tasks: The tasks that were submitted.
+            completed_tasks: The tasks with results populated.
+
+        Returns:
+            AggregatedResult with merged summary and conflict info.
+        """
+        import subprocess as _sp
+
+        result = AggregatedResult(
+            tasks_total=len(original_tasks),
+            tasks_completed=sum(1 for t in completed_tasks if t.status == "completed"),
+            tasks_failed=sum(1 for t in completed_tasks if t.status in ("error", "cancelled")),
+            total_cost_usd=sum(t.cost or 0 for t in completed_tasks),
+        )
+
+        # Check for file conflicts via git status
+        try:
+            git_result = _sp.run(
+                ["git", "diff", "--name-only", "HEAD"],
+                capture_output=True, text=True, timeout=10,
+                cwd=str(self.project_dir),
+                encoding="utf-8", errors="replace",
+            )
+            modified_files = set((git_result.stdout or "").strip().split("\n"))
+            modified_files.discard("")
+        except Exception:
+            modified_files = set()
+
+        # Detect uncommitted changes that might conflict
+        try:
+            git_result2 = _sp.run(
+                ["git", "diff", "--name-only"],
+                capture_output=True, text=True, timeout=10,
+                cwd=str(self.project_dir),
+                encoding="utf-8", errors="replace",
+            )
+            staged_files = set((git_result2.stdout or "").strip().split("\n"))
+            staged_files.discard("")
+            modified_files.update(staged_files)
+        except Exception:
+            pass
+
+        # Build per-task summaries
+        summaries = []
+        for task in completed_tasks:
+            task_info = {
+                "label": task.label,
+                "agent_id": task.agent_id,
+                "status": task.status,
+                "output_length": len(task.output),
+                "cost": task.cost,
+                "error": task.error,
+                "summary": self._extract_summary(task.output),
+            }
+            summaries.append(task_info)
+
+        result.per_task = summaries
+
+        # Detect conflicts: if multiple agents ran, check if there are
+        # merge conflicts or overlapping file modifications
+        if len(completed_tasks) > 1 and modified_files:
+            # Check for merge conflict markers in modified files
+            conflict_files = []
+            for fpath in modified_files:
+                full_path = self.project_dir / fpath
+                if not full_path.exists():
+                    continue
+                try:
+                    content = full_path.read_text(encoding="utf-8", errors="replace")
+                    if "<<<<<<" in content and ">>>>>>" in content:
+                        conflict_files.append(fpath)
+                except Exception:
+                    pass
+
+            if conflict_files:
+                result.has_conflicts = True
+                result.conflicts = [
+                    {"file": f, "type": "merge_conflict"}
+                    for f in conflict_files
+                ]
+
+        # Build merged summary
+        result.merged_summary = self._build_merged_summary(completed_tasks, result)
+
+        return result
+
+    @staticmethod
+    def _extract_summary(output: str) -> str:
+        """Extract a brief summary from agent output."""
+        if not output:
+            return "(no output)"
+        # Take first 300 chars + last 200 chars
+        if len(output) <= 500:
+            return output.strip()
+        return output[:300].strip() + "\n...\n" + output[-200:].strip()
+
+    @staticmethod
+    def _build_merged_summary(
+        tasks: List[AgentTask],
+        agg: AggregatedResult,
+    ) -> str:
+        """Build a unified summary of all parallel results."""
+        lines = [
+            f"## Parallel Execution Summary",
+            f"",
+            f"**Completed:** {agg.tasks_completed}/{agg.tasks_total}",
+            f"**Cost:** ${agg.total_cost_usd:.4f}",
+            f"**Conflicts:** {'YES — manual resolution needed' if agg.has_conflicts else 'None'}",
+            f"",
+        ]
+
+        if agg.conflicts:
+            lines.append("**Conflict Files:**")
+            for c in agg.conflicts:
+                lines.append(f"  - {c['file']} ({c['type']})")
+            lines.append("")
+
+        lines.append("**Per-task Results:**")
+        for task in tasks:
+            status_icon = "+" if task.status == "completed" else "!" if task.status == "error" else "?"
+            lines.append(f"")
+            lines.append(f"### [{status_icon}] {task.label}")
+            if task.error:
+                lines.append(f"**Error:** {task.error[:200]}")
+            elif task.output:
+                # Extract key info from output
+                preview = task.output[:500].strip()
+                lines.append(preview)
+
+        if agg.has_conflicts:
+            lines.append("")
+            lines.append("**ACTION REQUIRED:** Resolve merge conflicts before committing.")
+
+        return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------

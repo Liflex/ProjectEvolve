@@ -887,6 +887,7 @@ class RunRequest(BaseModel):
     strategy: str = Field(default="default", pattern=r"^(default|execution|quality)$")
     token_threshold: int = Field(default=100_000, ge=20_000, le=200_000)
     parallel_judges: bool = Field(default=False)
+    decompose: bool = Field(default=False)
 
 
 # ---------------------------------------------------------------------------
@@ -1028,6 +1029,7 @@ async def start_run(data: RunRequest):
         token_threshold=data.token_threshold,
         token_soft_threshold=int(data.token_threshold * 0.8),
         parallel_judges=data.parallel_judges,
+        decompose=data.decompose,
     )
     runner.add_listener(_research_event_handler)
     _active_runner = runner
@@ -1422,6 +1424,165 @@ async def stop_parallel_run():
             _parallel_task.cancel()
 
     return {"status": "stopped"}
+
+
+@app.post("/api/parallel/decompose")
+async def decompose_task(data: dict):
+    """Decompose a goal into parallel sub-tasks.
+
+    Body:
+        goal: str — the research goal to decompose
+        project_dir: str — project path (optional, uses current)
+        max_subtasks: int — max sub-tasks (default 3)
+        context: str — additional context (optional)
+
+    Returns:
+        List of sub-task descriptors with labels and prompts.
+    """
+    global _active_parallel
+
+    if not _sdk_available:
+        raise HTTPException(status_code=503, detail="claude-code-sdk not available")
+
+    goal = data.get("goal", "")
+    if not goal:
+        raise HTTPException(status_code=400, detail="Goal is required")
+
+    project_dir = Path(data.get("project_dir", str(get_project_dir()))).resolve()
+    if not project_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Path not found: {project_dir}")
+
+    max_subtasks = min(data.get("max_subtasks", 3), 5)
+    context = data.get("context")
+
+    try:
+        from agents.parallel import TaskDecomposer
+
+        decomposer = TaskDecomposer(project_dir, max_subtasks=max_subtasks)
+        sub_tasks = await decomposer.decompose(
+            goal=goal,
+            max_subtasks=max_subtasks,
+            context=context,
+        )
+
+        _log_append(f"[DECOMPOSE] Goal decomposed into {len(sub_tasks)} sub-tasks")
+        for t in sub_tasks:
+            _log_append(f"[DECOMPOSE]   '{t.label}': {len(t.prompt)} chars prompt")
+
+        return {
+            "status": "ok",
+            "subtasks": [
+                {
+                    "label": t.label,
+                    "agent_id": t.agent_id,
+                    "prompt_length": len(t.prompt),
+                    "cwd": t.cwd,
+                    "max_turns": t.max_turns,
+                }
+                for t in sub_tasks
+            ],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/parallel/decompose-and-run")
+async def decompose_and_run(data: dict):
+    """Decompose a goal and immediately run sub-tasks in parallel.
+
+    Body:
+        goal: str — the research goal
+        project_dir: str — project path (optional)
+        max_subtasks: int — max sub-tasks (default 3)
+        concurrency: int — max parallel agents (default 3)
+    """
+    global _active_parallel, _parallel_task, _parallel_results
+
+    if not _sdk_available:
+        raise HTTPException(status_code=503, detail="claude-code-sdk not available")
+
+    if _active_parallel and _active_parallel.is_running:
+        raise HTTPException(status_code=409, detail="Parallel run already in progress")
+
+    goal = data.get("goal", "")
+    if not goal:
+        raise HTTPException(status_code=400, detail="Goal is required")
+
+    project_dir = Path(data.get("project_dir", str(get_project_dir()))).resolve()
+    if not project_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Path not found: {project_dir}")
+
+    max_subtasks = min(data.get("max_subtasks", 3), 5)
+    concurrency = min(data.get("concurrency", 3), max_subtasks)
+
+    try:
+        from agents.parallel import (
+            ParallelAgentRunner,
+            ResultAggregator,
+            TaskDecomposer,
+        )
+
+        # Step 1: Decompose
+        _log_append(f"[DECOMPOSE+RUN] Decomposing goal...")
+        decomposer = TaskDecomposer(project_dir, max_subtasks=max_subtasks)
+        sub_tasks = await decomposer.decompose(goal=goal, max_subtasks=max_subtasks)
+
+        if not sub_tasks:
+            raise HTTPException(
+                status_code=422,
+                detail="Could not decompose goal into sub-tasks",
+            )
+
+        _log_append(
+            f"[DECOMPOSE+RUN] Decomposed into {len(sub_tasks)} sub-tasks: "
+            + ", ".join(t.label for t in sub_tasks)
+        )
+
+        # Step 2: Run in parallel
+        runner = ParallelAgentRunner(max_concurrency=concurrency)
+        runner.add_listener(_parallel_event_handler)
+        _active_parallel = runner
+        _parallel_results = []
+
+        async def _run_wrapper():
+            global _parallel_results
+            try:
+                results = await runner.run(sub_tasks, concurrency=concurrency)
+                _parallel_results = [t.to_dict() for t in results]
+
+                # Step 3: Aggregate
+                aggregator = ResultAggregator(project_dir)
+                aggregated = aggregator.aggregate(sub_tasks, results)
+
+                _log_append(
+                    f"[DECOMPOSE+RUN] Complete: {aggregated.tasks_completed}/"
+                    f"{aggregated.tasks_total} tasks, ${aggregated.total_cost_usd:.4f}"
+                )
+                if aggregated.has_conflicts:
+                    _log_append(
+                        f"[DECOMPOSE+RUN] CONFLICTS detected: "
+                        + ", ".join(c["file"] for c in aggregated.conflicts)
+                    )
+
+            except Exception as e:
+                _log_append(f"[DECOMPOSE+RUN] Fatal error: {e}")
+
+        _parallel_task = asyncio.create_task(_run_wrapper())
+
+        return {
+            "status": "started",
+            "run_id": runner._run_id,
+            "subtasks": [
+                {"label": t.label, "agent_id": t.agent_id}
+                for t in sub_tasks
+            ],
+            "concurrency": concurrency,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/logs")

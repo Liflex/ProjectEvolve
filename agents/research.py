@@ -165,11 +165,13 @@ class ResearchRunner:
         token_threshold: int = 100_000,
         token_soft_threshold: int = 80_000,
         parallel_judges: bool = False,
+        decompose: bool = False,
     ):
         self.project_dir = project_dir.resolve()
         self.strategy = strategy
         self.max_turns = max_turns
         self.parallel_judges = parallel_judges
+        self.decompose = decompose
 
         self.tokens = TokenBudget(
             threshold=token_threshold,
@@ -364,6 +366,104 @@ class ResearchRunner:
         except Exception as e:
             logger.warning("Judge evaluation failed for exp %d: %s", experiment_number, e)
             return None
+
+    async def _run_decomposed_experiment(
+        self,
+        prompt: str,
+        iteration: int,
+    ) -> Dict[str, Any]:
+        """Run a single experiment as decomposed parallel sub-tasks.
+
+        When ``self.decompose`` is True and the prompt looks decomposable,
+        splits the goal into independent sub-tasks, runs them in parallel
+        via ParallelAgentRunner, then aggregates results.
+
+        Falls back to normal sequential execution if decomposition fails.
+        """
+        from agents.parallel import (
+            ParallelAgentRunner,
+            ResultAggregator,
+            TaskDecomposer,
+        )
+
+        await self._emit(_make_event(
+            EVENT_LOG,
+            message=f"Experiment {iteration}: decomposing into sub-tasks...",
+        ))
+
+        decomposer = TaskDecomposer(self.project_dir)
+        sub_tasks = await decomposer.decompose(prompt, max_subtasks=3)
+
+        if not sub_tasks:
+            await self._emit(_make_event(
+                EVENT_LOG,
+                message=f"Experiment {iteration}: decomposition failed, falling back to sequential",
+            ))
+            return await self.run_experiment(prompt, iteration)
+
+        await self._emit(_make_event(
+            EVENT_LOG,
+            message=f"Experiment {iteration}: decomposed into {len(sub_tasks)} sub-tasks: "
+                    + ", ".join(t.label for t in sub_tasks),
+        ))
+
+        # Run sub-tasks in parallel
+        runner = ParallelAgentRunner(max_concurrency=len(sub_tasks))
+        runner.add_listener(lambda event: asyncio.ensure_future(self._emit(event)))
+
+        # Forward parallel events with experiment context
+        original_listener = self._emit
+
+        async def _forward_with_context(event: dict):
+            event["experiment_number"] = iteration
+            await original_listener(event)
+
+        runner._listeners = [_forward_with_context]
+
+        completed = await runner.run(sub_tasks, concurrency=len(sub_tasks))
+
+        # Aggregate results
+        aggregator = ResultAggregator(self.project_dir)
+        aggregated = aggregator.aggregate(sub_tasks, completed)
+
+        await self._emit(_make_event(
+            EVENT_LOG,
+            message=f"Experiment {iteration}: parallel execution complete — "
+                    f"{aggregated.tasks_completed}/{aggregated.tasks_total} tasks, "
+                    f"${aggregated.total_cost_usd:.4f}, "
+                    f"conflicts={'YES' if aggregated.has_conflicts else 'none'}",
+        ))
+
+        # Build unified output from all sub-tasks
+        full_output = aggregated.merged_summary
+        for task in completed:
+            if task.status == "completed" and task.output:
+                full_output += f"\n\n--- {task.label} ---\n{task.output}"
+
+        # Track tokens/cost from sub-tasks
+        for task in completed:
+            if task.usage:
+                self.tokens.update_from_result(task.usage, task.cost)
+
+        # Determine overall status
+        all_completed = all(t.status == "completed" for t in completed)
+        status = "success" if all_completed and not aggregated.has_conflicts else (
+            "conflict" if aggregated.has_conflicts else "partial"
+        )
+        is_complete = ">>>EXPERIMENT_COMPLETE<<<" in full_output
+
+        return {
+            "status": "success" if is_complete else status,
+            "output": full_output,
+            "session_id": self._session_id,
+            "usage": None,  # aggregated, not per-agent
+            "cost": aggregated.total_cost_usd,
+            "num_turns": sum(t.usage.get("num_turns", 0) if t.usage else 0 for t in completed),
+            "decomposed": True,
+            "subtask_count": len(sub_tasks),
+            "subtask_completed": aggregated.tasks_completed,
+            "aggregation": aggregated.to_dict(),
+        }
 
     async def _auto_revert_discard(
         self,
@@ -637,8 +737,11 @@ class ResearchRunner:
                     raise ValueError("build_prompt_fn is required")
                 prompt = build_prompt_fn(i, max_number)
 
-                # Run experiment
-                result = await self.run_experiment(prompt, i)
+                # Run experiment (decomposed or sequential)
+                if self.decompose:
+                    result = await self._run_decomposed_experiment(prompt, i)
+                else:
+                    result = await self.run_experiment(prompt, i)
                 self.results.append(result)
 
                 await self._emit(_make_event(
@@ -711,4 +814,5 @@ class ResearchRunner:
             "session_id": self._session_id,
             "tokens": self.tokens.to_dict(),
             "parallel_judges": self.parallel_judges,
+            "decompose": self.decompose,
         }
