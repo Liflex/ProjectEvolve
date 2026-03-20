@@ -88,6 +88,59 @@
         </div>
     </div>
 
+    <!-- Docs Search Overlay (Ctrl+Shift+D) -->
+    <div x-show="docsSearch.show" x-cloak class="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]"
+         @click.self="closeDocsSearch()" @keydown.escape.window="closeDocsSearch()">
+        <div class="docs-search-panel w-full max-w-2xl mx-4" @click.stop>
+            <div class="docs-search-input-wrap">
+                <span class="docs-search-icon">&#x1f4d6;</span>
+                <input id="docs-search-input" x-model="docsSearch.query"
+                       @input="onDocsSearchInput(docsSearch.query)"
+                       @keydown="docsSearchKeyDown($event)"
+                       placeholder="Search project documentation..."
+                       class="docs-search-input"
+                       autocomplete="off" spellcheck="false">
+                <span class="docs-search-shortcut-hint" x-show="!docsSearch.query">Ctrl+Shift+D</span>
+                <span x-show="docsSearch.loading" class="docs-search-loading">
+                    <span class="thinking-spinner" style="width:10px;height:10px;border-width:1.5px"></span>
+                </span>
+            </div>
+            <div class="docs-search-meta" x-show="docsSearch.results.length > 0">
+                <span x-text="docsSearch.results.length + ' results'"></span>
+                <span x-show="docsSearch.totalSections" class="docs-search-meta-dim" x-text="'from ' + docsSearch.totalSections + ' sections indexed'"></span>
+            </div>
+            <div class="docs-search-results">
+                <template x-for="(r, ri) in docsSearch.results" :key="ri">
+                    <div class="docs-search-result" @click="insertDocRef(r)">
+                        <div class="docs-search-result-header">
+                            <span class="docs-search-result-file" x-text="r.file"></span>
+                            <span class="docs-search-result-line" x-text="'L' + r.line_start + '-' + r.line_end"></span>
+                            <span class="docs-search-result-score" x-text="r.score.toFixed(2)"></span>
+                        </div>
+                        <div class="docs-search-result-title" x-show="r.title && r.title !== r.file_title" x-text="r.title"></div>
+                        <div class="docs-search-result-snippet" x-text="r.snippet"></div>
+                        <div class="docs-search-result-tags">
+                            <template x-for="(term, ti) in r.matched_terms" :key="ti">
+                                <span class="docs-search-tag" x-text="term"></span>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="!docsSearch.loading && docsSearch.query && docsSearch.query.length >= 2 && docsSearch.results.length === 0" class="docs-search-empty">
+                    No documentation matches found_
+                </div>
+                <div x-show="!docsSearch.loading && (!docsSearch.query || docsSearch.query.length < 2)" class="docs-search-empty">
+                    Type at least 2 characters to search_
+                </div>
+            </div>
+            <div class="docs-search-footer">
+                <span><kbd style="padding:0 4px;border:1px solid var(--v-dim)">Click</kbd> insert reference to chat</span>
+                <span><kbd style="padding:0 4px;border:1px solid var(--v-dim)">Esc</kbd> close</span>
+                <span style="margin-left:auto;color:var(--v-dim)">Ctrl+Shift+D</span>
+            </div>
+        </div>
+    </div>
+
     <div class="flex h-screen overflow-hidden relative z-10">
 
         <!-- ========== SIDEBAR (template: sidebar.js) ========== -->

@@ -1441,6 +1441,73 @@ async def preflight_check(path: str):
 
 
 # =============================================================================
+# DOCUMENTATION SEARCH — ranked search across project docs
+# =============================================================================
+
+_docs_cache: Dict[str, Any] = {"project": None, "engine": None, "ts": 0.0}
+
+
+def _get_docs_engine(project_dir: Path):
+    """Get or create a cached DocSearchEngine for the project."""
+    import time as _time
+    key = str(project_dir)
+    if _docs_cache["project"] == key and (_time.time() - _docs_cache["ts"]) < 300:
+        return _docs_cache["engine"]
+    from utils.docsearch import DocSearchEngine
+    engine = DocSearchEngine(project_dir)
+    count = engine.index()
+    _docs_cache["project"] = key
+    _docs_cache["engine"] = engine
+    _docs_cache["ts"] = _time.time()
+    return engine
+
+
+@app.get("/api/docs/search")
+async def search_docs(q: str, project: str = "", max_results: int = 15):
+    """Search project documentation with relevance ranking (TF-IDF)."""
+    if not q or len(q.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Query must be at least 2 characters")
+    if max_results > 50:
+        max_results = 50
+
+    # Determine project directory
+    if project:
+        project_dir = Path(project).resolve()
+        allowed_bases = {get_project_dir().resolve(), Path.cwd().resolve()}
+        if not any(str(project_dir).startswith(str(base)) for base in allowed_bases):
+            raise HTTPException(status_code=403, detail="Path traversal blocked")
+    else:
+        project_dir = get_project_dir().resolve()
+
+    if not project_dir.is_dir():
+        raise HTTPException(status_code=404, detail="Project directory not found")
+
+    try:
+        engine = _get_docs_engine(project_dir)
+        results = engine.search(q.strip(), max_results=max_results)
+        return {
+            "query": q,
+            "total_sections": engine._total_sections,
+            "results": [
+                {
+                    "file": r.section.file_path,
+                    "title": r.section.title,
+                    "file_title": r.section.file_title,
+                    "level": r.section.level,
+                    "score": round(r.score, 3),
+                    "matched_terms": r.matched_terms,
+                    "snippet": r.snippet,
+                    "line_start": r.section.line_start,
+                    "line_end": r.section.line_end,
+                }
+                for r in results
+            ],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
 # RESEARCH WEBSOCKET — real-time experiment streaming
 # =============================================================================
 

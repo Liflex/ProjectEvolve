@@ -271,6 +271,8 @@ function _buildAppData() {
         settings: JSON.parse(localStorage.getItem('ar-settings') || '{"matrixRain":true,"crtEffect":true,"catCompanion":true,"theme":"synthwave","fontSize":16,"chatDensity":"comfortable","compactSidebar":false,"showThinking":false,"costBudget":5.00}'),
         _matrixRainStopped: false,
         _catHovering: false,
+        // Docs search state
+        docsSearch: { show: false, query: '', results: [], loading: false, totalSections: 0, _timer: null },
 
         // Chat state
         chatTabs: [],
@@ -403,6 +405,7 @@ function _buildAppData() {
             { id: 'chat-tools', label: 'Chat: Toggle Tools Summary', category: 'CHAT', action: () => { this.toggleBottomPanel('summary'); } },
             { id: 'chat-search', label: 'Chat: Search in Messages', shortcut: 'Ctrl+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.openChatSearch()); } },
             { id: 'chat-file-search', label: 'Chat: Search Project Files', shortcut: 'Ctrl+Shift+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.toggleFileSearch()); } },
+            { id: 'docs-search', label: 'Search: Project Documentation', shortcut: 'Ctrl+Shift+D', category: 'SEARCH', action: () => { this.openDocsSearch(); } },
             { id: 'chat-global-search', label: 'Chat: Search All Sessions', shortcut: 'Ctrl+Alt+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.toggleGlobalSearch()); } },
             { id: 'chat-goto-msg', label: 'Chat: Go to Message', shortcut: 'Ctrl+G', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.openGoToMsg()); } },
             { id: 'chat-branch', label: 'Chat: Branch from Last Message', category: 'CHAT', action: () => { if (this.section === 'chat' && this.activeTab) { const t = this.activeTab; let lastIdx = -1; for (let i = t.messages.length - 1; i >= 0; i--) { if (t.messages[i].role === 'assistant') { lastIdx = i; break; } } if (lastIdx >= 0) this.branchFrom(t.tab_id, lastIdx); else this.showToast('No assistant message to branch from', 'error'); } } },
@@ -470,6 +473,13 @@ function _buildAppData() {
                 { keys: 'Paste image', desc: 'Attach clipboard image to message' },
                 { keys: 'Drag & drop', desc: 'Drop files into chat input' },
                 { keys: 'Clip button', desc: 'File picker for attachments' },
+            ]},
+            { category: 'SEARCH', items: [
+                { keys: 'Ctrl+F', desc: 'Search in chat messages' },
+                { keys: 'Ctrl+Shift+F', desc: 'Search project files (grep)' },
+                { keys: 'Ctrl+Shift+D', desc: 'Search project documentation (ranked)' },
+                { keys: 'Ctrl+Alt+F', desc: 'Search all chat sessions' },
+                { keys: 'Ctrl+G', desc: 'Go to message by number' },
             ]},
         ],
         slashCommands: [
@@ -653,6 +663,12 @@ function _buildAppData() {
                 if (e.key === 'Escape' && this.chatSearch.show) { this.closeChatSearch(); }
                 if (e.key === 'Escape' && this._fileSearch.show) { this.closeFileSearch(); }
                 if (e.key === 'Escape' && this._globalSearch.show) { this.closeGlobalSearch(); }
+                // Ctrl+Shift+D — docs search
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
+                    e.preventDefault();
+                    this.docsSearch.show ? this.closeDocsSearch() : this.openDocsSearch();
+                }
+                if (e.key === 'Escape' && this.docsSearch.show) { this.closeDocsSearch(); }
                 // Ctrl+G — Go to Message (like VS Code)
                 if ((e.ctrlKey || e.metaKey) && e.key === 'g' && this.section === 'chat' && this.activeTab) {
                     e.preventDefault();
@@ -858,6 +874,65 @@ function _buildAppData() {
         closeShortcuts() {
             this.showShortcuts = false;
             this.shortcutsFilter = '';
+        },
+        // ========== DOCS SEARCH ==========
+        openDocsSearch() {
+            this.docsSearch.show = true;
+            this.docsSearch.query = '';
+            this.docsSearch.results = [];
+            this.docsSearch.loading = false;
+            this.docsSearch.totalSections = 0;
+            this.$nextTick(() => {
+                const inp = document.getElementById('docs-search-input');
+                if (inp) inp.focus();
+            });
+        },
+        closeDocsSearch() {
+            this.docsSearch.show = false;
+            this.docsSearch.query = '';
+            this.docsSearch.results = [];
+            if (this.docsSearch._timer) { clearTimeout(this.docsSearch._timer); this.docsSearch._timer = null; }
+        },
+        onDocsSearchInput(query) {
+            this.docsSearch.query = query;
+            if (this.docsSearch._timer) clearTimeout(this.docsSearch._timer);
+            if (!query || query.trim().length < 2) {
+                this.docsSearch.results = [];
+                this.docsSearch.loading = false;
+                return;
+            }
+            this.docsSearch.loading = true;
+            this.docsSearch._timer = setTimeout(() => this._runDocsSearch(query.trim()), 300);
+        },
+        async _runDocsSearch(query) {
+            try {
+                const params = new URLSearchParams({ q: query, max_results: '20' });
+                const res = await fetch('/api/docs/search?' + params);
+                if (!res.ok) { this.docsSearch.results = []; return; }
+                const data = await res.json();
+                this.docsSearch.results = data.results || [];
+                this.docsSearch.totalSections = data.total_sections || 0;
+            } catch (e) {
+                this.docsSearch.results = [];
+            } finally {
+                this.docsSearch.loading = false;
+            }
+        },
+        insertDocRef(result) {
+            // Insert file reference into active chat tab input
+            const tab = this.activeTab;
+            if (!tab || !result) return;
+            const ref = '@' + result.file + ':' + result.line_start;
+            tab.input_text = (tab.input_text || '') + ref + ' ';
+            this.closeDocsSearch();
+            if (this.section !== 'chat') this.navigateSection('chat');
+            this.$nextTick(() => {
+                const ta = document.querySelector('#chat-messages-' + tab.tab_id)?.closest('.flex.flex-col')?.querySelector('textarea');
+                if (ta) { ta.focus(); ta.setSelectionRange(tab.input_text.length, tab.input_text.length); }
+            });
+        },
+        docsSearchKeyDown(e) {
+            if (e.key === 'Escape') { e.preventDefault(); this.closeDocsSearch(); }
         },
         executePaletteCmd(cmd) {
             if (!cmd) return;

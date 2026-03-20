@@ -3959,3 +3959,158 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     letter-spacing: 0.06em;
     white-space: nowrap;
 }
+
+/* === DOCS SEARCH PANEL (Ctrl+Shift+D) === */
+.docs-search-panel {
+    background: var(--bg2);
+    border: 1px solid var(--v-dim);
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    max-height: 70vh;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 16px rgba(180,74,255,0.08);
+}
+.docs-search-input-wrap {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--v-dim);
+    gap: 8px;
+}
+.docs-search-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+.docs-search-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--ng2);
+    font-family: inherit;
+    font-size: 0.875rem;
+    letter-spacing: 0.02em;
+}
+.docs-search-input::placeholder {
+    color: var(--v3);
+}
+.docs-search-shortcut-hint {
+    font-size: 0.5625rem;
+    color: var(--v3);
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+    padding: 2px 6px;
+    border: 1px solid var(--v-dim);
+    border-radius: 2px;
+    background: rgba(0,0,0,0.15);
+}
+.docs-search-loading {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+}
+.docs-search-meta {
+    display: flex;
+    align-items: center;
+    padding: 4px 14px;
+    font-size: 0.5625rem;
+    color: var(--v3);
+    letter-spacing: 0.1em;
+    border-bottom: 1px solid rgba(180,74,255,0.06);
+}
+.docs-search-meta-dim {
+    color: var(--v3);
+    opacity: 0.5;
+    margin-left: 8px;
+}
+.docs-search-results {
+    overflow-y: auto;
+    flex: 1;
+    padding: 4px 0;
+}
+.docs-search-result {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(180,74,255,0.04);
+    transition: background 0.15s;
+}
+.docs-search-result:hover {
+    background: rgba(180,74,255,0.06);
+}
+.docs-search-result-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.docs-search-result-file {
+    font-size: 0.6875rem;
+    color: var(--cyan);
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.docs-search-result-line {
+    font-size: 0.5rem;
+    color: var(--v3);
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+}
+.docs-search-result-score {
+    font-size: 0.5625rem;
+    color: var(--ng);
+    margin-left: auto;
+    font-family: 'Press Start 2P', monospace;
+    flex-shrink: 0;
+}
+.docs-search-result-title {
+    font-size: 0.75rem;
+    color: var(--v);
+    font-weight: bold;
+    margin-bottom: 4px;
+    letter-spacing: 0.02em;
+}
+.docs-search-result-snippet {
+    font-size: 0.6875rem;
+    color: var(--ng2);
+    opacity: 0.8;
+    line-height: 1.5;
+    max-height: 4em;
+    overflow: hidden;
+    word-break: break-word;
+}
+.docs-search-result-tags {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+}
+.docs-search-tag {
+    font-size: 0.5rem;
+    padding: 1px 5px;
+    background: rgba(180,74,255,0.08);
+    color: var(--pink);
+    border: 1px solid rgba(180,74,255,0.12);
+    letter-spacing: 0.06em;
+    border-radius: 2px;
+}
+.docs-search-empty {
+    padding: 24px 14px;
+    text-align: center;
+    font-size: 0.6875rem;
+    color: var(--v3);
+    letter-spacing: 0.1em;
+}
+.docs-search-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 14px;
+    border-top: 1px solid var(--v-dim);
+    font-size: 0.5rem;
+    color: var(--v3);
+    letter-spacing: 0.08em;
+}
