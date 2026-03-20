@@ -5137,3 +5137,38 @@ Results
 N/A
 
 ---
+
+## Experiment 127 — Cat — contextual observation tooltip near companion
+
+**Date:** 2026-03-20 03:59:40
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- `ui/static/modules/cat.js` — `getContextTooltip(page, ctx)` method (+78 lines)
+- `ui/static/templates/sidebar.js` — tooltip HTML element below speech bubble (+7 lines)
+- `ui/static/css/main.css` — `.cat-obs-tooltip` styles with mood variants (+38 lines)
+- `ui/static/js/app.js` — `catContextTooltip` data, `_buildCatTooltipContext()`, polling (+32 lines)
+
+### Results
+
+Results
+
+**What was done:**
+1. **`CatModule.getContextTooltip(page, ctx)`** — метод, возвращающий контекстную строку-наблюдение кота:
+   - **Dashboard**: "127 эксп. · 98 KEEP · 85%"
+   - **Experiments**: "Журнал: 127 записей"
+   - **Chat**: "2 сессии · 45 сообщ. · $0.12" или "Агент работает... 12 сообщ."
+   - **Settings**: "Тема: dracula · 16px"
+   - **Run**: "Эксперимент идёт... 02:34" или "Жду запуска..."
+   - **Idle override**: при idle level ≥2 показывает "*зевает* Скучно..." и т.п.
+2. **Too
+
+### Notes for Next
+
+N/A
+
+---

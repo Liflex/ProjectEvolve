@@ -361,6 +361,24 @@
                         <span x-show="tab.tokens.cost > 0" class="text-[0.5625rem] text-[var(--yellow)] tabular-nums" x-text="'$'+tab.tokens.cost.toFixed(4)"></span>
                         <span x-show="tab.tokens.input > tab.tokens.threshold * 0.9" class="text-[0.5625rem] text-[var(--red)] blink tracking-wider">HIGH_CTX</span>
                     </div>
+                    <!-- Agent Activity Status Bar -->
+                    <div x-show="tab._agentActivity && tab._agentActivity.type !== 'idle'" x-cloak
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0 -translate-y-1"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         x-transition:leave="transition ease-in duration-150"
+                         x-transition:leave-start="opacity-100"
+                         x-transition:leave-end="opacity-0"
+                         class="agent-activity-bar">
+                        <span class="agent-activity-icon" x-html="tab._agentActivity.icon"></span>
+                        <span class="agent-activity-text" :style="'color:' + (tab._agentActivity.color || 'var(--v)')" x-text="tab._agentActivity.text"></span>
+                        <span x-show="tab._agentActivity.type === 'thinking'" class="agent-activity-dots">
+                            <span></span><span></span><span></span>
+                        </span>
+                        <span x-show="tab._agentActivity.type === 'streaming'" class="agent-activity-cursor"></span>
+                        <span x-show="tab._agentActivity.toolCount > 1" class="agent-activity-toolcount"
+                              x-text="tab._agentActivity.toolCount + ' tools'"></span>
+                    </div>
                     <!-- Input area -->
                     <div class="border-t-2 bg-[var(--bg2)] p-3 shrink-0 relative"
                          :class="tab._editMode ? 'border-t-2 border-[var(--yellow)]' : 'border-t-2 border-[var(--v-dim)]'"

@@ -2481,6 +2481,67 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     50% { opacity: 1; }
 }
 
+/* === AGENT ACTIVITY STATUS BAR === */
+.agent-activity-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 12px;
+    background: var(--bg);
+    border-top: 1px solid var(--v-dim);
+    font-size: 0.625rem;
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+    overflow: hidden;
+    white-space: nowrap;
+}
+.agent-activity-icon {
+    font-size: 0.75rem;
+    flex-shrink: 0;
+    animation: act-icon-pulse 1.5s ease-in-out infinite;
+}
+.agent-activity-text {
+    color: var(--v);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.agent-activity-dots {
+    display: inline-flex;
+    gap: 2px;
+    margin-left: 2px;
+}
+.agent-activity-dots span {
+    display: block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--amber);
+    animation: tsi-bounce 1.4s ease-in-out infinite;
+}
+.agent-activity-dots span:nth-child(2) { animation-delay: 0.2s; }
+.agent-activity-dots span:nth-child(3) { animation-delay: 0.4s; }
+.agent-activity-cursor {
+    display: inline-block;
+    width: 6px;
+    height: 0.85em;
+    background: var(--cyan);
+    animation: cursor-blink 0.8s step-end infinite;
+    margin-left: 2px;
+    vertical-align: middle;
+}
+.agent-activity-toolcount {
+    margin-left: auto;
+    color: var(--v3);
+    font-size: 0.5rem;
+    letter-spacing: 0.12em;
+    flex-shrink: 0;
+}
+@keyframes act-icon-pulse {
+    0%, 100% { opacity: 0.7; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.15); }
+}
+
 /* === CHAT TURN SEPARATOR === */
 .chat-turn-sep {
     display: flex;

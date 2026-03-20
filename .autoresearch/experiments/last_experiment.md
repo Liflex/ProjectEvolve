@@ -1,28 +1,31 @@
 # Last Experiment Summary
 
-**Experiment #127** — Cat — contextual observation tooltip near companion
+**Experiment #128** — Chat — real-time agent activity status bar
 **Date:** 2026-03-20
 
 ## What Was Done
 
-1. **`CatModule.getContextTooltip(page, ctx)`** — метод, возвращающий контекстную строку-наблюдение кота на основе текущей страницы и состояния приложения
-2. **Tooltip HTML** — маленький тултип под speech bubble с цветной точкой-индикатором
-3. **CSS стили** — mood-варианты (happy/angry/sleepy/thinking/surprised) с анимацией пульсации
-4. **Alpine wiring** — `catContextTooltip` data property, `_buildCatTooltipContext()`, polling каждые 3s
+1. **Agent activity status bar** — компактная строка между token indicator и input area, показывающая текущую активность агента в реальном времени:
+   - **Thinking**: 🧠 "Thinking..." с анимированными точками
+   - **Tool calls**: 📖 "Reading server.py" / ✏️ "Editing chat.js" / ⌨️ "Running pytest..." / 🔍 "Searching..."
+   - **Streaming**: ✍️ "Writing..." с мигающим курсором
+   - **Idle**: скрыта (не отображается)
+   - **Tool counter**: показывает количество tool calls за текущий turn ("3 tools")
+2. **Состояние `_agentActivity`** в tab: `{ type, text, icon, color, toolCount }`
+3. **Состояние `_turnToolCount`** — счётчик инструментов за текущий turn, сбрасывается на `result`
 
 ## Files Modified
 
-- `ui/static/modules/cat.js` — getContextTooltip()
-- `ui/static/templates/sidebar.js` — tooltip HTML element
-- `ui/static/css/main.css` — .cat-obs-tooltip styles
-- `ui/static/js/app.js` — catContextTooltip, _buildCatTooltipContext()
+- `ui/static/js/modules/chat.js` — `_agentActivity` state + WS handlers (+15 lines)
+- `ui/static/templates/chat-section.js` — activity bar HTML element (+18 lines)
+- `ui/static/css/main.css` — `.agent-activity-bar` styles with animations (+61 lines)
 
 ## Key Results
 
-- Tooltip показывает релевантную информацию для каждой страницы (dashboard/experiments/chat/settings/run)
-- При idle ≥2 показывает состояние сна/скуки вместо контекстной информации
-- Обновляется каждые 3 секунды через существующий setInterval
-- Скрыт в compact sidebar mode
+- User всегда видит что агент делает прямо сейчас, без необходимости скроллить историю сообщений
+- Цветовое кодирование по типу активности (amber=thinking, cyan=streaming, read/edit/bash/search各有цвет)
+- Плавные transition при появлении/исчезновении (Alpine.js x-transition)
+- Tool counter показывает прогресс: "3 tools" когда агент использует несколько инструментов
 
 ## For Next Iteration
 

@@ -67,6 +67,8 @@ window.AppChat = (function() {
                     _catCtxWarned: false,
                     _catCostMilestone: 0,
                     _catStreamPatienceTimer: null,
+                    _agentActivity: { type: 'idle', text: '', icon: '', color: '' },
+                    _turnToolCount: 0,
                     _editDiffOpen: false,
                     _collapsedTurns: new Set(),
                 };
@@ -213,6 +215,7 @@ window.AppChat = (function() {
                             const text = data.text || '';
                             if (text) {
                                 tab.is_thinking = false;
+                                tab._agentActivity = { type: 'streaming', text: 'Writing...', icon: '&#x270d;', color: 'var(--cyan)' };
                                 if (tab._catThinking && window.CatModule && CatModule.isActive()) {
                                     tab._catThinking = false;
                                     CatModule.setExpression('neutral');
@@ -264,6 +267,7 @@ window.AppChat = (function() {
                             if (thinkingText) {
                                 tab._thinkingBuffer = (tab._thinkingBuffer || '') + thinkingText;
                             }
+                            tab._agentActivity = { type: 'thinking', text: 'Thinking...', icon: '&#x1f9e0;', color: 'var(--amber)' };
                             if (window.CatModule && CatModule.isActive() && !tab._catThinking) {
                                 tab._catThinking = true;
                                 CatModule.setExpression('thinking');
@@ -287,6 +291,7 @@ window.AppChat = (function() {
                             console.log('[ws] assistant extracted text:', JSON.stringify(text).slice(0, 200), 'len:', text.length, 'msgs before:', tab.messages.length);
                             if (text) {
                                 tab.is_thinking = false;
+                                tab._agentActivity = { type: 'streaming', text: 'Writing...', icon: '&#x270d;', color: 'var(--cyan)' };
                                 // Remove regenerating placeholder if present
                                 const lastMsg = tab.messages[tab.messages.length - 1];
                                 if (lastMsg && lastMsg.is_regenerating) {
@@ -345,12 +350,21 @@ window.AppChat = (function() {
                                 toolDetail = name;
                             }
                             tab.messages.push({ role: 'tool', content: name, toolType, toolDetail, toolPath, toolEditOld: _toolEditOld || '', toolEditNew: _toolEditNew || '', toolWriteContent: _toolWriteContent || '' });
+                            // Agent activity status bar
+                            tab._turnToolCount = (tab._turnToolCount || 0) + 1;
+                            const _actIcons = { read: '&#x1f4d6;', edit: '&#x270f;', write: '&#x1f4be;', bash: '&#x2328;', search: '&#x1f50d;', other: '&#x2699;' };
+                            const _actColors = { read: 'var(--cyan)', edit: 'var(--yellow)', write: 'var(--ng)', bash: 'var(--pink)', search: 'var(--amber)', other: 'var(--v3)' };
+                            const _actLabels = { read: 'Reading', edit: 'Editing', write: 'Writing', bash: 'Running', search: 'Searching', other: 'Tool' };
+                            const _actText = toolDetail ? (_actLabels[toolType] || 'Tool') + ' ' + toolDetail : (_actLabels[toolType] || 'Working') + '...';
+                            tab._agentActivity = { type: 'tool', text: _actText, icon: _actIcons[toolType] || _actIcons.other, color: _actColors[toolType] || _actColors.other, toolCount: tab._turnToolCount };
                             _app.chatTick++;
                             // Cat: react to tool call in real-time
                             if (window.CatModule && CatModule.isActive() && CatModule.reactToToolCall) {
                                 CatModule.reactToToolCall(toolType, toolDetail || '');
                             }
                         } else if (etype === 'result') {
+                            tab._agentActivity = { type: 'idle', text: '', icon: '', color: '' };
+                            tab._turnToolCount = 0;
                             const usage = data.usage || {};
                             if (usage.input_tokens) tab.tokens.input = usage.input_tokens;
                             if (usage.output_tokens) tab.tokens.output += usage.output_tokens;
