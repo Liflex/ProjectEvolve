@@ -2232,6 +2232,39 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .chat-bubble-user .chat-collapsed-preview::after {
     background: linear-gradient(transparent, var(--chat-user-bg, rgba(180,74,255,0.1)));
 }
+/* Smart collapsed preview — conclusion-first for assistant messages */
+.smart-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 180px;
+}
+.smart-preview .smart-preview-title {
+    font-size: 0.8125rem;
+    color: var(--ng2);
+    line-height: 1.4;
+}
+.smart-preview .smart-preview-title .md {
+    font-size: inherit;
+}
+.smart-preview .smart-preview-summary {
+    font-size: 0.5625rem;
+    letter-spacing: 0.08em;
+    color: var(--v3);
+    padding: 2px 0;
+    border-top: 1px dashed var(--v-dim);
+    border-bottom: 1px dashed var(--v-dim);
+    user-select: none;
+}
+.smart-preview .smart-preview-conclusion {
+    font-size: 0.75rem;
+    color: var(--ng3);
+    line-height: 1.4;
+    opacity: 0.85;
+}
+.smart-preview .smart-preview-conclusion .md {
+    font-size: inherit;
+}
 .chat-expand-btn {
     display: flex; align-items: center; justify-content: center; gap: 6px;
     padding: 4px 8px; font-size: 0.5625rem; letter-spacing: 0.1em;

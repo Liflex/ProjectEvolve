@@ -1519,6 +1519,33 @@ window.AppChat = (function() {
             }
         },
 
+        // ========== CHAT: SMART COLLAPSED PREVIEW ==========
+        _buildSmartCollapsedPreview(content) {
+            if (!content) return { title: '', conclusion: '', summary: '' };
+            const codeBlocks = content.match(/```[\s\S]*?```/g) || [];
+            const codeBlockCount = codeBlocks.length;
+            const totalCodeLines = codeBlocks.reduce((sum, block) => sum + block.split('\n').length, 0);
+            // Strip code blocks to find text paragraphs
+            const textOnly = content.replace(/```[\s\S]*?```/g, '').replace(/\n{3,}/g, '\n\n').trim();
+            const paragraphs = textOnly.split(/\n\n+/).filter(p => p.trim().length > 0);
+            // Title: first line (often a heading or first sentence)
+            const title = paragraphs.length > 0 ? paragraphs[0].split('\n')[0].trim().slice(0, 120) : '';
+            // Conclusion: last non-trivial paragraph (skip if same as title)
+            let conclusion = '';
+            for (let i = paragraphs.length - 1; i >= 0; i--) {
+                const p = paragraphs[i].trim();
+                if (p.length > 20 && p !== title) {
+                    conclusion = p.split('\n').slice(0, 3).join('\n').slice(0, 300);
+                    break;
+                }
+            }
+            // Build summary badge parts
+            const parts = [];
+            if (codeBlockCount > 0) parts.push(codeBlockCount + ' code block' + (codeBlockCount > 1 ? 's' : '') + ' · ' + totalCodeLines + ' lines');
+            if (paragraphs.length > 2) parts.push((paragraphs.length - 2) + ' more section' + (paragraphs.length - 2 > 1 ? 's' : ''));
+            return { title, conclusion, summary: parts.join(' · ') };
+        },
+
         // ========== CHAT: RENDER ==========
         renderChatHTML(tab) {
             const _ = this.chatTick;
@@ -1647,8 +1674,22 @@ window.AppChat = (function() {
                     + thinkingIndicatorHtml
                     + '<div class="chat-bubble-asst" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit">'
                     + (aCollapsed
-                        ? '<div class="chat-collapsed-preview"><div class="md">' + this.linkMsgRefs(this.linkFilePaths(this.renderMarkdown(msg.content.slice(0, 300))), tab.tab_id) + '</div></div>'
-                          + '<div class="chat-expand-btn" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + idx + ')">&#x25BC; EXPAND (' + aChars + ' chars)</div>'
+                        ? (() => {
+                            const preview = this._buildSmartCollapsedPreview(msg.content);
+                            let html = '<div class="chat-collapsed-preview smart-preview">';
+                            if (preview.title) {
+                                html += '<div class="smart-preview-title"><div class="md">' + this.linkMsgRefs(this.linkFilePaths(this.renderMarkdown(preview.title)), tab.tab_id) + '</div></div>';
+                            }
+                            if (preview.summary) {
+                                html += '<div class="smart-preview-summary">' + this.escHtml(preview.summary) + '</div>';
+                            }
+                            if (preview.conclusion && preview.conclusion !== preview.title) {
+                                html += '<div class="smart-preview-conclusion"><div class="md">' + this.linkMsgRefs(this.linkFilePaths(this.renderMarkdown(preview.conclusion)), tab.tab_id) + '</div></div>';
+                            }
+                            html += '</div>';
+                            html += '<div class="chat-expand-btn" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + idx + ')">&#x25BC; EXPAND (' + aChars + ' chars)</div>';
+                            return html;
+                        })()
                         : contentHtml)
                     + (aRegenDiff && msg._showRegenDiff ? this._renderRegenDiffHtml(msg) : '')
                     + '</div></div></div>';

@@ -3129,3 +3129,51 @@ Results
 **Working:** yes 
 
 
+## Experiment 149 — Cat companion reactions to all chat user actions
+
+**Time:** 2026-03-20 17:17:44
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+Добавлены cat reactions к **14 chat actions**, которые раньше были "молчаливыми":
+
+| Action | Reaction | Expression |
+|--------|----------|------------|
+| `closeChatTab` | "Прощай, сессия..." | sleepy |
+| `deleteChatMsg` | "Удалил сообщение!" | surprised |
+| `quoteMessage` | "Цитируешь? Что ответим?" | thinking |
+| `regenerateResponse` | "Переделываем!" | happy |
+| `togglePinMessage` (pin) | "Зафиксировал!" + paw wave | happy |
+| `togglePinMessage` (unpin) | "Открепил
+
+
+## Experiment 150 — Chat image paste with Claude Vision (multimodal content blocks)
+
+**Time:** 2026-03-20 17:23:03
+
+**Files:** Target:** chat.js, session.py, server.py, chat-section.js, main.css
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+Ранее изображения отправлялись как markdown-текст `![](dataUrl)` внутри строкового prompt — Claude не мог видеть их как картинки, только как base64-строку. Теперь:
+
+1. **Backend `session.py`**: `send()` принимает prompt как `str` или `list` (мультимодальные content blocks). Streaming mode передаёт multimodal content через `_single_message()`.
+2. **Backend `server.py`**: WS handler извлекает `images` из сообщения, строит массив `[text_block, image_block, ...]` и переда
+
+
