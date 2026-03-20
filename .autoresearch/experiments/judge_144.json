@@ -1,0 +1,39 @@
+{
+  "score": 0.83,
+  "recommendation": "KEEP",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "pass",
+      "message": "Experiment commit found: exp #144: chat cost budget system with warnings"
+    },
+    {
+      "name": "file_consistency",
+      "status": "warn",
+      "message": "Agent claimed no files but 8 actually changed: ui/static/templates/lab-settings.js, ui/static/js/modules/chat.js, ui/static/css/main.css, ui/static/templates/chat-section.js, autoresearch/experiments/accumulation_context.md"
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected"
+    },
+    {
+      "name": "diff_size",
+      "status": "pass",
+      "message": "8 file(s), +148/-21 lines"
+    },
+    {
+      "name": "report_quality",
+      "status": "warn",
+      "message": "No report text provided"
+    },
+    {
+      "name": "code_quality",
+      "status": "pass",
+      "message": "No code smells detected"
+    }
+  ],
+  "summary": "4/6 checks passed, 2 warnings",
+  "agent_decision": "",
+  "agent_score": null
+}

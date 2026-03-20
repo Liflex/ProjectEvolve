@@ -1,0 +1,39 @@
+{
+  "score": 0.83,
+  "recommendation": "KEEP",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "pass",
+      "message": "Experiment commit found: exp #149: cat companion reactions to all chat user actions \u2014"
+    },
+    {
+      "name": "file_consistency",
+      "status": "warn",
+      "message": "Agent claimed no files but 6 actually changed: ui/static/modules/cat.js, ui/static/js/modules/chat.js, autoresearch/experiments/accumulation_context.md, ui/static/js/app.js, autoresearch/experiments/last_experiment.md"
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected"
+    },
+    {
+      "name": "diff_size",
+      "status": "pass",
+      "message": "6 file(s), +243/-11 lines"
+    },
+    {
+      "name": "report_quality",
+      "status": "warn",
+      "message": "No report text provided"
+    },
+    {
+      "name": "code_quality",
+      "status": "pass",
+      "message": "No code smells detected"
+    }
+  ],
+  "summary": "4/6 checks passed, 2 warnings",
+  "agent_decision": "",
+  "agent_score": null
+}

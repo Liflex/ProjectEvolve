@@ -1,0 +1,39 @@
+{
+  "score": 0.75,
+  "recommendation": "REVIEW",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "pass",
+      "message": "Experiment commit found: exp #146: enhanced markdown rendering \u2014 task lists, tables, "
+    },
+    {
+      "name": "file_consistency",
+      "status": "fail",
+      "message": "No claimed files found in diff. Actual: ui/static/css/main.css, autoresearch/experiments/accumulation_context.md, autoresearch/experiments/last_experiment.md, autoresearch/experiments/changes_log.md, ui/static/js/modules/renderer.js"
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected"
+    },
+    {
+      "name": "diff_size",
+      "status": "pass",
+      "message": "5 file(s), +139/-23 lines"
+    },
+    {
+      "name": "report_quality",
+      "status": "warn",
+      "message": "No report text provided"
+    },
+    {
+      "name": "code_quality",
+      "status": "pass",
+      "message": "No code smells detected"
+    }
+  ],
+  "summary": "4/6 checks passed, 1 failed, 1 warnings",
+  "agent_decision": "",
+  "agent_score": null
+}

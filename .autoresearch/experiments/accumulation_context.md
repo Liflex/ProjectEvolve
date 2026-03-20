@@ -1,4 +1,25 @@
 
+## Experiment 154 — Chat STOP button replaces SEND during streaming + ESC shortcut
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **SEND/STOP toggle** — SEND полностью заменяется на STOP кнопку во время стриминга. Убран отдельный маленький `[X]`.
+2. **STOP button styling** — красная рамка, `[X] STOP`, hover заполняет фон, пульсирующая анимация, Alpine transition.
+3. **ESC shortcut** — Escape останавливает генерацию (высший приоритет).
+4. **`[stopped]` badge** — красный italic badge на assistant-сообщении после остановки.
+5. **Dynamic hint** — `GENERATING... — ESC to stop` (красным) под input'ом.
+6. **Persistence** — `_stopped` флаг в localStorage.
+
+### Files Modified
+
+- `ui/static/templates/chat-section.js` — SEND/STOP toggle, dynamic hint
+- `ui/static/js/modules/chat.js` — ESC handler, `_stopped`, `aStoppedHtml`, persistence
+- `ui/static/css/main.css` — `.msg-stopped-badge`, `.chat-stop-btn` pulse
+
+---
+
 ## Experiment 152 — Chat send mode toggle (Enter/Ctrl+Enter to send)
 
 **Date:** 2026-03-20
@@ -6082,6 +6103,41 @@ Results
 
 **Working:** yes
 **Tests:** skipped (UI cha
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 153 — Chat token budget bar with real-time cost tracking
+
+**Date:** 2026-03-20 17:38:42
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- `ui/static/templates/chat-section.js` — budget bar HTML в toolbar + detail popup
+- `ui/static/js/modules/chat.js` — `budgetBarColor()`, `formatTokenCount()`, close on tab switch
+- `ui/static/js/app.js` — `_budgetDetailOpen` state
+- `ui/static/css/main.css` — budget bar & detail popup стили
+
+### Results
+
+Results
+
+**What was done:**
+- Compact progress bar в toolbar чата, показывающий % использования бюджета цветом (зелёный → жёлтый → оранжевый → красный при 50%/80%/100%)
+- Cost label ($X.XX) рядом с progress bar
+- Detail popup при клике: input tokens, output tokens, budget %, context window %
+- Auto-close popup при клике вне и при переключении вкладок
+- Hover effect — progress bar утолщается
+
+**Working:** yes
+**Tests:** skipped (UI change, Python syntax OK, template backticks balanced)
 
 ### Notes for Next
 
