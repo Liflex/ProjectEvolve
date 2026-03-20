@@ -1,4 +1,29 @@
 
+## Experiment 135 — Chat — text selection floating toolbar (Copy, Quote, Find, Web)
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`onChatMouseUp(event)`** — обработчик mouseup в области сообщений, запускает проверку выделения текста с задержкой 150ms
+2. **`_checkTextSelection(event)`** — определяет выделенный текст, находит msg-контейнер и позицию, показывает тулбар над выделением
+3. **`_hideSelToolbar()`** — скрывает тулбар, вызывается при скролле, клике вне bubble, и после действий
+4. **`selToolbarCopy()`** — копирует выделенный текст в буфер обмена с toast уведомлением
+5. **`selToolbarQuote()`** — вставляет выделенный текст как цитату (с `> ` префиксом) в поле ввода
+6. **`selToolbarSearch()`** — ищет выделенный текст в чате через встроенный поиск
+7. **`selToolbarWebSearch()`** — открывает Google поиск выделенного текста в новой вкладке
+8. **Toolbar HTML** — всплывающая панель с 4 кнопками (COPY, QUOTE, FIND, WEB) и индикатором длины
+9. **CSS** — `.sel-floating-toolbar` стили: absolute позиция, transform translateX(-50%), тень, hover эффекты
+10. **Auto-hide on scroll** — тулбар скрывается при скролле чата (позиция устаревает)
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` — onChatMouseUp(), _checkTextSelection(), _hideSelToolbar(), selToolbarCopy/Quote/Search/WebSearch(), onChatScroll hide
+- `ui/static/templates/chat-section.js` — @mouseup event, floating toolbar HTML
+- `ui/static/css/main.css` — .sel-floating-toolbar, .sel-tb-btn, .sel-tb-meta styles
+
+---
+
 ## Experiment 134 — Chat — response regeneration diff view (compare original vs new)
 
 **Date:** 2026-03-20
@@ -5370,6 +5395,36 @@ Results
 **What was done:**
 1. **`renderActivitySparkline(tab)`** — генерирует SVG sparkline по одному bar на каждое assistant сообщение с токен-статистикой. Максимум 20 последних ответов. Высота bar'а пропорциональна output tokens относительно максимального значения в выборке. Цвет кодирует относительную нагрузку: green (<33%), cyan (33-66%), amber (66-90%), red (>90%).
 2. **Sparkline в IDE status bar** — мини-график вставлен после cost indicator (`$X.XXXX`). Показывается только при 2+ ответах 
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 134 — Chat — response regeneration diff view
+
+**Date:** 2026-03-20 04:39:10
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` — regenerateResponse(), stream handlers, renderAssistantMsg(), toggleRegenDiff(), _renderRegenDiffHtml(), saveChatState(), context menu
+- `ui/static/css/main.css` — .regen-diff-panel styles, .act-diff button styles
+
+### Results
+
+Results
+
+**What was done:**
+1. При регенерации ответа (`regenerateResponse()`) оригинальный контент ассистента сохраняется в `tab._regenOriginalContent`
+2. В обоих stream handler'ах новое регенерированное сообщение получает `_regenOriginal` с оригинальным текстом
+3. В action bar регенерированных сообщений появляется кнопка **DIFF** (только когда оригинал и новый ответ отличаются)
+4. В контекстном меню (правый клик) добавлена опция **SHOW DIFF / HIDE DIFF**
+5. `_renderRegenDiffHtml(msg)` рендерит
 
 ### Notes for Next
 

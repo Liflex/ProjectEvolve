@@ -1031,6 +1031,54 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .regen-diff-body .diff-truncated { padding: 4px 8px; color: var(--v3); font-size: 0.5rem; text-align: center; border-top: 1px solid var(--v-dim); letter-spacing: 0.1em; }
 .act-diff { color: var(--cyan); opacity: 0.7; }
 .act-diff.active { opacity: 1; color: var(--ng); }
+
+/* === CHAT: TEXT SELECTION FLOATING TOOLBAR === */
+.sel-floating-toolbar {
+    position: absolute;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px 4px;
+    background: var(--bg2, #1a1a2e);
+    border: 1px solid var(--v2, rgba(180,74,255,0.4));
+    border-radius: 4px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5), 0 0 8px rgba(180,74,255,0.15);
+    transform: translateX(-50%);
+    pointer-events: auto;
+    white-space: nowrap;
+}
+.sel-tb-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 7px;
+    font-size: 0.5rem;
+    letter-spacing: 0.08em;
+    color: var(--v3, #888);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.12s;
+    white-space: nowrap;
+}
+.sel-tb-btn:hover {
+    color: var(--ng2, #d0d0d0);
+    background: rgba(180,74,255,0.1);
+    border-color: rgba(180,74,255,0.25);
+}
+.sel-tb-btn:active {
+    background: rgba(180,74,255,0.2);
+}
+.sel-tb-meta {
+    font-size: 0.4375rem;
+    color: var(--v3, #666);
+    letter-spacing: 0.05em;
+    padding: 0 4px;
+    opacity: 0.6;
+}
+
 /* Write preview in tool messages */
 .tool-write-preview { border: 1px solid var(--v-dim); border-radius: 2px; overflow: hidden; margin-top: 4px; font-size: 0.625rem; }
 .tool-write-preview .write-header { display: flex; align-items: center; gap: 8px; padding: 3px 8px; background: var(--tool-header-bg); border-bottom: 1px solid var(--v-dim); }

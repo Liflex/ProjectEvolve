@@ -2125,6 +2125,101 @@ window.AppChat = (function() {
         onChatClick(event) {
             if (event.target.tagName === 'A') { event.target.target = '_blank'; }
         },
+
+        // ========== CHAT: TEXT SELECTION FLOATING TOOLBAR ==========
+        _selToolbar: { show: false, x: 0, y: 0, text: '', tabId: '', msgIdx: -1 },
+        _selToolbarTimer: null,
+
+        onChatMouseUp(event) {
+            // Hide toolbar if clicking outside a message bubble
+            const bubble = event.target.closest('.chat-bubble-asst, .chat-bubble-user, .chat-collapsed-preview');
+            if (!bubble) {
+                this._hideSelToolbar();
+                return;
+            }
+            // Delay to let browser finalize selection
+            clearTimeout(this._selToolbarTimer);
+            this._selToolbarTimer = setTimeout(() => this._checkTextSelection(event), 150);
+        },
+
+        _checkTextSelection(event) {
+            const sel = window.getSelection();
+            const text = (sel || '').toString().trim();
+            if (!text || text.length < 3) {
+                this._hideSelToolbar();
+                return;
+            }
+            // Find which message the selection is in
+            const bubble = sel.anchorNode && (sel.anchorNode.parentElement?.closest('.chat-bubble-asst, .chat-bubble-user, .chat-collapsed-preview')
+                || sel.anchorNode.closest?.('.chat-bubble-asst, .chat-bubble-user, .chat-collapsed-preview'));
+            if (!bubble) { this._hideSelToolbar(); return; }
+            const msgWrap = bubble.closest('[data-msg-idx]');
+            if (!msgWrap) { this._hideSelToolbar(); return; }
+            const msgIdx = parseInt(msgWrap.getAttribute('data-msg-idx'), 10);
+            const tabContainer = bubble.closest('[id^="chat-messages-"]');
+            if (!tabContainer) { this._hideSelToolbar(); return; }
+            const tabId = tabContainer.id.replace('chat-messages-', '');
+            // Position toolbar above selection
+            const range = sel.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            const containerRect = tabContainer.getBoundingClientRect();
+            const x = Math.max(0, rect.left + rect.width / 2 - containerRect.left);
+            const y = Math.max(0, rect.top - containerRect.top - 8);
+            this._selToolbar = { show: true, x, y, text, tabId, msgIdx };
+        },
+
+        _hideSelToolbar() {
+            if (this._selToolbar.show) {
+                this._selToolbar = { show: false, x: 0, y: 0, text: '', tabId: '', msgIdx: -1 };
+            }
+        },
+
+        selToolbarCopy() {
+            if (this._selToolbar.text) {
+                navigator.clipboard.writeText(this._selToolbar.text).then(() => {
+                    this.showToast('SELECTION COPIED', 'success');
+                });
+            }
+            this._hideSelToolbar();
+            window.getSelection()?.removeAllRanges();
+        },
+
+        selToolbarQuote() {
+            const tab = this.chatTabs.find(t => t.tab_id === this._selToolbar.tabId);
+            if (!tab) return;
+            const text = this._selToolbar.text;
+            const prefix = '> ' + text.split('\n').join('\n> ');
+            const sep = tab.input_text ? '\n' : '';
+            tab.input_text += sep + prefix + '\n';
+            this._hideSelToolbar();
+            window.getSelection()?.removeAllRanges();
+            this.$nextTick(() => {
+                const ta = document.querySelector('#chat-messages-' + tab.tab_id)?.closest('.flex.flex-col')?.querySelector('textarea');
+                if (ta) { ta.focus(); this.autoResizeTextarea({ target: ta }); }
+            });
+        },
+
+        selToolbarSearch() {
+            const text = this._selToolbar.text;
+            if (text) {
+                // Search in chat
+                this._chatSearchQuery = text.slice(0, 100);
+                this._chatSearchActive = true;
+                this._chatSearchIdx = 0;
+                this.chatTick++;
+            }
+            this._hideSelToolbar();
+            window.getSelection()?.removeAllRanges();
+        },
+
+        selToolbarWebSearch() {
+            const text = this._selToolbar.text;
+            if (text) {
+                window.open('https://www.google.com/search?q=' + encodeURIComponent(text.slice(0, 200)), '_blank');
+            }
+            this._hideSelToolbar();
+            window.getSelection()?.removeAllRanges();
+        },
         onChatContextMenu(tab, event) {
             const msgWrap = event.target.closest('[data-msg-idx]');
             if (!msgWrap) return;
@@ -2136,6 +2231,8 @@ window.AppChat = (function() {
             const el = event.target;
             tab._distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
             tab.scrolledUp = tab._distFromBottom > 100;
+            // Hide selection toolbar on scroll (position becomes stale)
+            this._hideSelToolbar();
             // Minimap viewport tracking
             if (el.scrollHeight > el.clientHeight) {
                 tab._mmTop = (el.scrollTop / el.scrollHeight) * 100;

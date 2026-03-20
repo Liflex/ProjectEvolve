@@ -302,8 +302,20 @@
                         <div class="absolute inset-0 overflow-y-auto p-4 space-y-3" :id="'chat-messages-' + tab.tab_id"
                              x-html="renderChatHTML(tab)"
                              @click="onChatClick($event)"
+                             @mouseup="onChatMouseUp($event)"
                              @contextmenu="onChatContextMenu(tab, $event)"
                              @scroll="onChatScroll(tab, $event)">
+                        </div>
+                        <!-- Text selection floating toolbar -->
+                        <div x-show="_selToolbar.show && _selToolbar.tabId === tab.tab_id" x-cloak
+                             x-transition.duration.100ms
+                             class="sel-floating-toolbar"
+                             :style="'left:' + Math.min(_selToolbar.x, 350) + 'px;top:' + Math.max(4, _selToolbar.y) + 'px'">
+                            <button class="sel-tb-btn" @mousedown.prevent="selToolbarCopy()" title="Copy selection">&#x1f4cb; COPY</button>
+                            <button class="sel-tb-btn" @mousedown.prevent="selToolbarQuote()" title="Quote in reply">&#x275d; QUOTE</button>
+                            <button class="sel-tb-btn" @mousedown.prevent="selToolbarSearch()" title="Search in chat">&#x1f50d; FIND</button>
+                            <button class="sel-tb-btn" @mousedown.prevent="selToolbarWebSearch()" title="Search on Google">&#x1f310; WEB</button>
+                            <span class="sel-tb-meta" x-text="_selToolbar.text.length + 'ch'"></span>
                         </div>
                         <!-- Minimap overlay -->
                         <div class="chat-minimap" x-show="tab.messages.length > 5"
