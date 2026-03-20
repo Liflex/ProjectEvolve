@@ -1,3 +1,27 @@
+## Experiment 145 — Chat toolbar overflow groups — PANEL/MSG/FILTER dropdowns
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **PANEL dropdown** — RAW LOG, TOOLS, FILE PREVIEW grouped into single "PANEL" dropdown button. Active panel highlighted. Includes [X] CLOSE option when panel is open.
+2. **MSG dropdown** — FOLD ALL, UNFOLD ALL, COLLAPSE TURNS, EXPAND TURNS grouped into "MSG" dropdown. Color-coded icons (amber/cyan).
+3. **FILTER dropdown** — USER, CLAUDE, TOOLS, THINKING toggles grouped into "FILTER" dropdown with [x]/[ ] checkboxes. "SHOW ALL" reset button. Badge "ON" when any filter is active.
+4. **Removed duplicate EXPORT button** — toolbar had two EXPORT buttons (direct + dropdown). Removed the direct one; dropdown version remains.
+5. **Removed standalone [X] PANEL button** — panel closing moved into PANEL dropdown.
+6. **CSS** — `.tb-dropdown-menu`, `.tb-dropdown-item`, `.tb-dropdown-header`, `.tb-dropdown-sep`, `.tb-dropdown-check`, `.tb-filter-badge`.
+7. **State** — `_tbPanelOpen`, `_tbMsgOpen`, `_tbFilterOpen` boolean states in app.js.
+
+**Result:** Toolbar reduced from ~25 visible buttons + 16 separator groups to ~14 visible items + 3 organized dropdown groups.
+
+### Files Modified
+
+- `ui/static/templates/chat-section.js` — toolbar reorganization
+- `ui/static/css/main.css` — dropdown menu styles
+- `ui/static/js/app.js` — dropdown state variables
+
+---
+
 ## Experiment 140 — Chat — collapsible markdown sections (heading fold/unfold)
 
 **Date:** 2026-03-20
@@ -2998,5 +3022,26 @@ N/A
 **Results:**
 
 N/A
+
+
+## Experiment 144 — Chat cost budget system with warnings
+
+**Time:** 2026-03-20 16:51:26
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **`costBudget` setting** (default $5.00) — сохраняется в localStorage, миграция для старых данных
+2. **Budget indicator** в token bar — текущая стоимость vs бюджет, прогресс-бар, проценты, цветовая кодировка (зелёный < 50%, жёлтый < 80%, оранжевый < 100%, красный >= 100% с миганием)
+3. **Предупреждения** — toast уведомления при 50%/80%/100% бюджета. Кот реагирует на 80% (thinking) и 100% (angry + speech)
+4. **Кнопка RESET** — сброс счётчика стоимости и флагов преду
 
 

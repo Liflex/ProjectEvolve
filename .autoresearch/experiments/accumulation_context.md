@@ -5723,3 +5723,31 @@ N/A
 N/A
 
 ---
+
+## Experiment 144 — Chat cost budget system with warnings
+
+**Date:** 2026-03-20 16:51:26
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+Results
+
+**What was done:**
+1. **`costBudget` setting** (default $5.00) — сохраняется в localStorage, миграция для старых данных
+2. **Budget indicator** в token bar — текущая стоимость vs бюджет, прогресс-бар, проценты, цветовая кодировка (зелёный < 50%, жёлтый < 80%, оранжевый < 100%, красный >= 100% с миганием)
+3. **Предупреждения** — toast уведомления при 50%/80%/100% бюджета. Кот реагирует на 80% (thinking) и 100% (angry + speech)
+4. **Кнопка RESET** — сброс счётчика стоимости и флагов преду
+
+### Notes for Next
+
+N/A
+
+---
