@@ -1025,6 +1025,11 @@
     let _userTypingTimer = null;           // debounce timer for typing stop
     let _pose = 'sitting';                 // 'sitting' | 'lying'
     let _poseTransition = 0;               // ticks remaining for pose transition animation
+    let _headTiltAngle = 0;                // current head tilt angle in degrees (-6 to 6)
+    let _headTiltTarget = 0;               // target tilt angle (smoothly interpolated)
+    let _headTiltTicks = 0;                // ticks remaining for forced tilt hold
+    let _bounceTicks = 0;                  // remaining ticks for body bounce
+    let _bounceOffset = 0;                 // current bounce Y offset (pixels)
 
     // Mouse move handler for eye tracking
     function _onMouseMove(e) {
@@ -1087,11 +1092,11 @@
         { expr: 'surprised', speech: 'Мяу?! *подпрыгнул*', anim: 'earTwitch' },
         { expr: 'happy', speech: '*мурр* =^_^=', anim: 'pawWave' },
         { expr: 'happy', speech: 'Мур-мур-мур!', anim: 'purr' },
-        { expr: 'thinking', speech: '*прищурился* Чего надо?', anim: 'earTwitch' },
+        { expr: 'thinking', speech: '*прищурился* Чего надо?', anim: 'headTilt' },
         { expr: 'surprised', speech: 'Не трогай! *шипение*', anim: 'earTwitch' },
         { expr: 'happy', speech: 'Ещё! Ещё! =^._.^=', anim: 'pawWave' },
-        { expr: 'neutral', speech: 'Мяу~', anim: 'earTwitch' },
-        { expr: 'thinking', speech: '*наклонил голову*...', anim: null },
+        { expr: 'neutral', speech: 'Мяу~', anim: 'headTilt' },
+        { expr: 'thinking', speech: '*наклонил голову*...', anim: 'headTilt' },
     ];
 
     const PETTING_REACTIONS = [
@@ -1241,7 +1246,7 @@
             tailOffX = 3;
             tailOffY = 2;
         }
-        const tailPos = { x: tailBase.x + tailOffX, y: tailBase.y + tailOffY };
+        const tailPos = { x: tailBase.x + tailOffX, y: tailBase.y + tailOffY + _bounceOffset };
 
         // Z-order differs by pose:
         // Sitting: tail → body → head → paw → eyes → whiskers → particles
@@ -1251,37 +1256,51 @@
         if (isLying) {
             // Lying body (horizontal)
             drawFilled(BODY_LYING.outline, BODY_LYING.fill,
-                { x: bodyBase.x + bodyOffX, y: bodyBase.y + bodyOffY },
+                { x: bodyBase.x + bodyOffX, y: bodyBase.y + bodyOffY + _bounceOffset },
                 outlineColor, fillColor);
             // Front paws between head and body
-            drawGrid(PAWS_LYING.outline, LIE_PAWS_POS.x, LIE_PAWS_POS.y, outlineColor);
+            drawGrid(PAWS_LYING.outline, LIE_PAWS_POS.x, LIE_PAWS_POS.y + _bounceOffset, outlineColor);
         } else {
             // Sitting body (vertical)
             drawFilled(BODY.outline, BODY.fill,
-                { x: bodyBase.x + bodyOffX, y: bodyBase.y + bodyOffY },
+                { x: bodyBase.x + bodyOffX, y: bodyBase.y + bodyOffY + _bounceOffset },
                 outlineColor, fillColor);
         }
 
-        // Head with ear twitch + stretch offset
-        drawFilled(HEAD.outline, HEAD.fill,
-            { x: headBase.x + _headOffX, y: headBase.y + _headOffY + headExtraY },
-            outlineColor, fillColor);
-
-        // Paw wave animation (sitting only)
+        // Paw wave animation (sitting only — drawn before head tilt so it's not rotated)
         if (!isLying && _pawWaveTicks > 0 && (_pawWavePhase === 1 || _pawWavePhase === 2)) {
             const pawX = bodyBase.x + 12 + bodyOffX;
-            const pawBaseY = bodyBase.y + 14 + bodyOffY;
+            const pawBaseY = bodyBase.y + 14 + bodyOffY + _bounceOffset;
             const pawLift = _pawWavePhase === 2 ? 3 : 2;
             drawFilled(PAW_OUTLINE, PAW_FILL,
                 { x: pawX, y: pawBaseY - pawLift },
                 outlineColor, fillColor);
         }
 
+        // === Head tilt: canvas rotation around neck pivot ===
+        const headDrawX = headBase.x + _headOffX;
+        const headDrawY = headBase.y + _headOffY + headExtraY + _bounceOffset;
+        const tiltRad = _headTiltAngle * Math.PI / 180;
+        const pivotX = (headDrawX + HEAD.w / 2) * ps;
+        const pivotY = (headDrawY + HEAD.h - 2) * ps;
+
+        if (Math.abs(tiltRad) > 0.001) {
+            ctx.save();
+            ctx.translate(pivotX, pivotY);
+            ctx.rotate(tiltRad);
+            ctx.translate(-pivotX, -pivotY);
+        }
+
+        // Head with ear twitch + stretch offset
+        drawFilled(HEAD.outline, HEAD.fill,
+            { x: headDrawX, y: headDrawY },
+            outlineColor, fillColor);
+
         // Eyes — compute position relative to head base (works for both poses)
         const eyeRelX = cfg.x - HEAD_POS.x;
         const eyeRelY = cfg.y - HEAD_POS.y;
-        const eyeAbsX = headBase.x + _headOffX + eyeRelX;
-        const eyeAbsY = headBase.y + _headOffY + headExtraY + eyeRelY;
+        const eyeAbsX = headDrawX + eyeRelX;
+        const eyeAbsY = headDrawY + eyeRelY;
 
         const frames = cfg.frames;
         if (frames && frames.length > 0 && frames[eyeFrame]) {
@@ -1319,11 +1338,16 @@
         }
 
         // Head position for whiskers/mouth
-        const hx = headBase.x + _headOffX;
-        const hy = headBase.y + _headOffY + headExtraY;
+        const hx = headDrawX;
+        const hy = headDrawY;
 
         renderMouth(hx, hy);
         renderWhiskers(hx, hy);
+
+        // End head tilt transform
+        if (Math.abs(tiltRad) > 0.001) {
+            ctx.restore();
+        }
 
         renderParticles();
     }
@@ -1370,6 +1394,34 @@
             _headOffX = Math.random() < 0.5 ? 1 : -1;
             _headOffY = -1;
             _earTwitchTicks = 2 + Math.floor(Math.random() * 2);
+        }
+
+        // Head tilt: smooth rotation for curious/thinking expression, random idle
+        if (_headTiltTicks > 0) {
+            _headTiltTicks--;
+            if (_headTiltTicks === 0) _headTiltTarget = 0;
+        }
+        // Trigger head tilt during thinking/surprised expressions
+        if ((expression === 'thinking' || expression === 'surprised') && _headTiltTicks === 0 && Math.random() < 0.03) {
+            _headTiltTarget = (Math.random() < 0.5 ? -1 : 1) * (4 + Math.random() * 3);
+            _headTiltTicks = 8 + Math.floor(Math.random() * 6);
+        }
+        // Random head tilt during neutral idle
+        else if (expression === 'neutral' && _idleLevel === 0 && _earTwitchTicks === 0 && _stretchTicks === 0 && _headTiltTicks === 0 && Math.random() < 0.005) {
+            _headTiltTarget = (Math.random() < 0.5 ? -1 : 1) * (3 + Math.random() * 2);
+            _headTiltTicks = 6 + Math.floor(Math.random() * 4);
+        }
+        // Smooth interpolation toward target
+        _headTiltAngle += (_headTiltTarget - _headTiltAngle) * 0.15;
+        if (Math.abs(_headTiltAngle) < 0.1 && _headTiltTarget === 0) _headTiltAngle = 0;
+
+        // Body bounce: oscillating Y offset during celebrations
+        if (_bounceTicks > 0) {
+            _bounceTicks--;
+            _bounceOffset = Math.sin(_bounceTicks * 0.6) * 1.5;
+        } else {
+            _bounceOffset *= 0.8;
+            if (Math.abs(_bounceOffset) < 0.1) _bounceOffset = 0;
         }
 
         // Paw wave: random animation during idle
@@ -1656,6 +1708,11 @@
             expression = expr;
             eyeFrame = 0;
             _tailAccum = 0;
+            // Reset head tilt when expression changes (except thinking/surprised which trigger it)
+            if (expr !== 'thinking' && expr !== 'surprised') {
+                _headTiltTarget = 0;
+                _headTiltTicks = 0;
+            }
             // Adjust tail speed based on expression
             const tailSpeeds = {
                 neutral: 2, happy: 1, sleepy: 5, surprised: 1,
@@ -1664,6 +1721,8 @@
             _tailSpeed = tailSpeeds[expr] || 2;
             // Purr when happy
             if (expr === 'happy') _purrrTicks = 20;
+            // Head tilt when thinking (curious look)
+            if (expr === 'thinking') triggerHeadTilt();
             if (animating) render();
         },
 
@@ -1722,6 +1781,17 @@
             _stretchPhase = 0;
         },
 
+        /** Trigger a head tilt animation (curious/confused look). */
+        triggerHeadTilt() {
+            _headTiltTarget = (Math.random() < 0.5 ? -1 : 1) * (4 + Math.random() * 3);
+            _headTiltTicks = 8 + Math.floor(Math.random() * 6);
+        },
+
+        /** Trigger a body bounce animation (celebration/excitement). */
+        triggerBounce(ticks) {
+            _bounceTicks = ticks || 15;
+        },
+
         /**
          * React to experiment result — milestone detection, streak analysis, mood updates.
          * @param {string} decision - 'KEEP'|'DISCARD'|'ACCEPT'|'ERROR'|null
@@ -1745,6 +1815,8 @@
                 const milestoneText = pickRandom(SPEECH.milestone).replace('{n}', expNum);
                 setSpeechText(milestoneText, 5000);
                 triggerPawWave();
+                _bounceTicks = 20; // celebration bounce
+                triggerHeadTilt();
                 // Celebration sparkles
                 for (let s = 0; s < 5; s++) {
                     spawnParticle({
@@ -1776,6 +1848,7 @@
                     setExpression('happy');
                     setSpeechText(pickRandom(SPEECH.streak_keep).replace('{n}', streak), 5000);
                     _purrrTicks = 30;
+                    _bounceTicks = 15; // excited bounce
                     setTimeout(() => { if (animating) setExpression('neutral'); }, 5000);
                     return;
                 }
@@ -2239,6 +2312,7 @@
             if (reaction.anim === 'earTwitch') triggerEarTwitch();
             else if (reaction.anim === 'pawWave') triggerPawWave();
             else if (reaction.anim === 'purr') _purrrTicks = 15;
+            else if (reaction.anim === 'headTilt') triggerHeadTilt();
 
             // Return to neutral after delay
             setTimeout(() => {

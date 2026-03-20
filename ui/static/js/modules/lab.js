@@ -512,6 +512,7 @@ window.AppLab = (function() {
                             if (c === 'KEEP') {
                                 CatModule.setExpression('happy');
                                 CatModule.setSpeechText('Судья сказал KEEP! *довольно мурлычет*', 3000);
+                                if (CatModule.triggerBounce) CatModule.triggerBounce(10);
                             } else if (c === 'DISCARD') {
                                 CatModule.setExpression('angry');
                                 CatModule.setSpeechText('Судья отклонил! *возмущённо фыркает*', 3000);
