@@ -1,3 +1,43 @@
+## Experiment 140 — Chat — collapsible markdown sections (heading fold/unfold)
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`_addSectionFolding(html, prefix)`** — replaces `_addHeadingIds`. For messages with 3+ headings, wraps each heading + its content in a collapsible `<div class="md-section">`. Clicking a heading toggles `.md-section-collapsed` class, hiding/showing the section body. Falls back to simple ID injection for messages with fewer headings.
+2. **Fold arrow** — each heading gets a `<span class="md-fold-arrow">` (▼) that rotates 90° when collapsed.
+3. **TOC collapse/expand all** — "FOLD" and "OPEN" buttons in the OUTLINE panel header. `_toggleAllSections(msgEl, collapse)` finds all `.md-section` elements in a message bubble and toggles them.
+4. **CSS** — `.md-section`, `.md-heading` (flex, cursor, hover glow), `.md-fold-arrow` (rotation transition), `.md-section-collapsed .md-section-body` (display:none), `.msg-toc-collapse-btn`.
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` — _addSectionFolding(), _toggleAllSections(), TOC fold/open buttons
+- `ui/static/css/main.css` — .md-section, .md-heading, .md-fold-arrow, .md-section-collapsed, .md-section-body, .msg-toc-collapse-btn
+
+---
+
+## Experiment 139 — Chat — branch/fork conversation from any message
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`branchFrom(tabId, msgIdx)`** — creates a new tab with messages copied up to the branch point. Branched tab has `_branchedFrom` metadata, no backend session. Shows BRANCH badge on tab and watermark banner with "START SESSION" button.
+2. **`startBranchSession(tabId)`** — converts a branched tab (read-only) to a live session by creating a new backend session.
+3. **Tab persistence** — `branchedFrom` saved/restored in localStorage.
+4. **Context menu** — "BRANCH FROM HERE" option for user and assistant messages.
+5. **Keyboard shortcut** — `b` key in nav mode branches from focused message.
+6. **Cat reaction** — surprised expression + speech on branch.
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` — branchFrom(), startBranchSession(), context menu, persistence, branched tab info message
+- `ui/static/js/app.js` — command palette entry, keyboard shortcut
+- `ui/static/templates/chat-section.js` — branch badge on tab, watermark banner
+- `ui/static/css/main.css` — .tab-branch-badge, .branch-watermark, .act-branch
+
+---
+
 ## Experiment 135 — Chat — text selection floating toolbar (Copy, Quote, Find, Web)
 
 **Date:** 2026-03-20
