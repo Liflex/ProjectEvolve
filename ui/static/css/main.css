@@ -223,15 +223,40 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     border-color: rgba(0,229,255,0.3);
     background: rgba(0,229,255,0.05);
 }
-.md blockquote { border-left: 3px solid var(--md-blockquote-border, var(--pink)); padding-left: 0.75rem; margin: 0.5rem 0; color: var(--md-blockquote-text, var(--v3)); background: rgba(0,0,0,0.1); padding: 0.5rem 0.75rem; border-radius: 0 3px 3px 0; }
-.md table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.8125rem; border: 1px solid var(--v-dim); border-radius: 3px; overflow: hidden; }
-.md th { border: 1px solid var(--v-dim); padding: 4px 8px; background: var(--md-table-header-bg, rgba(180,74,255,0.05)); color: var(--md-h2-color, var(--v)); text-align: left; font-weight: normal; }
-.md td { border: 1px solid var(--v-dim); padding: 4px 8px; color: var(--ng2); }
-.md tr:nth-child(even) td { background: var(--md-table-stripe-bg, transparent); }
+.md blockquote { border-left: 3px solid var(--md-blockquote-border, var(--pink)); padding: 0.5rem 0.75rem; margin: 0.5rem 0; color: var(--md-blockquote-text, var(--v3)); background: rgba(0,0,0,0.1); border-radius: 0 3px 3px 0; font-style: italic; }
+.md blockquote blockquote { border-left-color: var(--cyan); color: var(--v3); opacity: 0.85; }
+.md blockquote blockquote blockquote { border-left-color: var(--amber); }
+.md blockquote p:first-child { margin-top: 0; }
+.md blockquote p:last-child { margin-bottom: 0; }
+.md .md-table-wrap { overflow-x: auto; margin: 0.5rem 0; border: 1px solid var(--v-dim); border-radius: 3px; }
+.md table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.md thead { position: sticky; top: 0; z-index: 1; }
+.md th { border: 1px solid var(--v-dim); padding: 5px 10px; background: var(--md-table-header-bg, rgba(180,74,255,0.05)); color: var(--md-h2-color, var(--v)); text-align: left; font-weight: normal; font-size: 0.75rem; letter-spacing: 0.05em; white-space: nowrap; }
+.md td { border: 1px solid var(--v-dim); padding: 4px 10px; color: var(--ng2); vertical-align: top; }
+.md tr:nth-child(even) td { background: var(--md-table-stripe-bg, rgba(180,74,255,0.02)); }
+.md tbody tr { transition: background 0.1s; }
+.md tbody tr:hover td { background: rgba(180,74,255,0.06); }
 /* Task lists */
-.md ul:has(> li > input[type="checkbox"]) { list-style: none; padding-left: 0; }
+.md ul:has(> li > input[type="checkbox"]) { list-style: none; padding-left: 0; margin: 0.5rem 0; }
 .md ul:has(> li > input[type="checkbox"]) > li::before { content: none; }
-.md input[type="checkbox"] { margin-right: 0.4em; accent-color: var(--v); }
+.md ul:has(> li > input[type="checkbox"]) > li { padding: 3px 0; transition: opacity 0.15s; }
+.md input[type="checkbox"] { margin-right: 0.5em; accent-color: var(--v); cursor: default; width: 0.85em; height: 0.85em; vertical-align: middle; }
+.md li:has(> input[type="checkbox"][checked]) { opacity: 0.55; }
+.md li:has(> input[type="checkbox"][checked]) > *:not(input) { text-decoration: line-through; text-decoration-color: var(--v3); }
+/* Task list progress bar */
+.md-task-progress { display: flex; align-items: center; gap: 8px; margin: 0.25rem 0 0.5rem; font-size: 0.6875rem; }
+.md-task-progress-label { color: var(--v3); letter-spacing: 0.05em; white-space: nowrap; }
+.md-task-progress-bar { flex: 1; height: 4px; background: var(--v-dim); border-radius: 2px; overflow: hidden; max-width: 120px; }
+.md-task-progress-fill { height: 100%; background: var(--ng, var(--v)); border-radius: 2px; transition: width 0.3s; }
+.md-task-progress-pct { color: var(--v3); min-width: 28px; text-align: right; font-variant-numeric: tabular-nums; }
+/* Details/Summary (collapsible sections) */
+.md details { margin: 0.5rem 0; border: 1px solid var(--v-dim); border-radius: 3px; overflow: hidden; }
+.md details > summary { padding: 6px 10px; cursor: pointer; font-size: 0.8125rem; color: var(--v); background: rgba(180,74,255,0.04); border-bottom: 1px solid var(--v-dim); user-select: none; transition: background 0.15s; letter-spacing: 0.05em; }
+.md details > summary:hover { background: rgba(180,74,255,0.08); }
+.md details > summary::marker { color: var(--v); }
+.md details[open] > summary { border-bottom-color: var(--v-dim); margin-bottom: 0; }
+.md details > *:not(summary) { padding: 0 0.75rem; }
+.md details > p { margin: 0.5rem 0; }
 /* Images */
 .md img { max-width: 100%; border: 1px solid var(--v-dim); border-radius: 3px; margin: 0.5rem 0; }
 /* Chat role labels */

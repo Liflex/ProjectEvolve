@@ -1,4 +1,24 @@
 
+## Experiment 146 — Chat — enhanced markdown rendering (task lists, tables, blockquotes, details)
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **DOMPurify fix** — Added `ADD_TAGS: ['input', 'details', 'summary', 'progress']` and extra attributes to allow markdown task lists and collapsible sections.
+2. **Task list progress bar** — Post-processing detects `<ul>` with 3+ checkboxes, prepends progress indicator.
+3. **Task list styling** — Checked items: strikethrough + opacity. Custom checkbox sizing.
+4. **Table improvements** — Scrollable wrapper, sticky thead, row hover, enhanced header.
+5. **Blockquote improvements** — Nested blockquotes: different border colors (pink→cyan→amber). Italic.
+6. **Details/Summary support** — Collapsible sections from markdown with theme-aware styling.
+
+### Files Modified
+
+- `ui/static/js/modules/renderer.js` — DOMPurify config, post-processing
+- `ui/static/css/main.css` — enhanced markdown styles
+
+---
+
 ## Experiment 138 — Cat — typing awareness (reacts when user types in chat)
 
 **Date:** 2026-03-20
@@ -5745,6 +5765,36 @@ Results
 2. **Budget indicator** в token bar — текущая стоимость vs бюджет, прогресс-бар, проценты, цветовая кодировка (зелёный < 50%, жёлтый < 80%, оранжевый < 100%, красный >= 100% с миганием)
 3. **Предупреждения** — toast уведомления при 50%/80%/100% бюджета. Кот реагирует на 80% (thinking) и 100% (angry + speech)
 4. **Кнопка RESET** — сброс счётчика стоимости и флагов преду
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 145 — Chat toolbar overflow groups — PANEL/MSG/FILTER dropdowns
+
+**Date:** 2026-03-20 16:55:48
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- `ui/static/templates/chat-section.js` — toolbar reorganization
+- `ui/static/css/main.css` — dropdown menu styles (.tb-dropdown-*)
+- `ui/static/js/app.js` — dropdown state variables
+
+### Results
+
+Results
+
+**What was done:**
+1. **PANEL dropdown** — RAW LOG, TOOLS, FILE PREVIEW сгруппированы в один dropdown "PANEL". Активная панель подсвечивается. Кнопка [X] CLOSE появляется когда панель открыта.
+2. **MSG dropdown** — FOLD ALL, UNFOLD ALL, COLLAPSE TURNS, EXPAND TURNS сгруппированы в dropdown "MSG" с цветными иконками.
+3. **FILTER dropdown** — 4 фильтра (USER, CLAUDE, TOOLS, THINKING) с чекбоксами [x]/[ ] и кнопкой "SHOW ALL" для сброса. Badge "ON" при активном фильтре.
+4. Удалён дублирующ
 
 ### Notes for Next
 

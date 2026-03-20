@@ -3045,3 +3045,24 @@ Results
 4. **Кнопка RESET** — сброс счётчика стоимости и флагов преду
 
 
+## Experiment 145 — Chat toolbar overflow groups — PANEL/MSG/FILTER dropdowns
+
+**Time:** 2026-03-20 16:55:48
+
+**Files:** `ui/static/templates/chat-section.js` — toolbar reorganization, `ui/static/css/main.css` — dropdown menu styles (.tb-dropdown-*), `ui/static/js/app.js` — dropdown state variables
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **PANEL dropdown** — RAW LOG, TOOLS, FILE PREVIEW сгруппированы в один dropdown "PANEL". Активная панель подсвечивается. Кнопка [X] CLOSE появляется когда панель открыта.
+2. **MSG dropdown** — FOLD ALL, UNFOLD ALL, COLLAPSE TURNS, EXPAND TURNS сгруппированы в dropdown "MSG" с цветными иконками.
+3. **FILTER dropdown** — 4 фильтра (USER, CLAUDE, TOOLS, THINKING) с чекбоксами [x]/[ ] и кнопкой "SHOW ALL" для сброса. Badge "ON" при активном фильтре.
+4. Удалён дублирующ
+
+

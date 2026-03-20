@@ -1,29 +1,30 @@
 # Last Experiment Summary
 
-**Experiment #145** — Chat toolbar overflow groups — PANEL/MSG/FILTER dropdowns
+**Experiment #146** — Chat — enhanced markdown rendering (task lists, tables, blockquotes, details)
 **Date:** 2026-03-20
 
 ## What Was Done
 
-1. **PANEL dropdown** — RAW LOG, TOOLS, FILE PREVIEW grouped into single "PANEL" dropdown button
-2. **MSG dropdown** — FOLD ALL, UNFOLD ALL, COLLAPSE TURNS, EXPAND TURNS grouped into "MSG" dropdown
-3. **FILTER dropdown** — USER, CLAUDE, TOOLS, THINKING toggles with checkboxes + SHOW ALL reset
-4. Removed duplicate EXPORT button and standalone [X] PANEL button
-5. CSS styles for `.tb-dropdown-*` components
-6. State variables `_tbPanelOpen`, `_tbMsgOpen`, `_tbFilterOpen` in app.js
+1. **DOMPurify fix** — Added `ADD_TAGS: ['input', 'details', 'summary', 'progress']` and `ADD_ATTR: ['type', 'checked', 'disabled', 'open']` to allow markdown task lists, collapsible sections, and progress elements through sanitization.
+2. **Task list progress bar** — Post-processing in renderer detects `<ul>` with 3+ checkboxes and prepends a progress indicator (e.g., "3/5 done" with progress bar and percentage).
+3. **Task list styling** — Checked items get strikethrough + reduced opacity. Custom checkbox size/spacing. Task list gets margin for breathing room.
+4. **Table improvements** — Tables wrapped in `.md-table-wrap` for horizontal scroll on overflow. Sticky thead. Row hover highlight. Enhanced header styling with letter-spacing. Vertical-align: top for td.
+5. **Blockquote improvements** — Nested blockquotes get different border colors (pink → cyan → amber). Font-style: italic. First/last paragraph margin fix.
+6. **Details/Summary support** — New `<details>/<summary>` elements from markdown render as collapsible sections with theme-aware styling (border, background, hover, cursor).
 
 ## Files Modified
 
-- `ui/static/templates/chat-section.js` — toolbar reorganization
-- `ui/static/css/main.css` — dropdown menu styles
-- `ui/static/js/app.js` — dropdown state variables
+- `ui/static/js/modules/renderer.js` — DOMPurify config, task list progress post-processing, table wrap post-processing
+- `ui/static/css/main.css` — enhanced styles for tables, blockquotes, task lists, details/summary, progress bar
 
 ## Key Results
 
-- Toolbar reduced from ~25 visible buttons to ~14 visible + 3 organized dropdown groups
-- All functionality preserved (accessible via dropdowns or command palette)
+- Task lists (`- [x]`, `- [ ]`) now render correctly with checkboxes (previously stripped by DOMPurify)
+- Tables with many columns scroll horizontally instead of breaking layout
+- Blockquote nesting is visually distinguishable
+- `<details>` blocks from markdown render as interactive collapsible sections
+- Progress indicators appear automatically for task lists with 3+ items
 
 ## For Next Iteration
 
-- Consider adding keyboard shortcuts for dropdown menus (e.g., Alt+P for Panel)
-- Test on smaller screens (< 1366px) for further optimization
+N/A

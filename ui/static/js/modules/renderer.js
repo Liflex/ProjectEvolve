@@ -67,7 +67,10 @@ window.AppRenderer = (function() {
             try {
                 const html = marked.parse(t, { breaks: true });
                 const str = typeof html === 'string' ? html : String(html);
-                const clean = DOMPurify.sanitize(str, { ADD_ATTR: ['class'] });
+                const clean = DOMPurify.sanitize(str, {
+                    ADD_ATTR: ['class', 'type', 'checked', 'disabled', 'open'],
+                    ADD_TAGS: ['input', 'details', 'summary', 'progress'],
+                });
                 // Language-specific accent colors for code block headers
                 const langAccents = {
                     python: '#3572A5', py: '#3572A5',
@@ -81,7 +84,23 @@ window.AppRenderer = (function() {
                     sql: '#e38c00', markdown: '#083fa1', md: '#083fa1',
                     cpp: '#f34b7d', c: '#555555', ruby: '#701516', php: '#4F5D95',
                 };
-                return clean.replace(/<pre><code(?:\s+class="language-(\w+)")?>([\s\S]*?)<\/code><\/pre>/g,
+                // Post-process: add progress indicator for task lists with 3+ items
+                let processed = clean.replace(/<ul>([\s\S]*?<\/ul>)/g, (ulMatch) => {
+                    const checks = ulMatch.match(/<input[^>]*type="checkbox"[^>]*>/g);
+                    if (!checks || checks.length < 3) return ulMatch;
+                    const checked = checks.filter(c => /\bchecked\b/.test(c)).length;
+                    const total = checks.length;
+                    const pct = Math.round((checked / total) * 100);
+                    const bar = '<div class="md-task-progress">'
+                        + '<span class="md-task-progress-label">' + checked + '/' + total + ' done</span>'
+                        + '<div class="md-task-progress-bar"><div class="md-task-progress-fill" style="width:' + pct + '%"></div></div>'
+                        + '<span class="md-task-progress-pct">' + pct + '%</span>'
+                        + '</div>';
+                    return bar + ulMatch;
+                });
+                // Post-process: wrap tables in scrollable container
+                processed = processed.replace(/<table>([\s\S]*?)<\/table>/g, '<div class="md-table-wrap"><table>$1</table></div>');
+                return processed.replace(/<pre><code(?:\s+class="language-(\w+)")?>([\s\S]*?)<\/code><\/pre>/g,
                     (match, lang, code) => {
                         const label = lang ? lang.toUpperCase() : 'CODE';
                         const id = 'cb-' + Math.random().toString(36).slice(2, 8);
