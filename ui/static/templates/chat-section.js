@@ -365,12 +365,14 @@
                             <div class="minimap-viewport" :style="'top:' + (tab._mmTop||0) + '%;height:' + (tab._mmHeight||100) + '%'"></div>
                         </div>
                     </div>
-                    <!-- Scroll-to-bottom FAB -->
+                    <!-- Scroll-to-bottom FAB with new message count -->
                     <button x-show="tab.scrolledUp" x-cloak
                             @click.stop="scrollToBottom(tab)"
-                            class="absolute right-4 z-10 px-2.5 py-1.5 bg-[var(--bg2)] border border-[var(--v2)] text-[var(--v)] text-[0.625rem] tracking-wider hover:bg-[rgba(180,74,255,0.15)] transition-all shadow-lg"
+                            class="absolute right-4 z-10 px-2.5 py-1.5 bg-[var(--bg2)] border text-[0.625rem] tracking-wider transition-all shadow-lg fab-scroll-bottom"
+                            :class="(tab._newMsgCount || 0) > 0 ? 'fab-has-new border-[var(--cyan)] text-[var(--cyan)] hover:bg-[rgba(0,229,255,0.1)]' : 'border-[var(--v2)] text-[var(--v)] hover:bg-[rgba(180,74,255,0.15)]'"
                             :style="'bottom:' + (chatBottomPanel !== 'closed' ? (chatBottomPanelHeight + 28) : '80') + 'px'"
-                            title="Scroll to bottom">&#x2193; BOTTOM</button>
+                            :title="(tab._newMsgCount || 0) > 0 ? (tab._newMsgCount + ' new message' + (tab._newMsgCount > 1 ? 's' : '') + ' below') : 'Scroll to bottom'"
+                            x-text="(tab._newMsgCount || 0) > 0 ? '\u2193 ' + tab._newMsgCount + ' NEW' : '\u2193 BOTTOM'"></button>
                     <!-- Bottom Panel (collapsible) -->
                     <template x-if="chatBottomPanel !== 'closed'">
                         <div>

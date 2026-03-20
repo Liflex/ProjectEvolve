@@ -552,6 +552,22 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     transition: top 0.08s linear, height 0.08s linear;
 }
 
+/* === SCROLL-TO-BOTTOM FAB === */
+.fab-scroll-bottom {
+    animation: fab-appear 0.2s ease-out;
+}
+.fab-has-new {
+    animation: fab-pulse 2s ease-in-out infinite;
+}
+@keyframes fab-appear {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fab-pulse {
+    0%, 100% { box-shadow: 0 2px 8px rgba(0, 229, 255, 0.15); }
+    50% { box-shadow: 0 2px 16px rgba(0, 229, 255, 0.35); }
+}
+
 /* === IDE STATUS BAR === */
 .chat-status-bar {
     display: flex; align-items: center; justify-content: space-between;

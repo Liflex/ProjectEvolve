@@ -85,6 +85,7 @@ window.AppChat = (function() {
                     _collapsedTurns: new Set(),
                     _mmTop: 0,
                     _mmHeight: 100,
+                    _newMsgCount: 0,  // messages added while user is scrolled up
                 };
                 this.chatTabs.push(tab);
                 this.activeChatTab = tab.tab_id;
@@ -303,6 +304,7 @@ window.AppChat = (function() {
                                     const regenOriginal = isRegen ? tab._regenOriginalContent : undefined;
                                     tab._regenerating = false;
                                     tab.messages.push({ role: 'assistant', content: text, thinking: thinkingContent || undefined, is_streaming: true, ts: Date.now(), regenerated: isRegen || undefined, _regenOriginal: regenOriginal });
+                                    _app._trackNewMsg(tab);
                                     tab._thinkingBuffer = '';
                                     _app._incrementUnread(tab);
                                 }
@@ -376,6 +378,7 @@ window.AppChat = (function() {
                                     const regenOriginal2 = isRegen2 ? tab._regenOriginalContent : undefined;
                                     tab._regenerating = false;
                                     tab.messages.push({ role: 'assistant', content: text, thinking: thinkingText || undefined, is_streaming: true, ts: Date.now(), regenerated: isRegen2 || undefined, _regenOriginal: regenOriginal2 });
+                                    _app._trackNewMsg(tab);
                                     _app._incrementUnread(tab);
                                 }
                                 tab._thinkingBuffer = '';
@@ -420,6 +423,7 @@ window.AppChat = (function() {
                                 toolDetail = name;
                             }
                             tab.messages.push({ role: 'tool', content: name, toolType, toolDetail, toolPath, toolEditOld: _toolEditOld || '', toolEditNew: _toolEditNew || '', toolWriteContent: _toolWriteContent || '' });
+                            _app._trackNewMsg(tab);
                             // Agent activity status bar
                             tab._turnToolCount = (tab._turnToolCount || 0) + 1;
                             const _actIcons = { read: '&#x1f4d6;', edit: '&#x270f;', write: '&#x1f4be;', bash: '&#x2328;', search: '&#x1f50d;', other: '&#x2699;' };
@@ -568,6 +572,7 @@ window.AppChat = (function() {
                             tab._editMode = null;
                         }
                         tab.messages.push({ role: 'assistant', content: '[ERROR] ' + (msg.message || 'Unknown error'), ts: Date.now() });
+                        _app._trackNewMsg(tab);
                         tab.is_streaming = false;
                         tab._regenerating = false;
                         _app.stopTurnTimer(tab);
@@ -597,6 +602,7 @@ window.AppChat = (function() {
             ws.onerror = (e) => {
                 console.error('[ws] error:', tab.session_id, e);
                 tab.messages.push({ role: 'assistant', content: '[ERROR] WebSocket connection failed', ts: Date.now() });
+                _app._trackNewMsg(tab);
                 tab.is_streaming = false;
                 tab.ws_state = 'disconnected';
                 _app.stopTurnTimer(tab);
@@ -662,6 +668,7 @@ window.AppChat = (function() {
             tab._typingStart = null;
             tab.messages.push({ role: 'user', content: displayContent, id: 'msg-' + Date.now(), ts: Date.now(), edited: wasEditing || undefined, _hasImages: visionImages.length > 0, _replyTo: replyTo, _typingDuration: typingDuration > 2000 ? typingDuration : undefined });
             tab._msgStartTime = Date.now();
+            // Don't count user's own messages as "new" — they just sent it
             this.startTurnTimer(tab);
             this.chatNavClear();
             tab._msgTokens = null;
@@ -2593,7 +2600,12 @@ window.AppChat = (function() {
         onChatScroll(tab, event) {
             const el = event.target;
             tab._distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+            const wasScrolledUp = tab.scrolledUp;
             tab.scrolledUp = tab._distFromBottom > 100;
+            // Reset new message count when user scrolls back to bottom
+            if (wasScrolledUp && !tab.scrolledUp) {
+                tab._newMsgCount = 0;
+            }
             // Hide selection toolbar on scroll (position becomes stale)
             this._hideSelToolbar();
             // Minimap viewport tracking
@@ -2616,6 +2628,13 @@ window.AppChat = (function() {
             if (el) el.scrollTop = el.scrollHeight;
             tab.scrolledUp = false;
             tab._distFromBottom = 0;
+            tab._newMsgCount = 0;
+        },
+        // Track new messages while user is scrolled up
+        _trackNewMsg(tab) {
+            if (tab.scrolledUp) {
+                tab._newMsgCount = (tab._newMsgCount || 0) + 1;
+            }
         },
 
         // ========== CHAT: MINIMAP ==========
@@ -2759,6 +2778,7 @@ window.AppChat = (function() {
                 _collapsedTurns: new Set(),
                 _mmTop: 0,
                 _mmHeight: 100,
+                _newMsgCount: 0,
                 _branchedFrom: { tabId: tabId, msgIdx: msgIdx, label: tab.label },
                 _restored: false,
             };
@@ -4077,6 +4097,7 @@ window.AppChat = (function() {
                         _turnElapsed: 0,
                         _turnTimerInterval: null,
                         _typingStart: null,
+                        _newMsgCount: 0,
                     };
                     this.chatTabs.push(tab);
                 }
