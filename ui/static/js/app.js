@@ -334,6 +334,11 @@ function _buildAppData() {
         statsView: 'session', // 'session' | 'all'
         showExportMenu: false,
 
+        // Toolbar group dropdowns
+        _tbPanelOpen: false,
+        _tbMsgOpen: false,
+        _tbFilterOpen: false,
+
         // Message type filters
         chatFilters: { user: true, assistant: true, tool: true, thinking: true },
 

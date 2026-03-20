@@ -68,43 +68,89 @@
         <!-- Chat Toolbar (shared across tabs) -->
         <div x-show="activeTab" class="chat-toolbar">
             <button class="chat-toolbar-btn" @click="clearActiveChat()" title="Clear chat messages">CLEAR</button>
-            <button class="chat-toolbar-btn" @click="exportActiveChat()" title="Export chat as markdown">EXPORT</button>
-            <div class="chat-toolbar-sep"></div>
-            <button class="chat-toolbar-btn" :class="chatBottomPanel === 'rawlog' && 'active'" @click="toggleBottomPanel('rawlog')" title="Toggle raw tool logs">
-                <span :style="'color:' + (chatBottomPanel === 'rawlog' ? 'var(--v)' : 'inherit')">&#x2328;</span> RAW LOG
-            </button>
-            <button class="chat-toolbar-btn" :class="chatBottomPanel === 'summary' && 'active'" @click="toggleBottomPanel('summary')" title="Toggle tools summary">
-                <span :style="'color:' + (chatBottomPanel === 'summary' ? 'var(--cyan)' : 'inherit')">&#x2699;</span> TOOLS
-            </button>
-            <button class="chat-toolbar-btn" :class="chatBottomPanel === 'filepreview' && 'active'" @click="chatBottomPanel === 'filepreview' ? chatBottomPanel = 'closed' : (filePreview.path ? chatBottomPanel = 'filepreview' : null)" title="Toggle file preview">
-                <span :style="'color:' + (chatBottomPanel === 'filepreview' ? 'var(--ng)' : 'inherit')">&#x1f4c4;</span> FILE
-            </button>
-            <div class="chat-toolbar-sep"></div>
             <button class="chat-toolbar-btn" :class="settings.showThinking && 'active'" @click="toggleSetting('showThinking')" title="Toggle thinking blocks visibility">
                 <span :style="'color:' + (settings.showThinking ? 'var(--amber)' : 'inherit')">&#x1f4ad;</span> THINK
             </button>
             <div class="chat-toolbar-sep"></div>
-            <button class="chat-toolbar-btn" @click="collapseAllMessages()" title="Collapse all long messages">FOLD ALL</button>
-            <button class="chat-toolbar-btn" @click="expandAllMessages()" title="Expand all folded messages">UNFOLD</button>
+            <!-- PANEL group dropdown -->
+            <div class="relative">
+                <button class="chat-toolbar-btn" :class="chatBottomPanel !== 'closed' && 'active'" @click.stop="_tbPanelOpen = !_tbPanelOpen" title="Bottom panels">
+                    <span :style="'color:' + (chatBottomPanel !== 'closed' ? 'var(--v)' : 'inherit')">&#x25BC;</span> PANEL
+                </button>
+                <div x-show="_tbPanelOpen" x-cloak x-transition.duration.150ms
+                     @click.outside="_tbPanelOpen = false"
+                     class="tb-dropdown-menu">
+                    <button class="tb-dropdown-item" :class="chatBottomPanel === 'rawlog' && 'active'" @click.stop="_tbPanelOpen = false; toggleBottomPanel('rawlog')">
+                        <span :style="'color:' + (chatBottomPanel === 'rawlog' ? 'var(--v)' : 'var(--v3)')">&#x2328;</span> RAW LOG
+                    </button>
+                    <button class="tb-dropdown-item" :class="chatBottomPanel === 'summary' && 'active'" @click.stop="_tbPanelOpen = false; toggleBottomPanel('summary')">
+                        <span :style="'color:' + (chatBottomPanel === 'summary' ? 'var(--cyan)' : 'var(--v3)')">&#x2699;</span> TOOLS
+                    </button>
+                    <button class="tb-dropdown-item" :class="chatBottomPanel === 'filepreview' && 'active'" @click.stop="_tbPanelOpen = false; chatBottomPanel === 'filepreview' ? chatBottomPanel = 'closed' : (filePreview.path ? chatBottomPanel = 'filepreview' : null)">
+                        <span :style="'color:' + (chatBottomPanel === 'filepreview' ? 'var(--ng)' : 'var(--v3)')">&#x1f4c4;</span> FILE PREVIEW
+                    </button>
+                    <button class="tb-dropdown-item" x-show="chatBottomPanel !== 'closed'" @click.stop="_tbPanelOpen = false; chatBottomPanel = 'closed'" style="color:var(--red)">
+                        [X] CLOSE
+                    </button>
+                </div>
+            </div>
+            <!-- MSG group dropdown -->
+            <div class="relative">
+                <button class="chat-toolbar-btn" @click.stop="_tbMsgOpen = !_tbMsgOpen" title="Message folding & turns">
+                    &#x25A0; MSG
+                </button>
+                <div x-show="_tbMsgOpen" x-cloak x-transition.duration.150ms
+                     @click.outside="_tbMsgOpen = false"
+                     class="tb-dropdown-menu">
+                    <button class="tb-dropdown-item" @click.stop="_tbMsgOpen = false; collapseAllMessages()">
+                        <span style="color:var(--amber)">&#x25B2;</span> FOLD ALL
+                    </button>
+                    <button class="tb-dropdown-item" @click.stop="_tbMsgOpen = false; expandAllMessages()">
+                        <span style="color:var(--cyan)">&#x25BC;</span> UNFOLD ALL
+                    </button>
+                    <div class="tb-dropdown-sep"></div>
+                    <button class="tb-dropdown-item" @click.stop="_tbMsgOpen = false; collapsePrevTurns()">
+                        &#x25B2; COLLAPSE TURNS
+                    </button>
+                    <button class="tb-dropdown-item" @click.stop="_tbMsgOpen = false; expandAllTurns()">
+                        &#x25BC; EXPAND TURNS
+                    </button>
+                </div>
+            </div>
+            <!-- FILTER group dropdown -->
+            <div class="relative">
+                <button class="chat-toolbar-btn" :class="(!chatFilters.user || !chatFilters.assistant || !chatFilters.tool || !chatFilters.thinking) && 'active'" @click.stop="_tbFilterOpen = !_tbFilterOpen" title="Message type filters">
+                    <span :style="'color:' + ((!chatFilters.user || !chatFilters.assistant || !chatFilters.tool || !chatFilters.thinking) ? 'var(--v)' : 'inherit')">&#x25BC;</span> FILTER
+                    <span x-show="!chatFilters.user || !chatFilters.assistant || !chatFilters.tool || !chatFilters.thinking" class="tb-filter-badge">ON</span>
+                </button>
+                <div x-show="_tbFilterOpen" x-cloak x-transition.duration.150ms
+                     @click.outside="_tbFilterOpen = false"
+                     class="tb-dropdown-menu">
+                    <div class="tb-dropdown-header">SHOW_MESSAGE_TYPES</div>
+                    <button class="tb-dropdown-item" :class="chatFilters.user && 'active'" @click.stop="toggleChatFilter('user')">
+                        <span :style="'color:' + (chatFilters.user ? 'var(--v)' : 'var(--v3)')">&#x1f464;</span> USER
+                        <span class="tb-dropdown-check" x-text="chatFilters.user ? '[x]' : '[ ]'"></span>
+                    </button>
+                    <button class="tb-dropdown-item" :class="chatFilters.assistant && 'active'" @click.stop="toggleChatFilter('assistant')">
+                        <span :style="'color:' + (chatFilters.assistant ? 'var(--cyan)' : 'var(--v3)')">&#x2b50;</span> CLAUDE
+                        <span class="tb-dropdown-check" x-text="chatFilters.assistant ? '[x]' : '[ ]'"></span>
+                    </button>
+                    <button class="tb-dropdown-item" :class="chatFilters.tool && 'active'" @click.stop="toggleChatFilter('tool')">
+                        <span :style="'color:' + (chatFilters.tool ? 'var(--pink)' : 'var(--v3)')">&#x2699;</span> TOOLS
+                        <span class="tb-dropdown-check" x-text="chatFilters.tool ? '[x]' : '[ ]'"></span>
+                    </button>
+                    <button class="tb-dropdown-item" :class="chatFilters.thinking && 'active'" @click.stop="toggleChatFilter('thinking')">
+                        <span :style="'color:' + (chatFilters.thinking ? 'var(--amber)' : 'var(--v3)')">&#x1f4ad;</span> THINKING
+                        <span class="tb-dropdown-check" x-text="chatFilters.thinking ? '[x]' : '[ ]'"></span>
+                    </button>
+                    <div class="tb-dropdown-sep"></div>
+                    <button class="tb-dropdown-item" @click.stop="chatFilters.user=true;chatFilters.assistant=true;chatFilters.tool=true;chatFilters.thinking=true" style="color:var(--ng)">
+                        SHOW ALL
+                    </button>
+                </div>
+            </div>
             <div class="chat-toolbar-sep"></div>
-            <button class="chat-toolbar-btn" @click="collapsePrevTurns()" title="Collapse all turns except the last one">&#x25B2; TURNS</button>
-            <button class="chat-toolbar-btn" @click="expandAllTurns()" title="Expand all collapsed turns">&#x25BC; TURNS</button>
-            <div class="chat-toolbar-sep"></div>
-            <!-- Message type filters -->
-            <button class="chat-filter-btn" :class="chatFilters.user && 'active'" @click="toggleChatFilter('user')" title="Toggle user messages">
-                <span :style="'color:' + (chatFilters.user ? 'var(--v)' : 'var(--v3)')">&#x1f464;</span> USER
-            </button>
-            <button class="chat-filter-btn" :class="chatFilters.assistant && 'active'" @click="toggleChatFilter('assistant')" title="Toggle assistant messages">
-                <span :style="'color:' + (chatFilters.assistant ? 'var(--cyan)' : 'var(--v3)')">&#x2b50;</span> CLAUDE
-            </button>
-            <button class="chat-filter-btn" :class="chatFilters.tool && 'active'" @click="toggleChatFilter('tool')" title="Toggle tool calls">
-                <span :style="'color:' + (chatFilters.tool ? 'var(--pink)' : 'var(--v3)')">&#x2699;</span> TOOLS
-            </button>
-            <button class="chat-filter-btn" :class="chatFilters.thinking && 'active'" @click="toggleChatFilter('thinking')" title="Toggle thinking blocks">
-                <span :style="'color:' + (chatFilters.thinking ? 'var(--amber)' : 'var(--v3)')">&#x1f4ad;</span> THINK
-            </button>
-            <span x-show="!chatFilters.user || !chatFilters.assistant || !chatFilters.tool || !chatFilters.thinking" class="chat-filter-badge" x-text="'FILTERED'" title="Some message types are hidden"></span>
-            <div class="chat-toolbar-sep"></div>
+            <!-- PINS -->
             <div class="relative">
                 <button class="chat-toolbar-btn" :class="showPinsPanel && 'active'" @click="showPinsPanel = !showPinsPanel" title="Pinned messages">
                     &#x1F4CC; PINS
@@ -218,7 +264,6 @@
             </div>
             <button class="chat-toolbar-btn" @click="openCmdPalette()" title="Command Palette (Ctrl+K)" style="font-size:0.5rem;letter-spacing:0.1em">CTRL+K</button>
             <button class="chat-toolbar-btn" @click="openShortcuts()" title="Keyboard Shortcuts (?)">? KEYS</button>
-            <button x-show="chatBottomPanel !== 'closed'" class="chat-toolbar-btn" @click="chatBottomPanel = 'closed'" title="Close panel">[X] PANEL</button>
         </div>
 
         <!-- Chat Search Bar (Ctrl+F) -->
