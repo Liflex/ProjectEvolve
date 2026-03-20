@@ -3571,3 +3571,86 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* Goal Progress Tracker */
+.goal-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 4px 8px;
+    border: 1px solid var(--v-dim);
+    background: var(--bg);
+    font-size: 0.625rem;
+    line-height: 1.5;
+    transition: border-color 0.15s;
+}
+.goal-item:hover {
+    border-color: var(--v2);
+}
+.goal-item-active {
+    border-left: 2px solid var(--cyan);
+}
+.goal-item-completed {
+    border-left: 2px solid var(--ng);
+    opacity: 0.7;
+}
+.goal-item-num {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.4375rem;
+    color: var(--v3);
+    min-width: 16px;
+    padding-top: 1px;
+}
+.goal-item-check {
+    font-size: 0.625rem;
+    color: var(--ng);
+    min-width: 12px;
+    padding-top: 1px;
+}
+.goal-item-text {
+    color: var(--ng2);
+    flex: 1;
+    word-break: break-word;
+}
+.goal-item-text-completed {
+    color: var(--v3);
+    text-decoration: line-through;
+    text-decoration-color: var(--v-dim);
+}
+.goal-status-icon {
+    font-size: 0.625rem;
+    min-width: 14px;
+    text-align: center;
+    padding-top: 1px;
+    flex-shrink: 0;
+}
+.goal-status-label {
+    font-size: 0.4375rem;
+    letter-spacing: 0.08em;
+    font-weight: bold;
+    white-space: nowrap;
+    padding-top: 2px;
+    flex-shrink: 0;
+}
+.goal-text {
+    color: var(--ng2);
+    font-size: 0.625rem;
+    line-height: 1.5;
+    flex: 1;
+    word-break: break-word;
+}
+.goal-text-completed {
+    color: var(--v3);
+    text-decoration: line-through;
+    text-decoration-color: var(--v-dim);
+}
+.goal-focus-tag {
+    display: inline-block;
+    font-size: 0.5rem;
+    color: var(--pink);
+    background: rgba(255, 102, 196, 0.08);
+    border: 1px solid rgba(255, 102, 196, 0.2);
+    padding: 1px 6px;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+}

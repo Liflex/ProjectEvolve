@@ -259,6 +259,7 @@ function _buildAppData() {
         heatmapTooltip: null,  // { date, count, x, y } for activity heatmap
         _heatmapData: null,     // cached heatmap data, updated when experiments load
         _streakData: null,      // cached streak data
+        _goalsShowCompleted: false,  // goal progress tracker: show completed goals
         catSpeech: '',
         catSpeechAction: null,
         catExpression: 'neutral',
@@ -751,7 +752,7 @@ function _buildAppData() {
             if (page === 'changes') this.loadChangesLog();
             if (page === 'prompt') this.loadPrompt();
             if (page === 'config') this.loadConfig();
-            if (page === 'dashboard') { this.loadStats(); this.loadExperiments(); }
+            if (page === 'dashboard') { this.loadStats(); this.loadExperiments(); this.loadConfig(); }
             if (page === 'run') { this.pollRunStatus(); if (this.runStatus.running) this.connectResearchWs(); }
             if (page !== 'run') this.disconnectResearchWs();
             if (window.CatModule && CatModule.isActive() && CatModule.setPage) { CatModule.setPage(page); }

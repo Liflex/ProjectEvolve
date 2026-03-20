@@ -1,3 +1,43 @@
+## Experiment 131 — Dashboard — score distribution histogram + score by type analysis
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`scoreDistribution()`** — метод, вычисляющий гистограмму распределения оценок экспериментов по 5 бакетам (0.0-0.2, 0.2-0.4, 0.4-0.6, 0.6-0.8, 0.8-1.0)
+2. **`scoreDistributionMax()`** — максимальное значение в бакетах для масштабирования баров
+3. **`scoreDistributionBarColor(idx)`** — цвет бара по индексу бакета (red→amber→yellow→cyan→green)
+4. **`scoreByType()`** — средний score, количество, keep/discard, min/max для каждого типа эксперимента
+5. **Score Distribution panel** — гистограмма с вертикальными барами, подписями бакетов, count на каждом баре, легендой BAD→GOOD
+6. **Score by Type panel** — список типов с progress bar (цвет по avg: ≥0.7 green, ≥0.5 cyan, ≥0.3 amber, <0.3 red), метаданными (count, keep, discard, range)
+
+### Files Modified
+
+- `ui/static/js/modules/lab.js` — scoreDistribution(), scoreDistributionMax(), scoreDistributionBarColor(), scoreByType()
+- `ui/static/templates/lab-dashboard.js` — two new panels in grid below Score Chart + Types
+
+---
+
+## Experiment 130 — Chat — message minimap sidebar (IDE-style)
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`renderMinimap(tab)`** — рендерит HTML-блоки для миникарты чата. Каждый message = цветной div, высота пропорциональна длине контента. Цвета: user=green, assistant=cyan, tool=pink, system=gray
+2. **`minimapClick(tab, event)`** — навигация по клику на миникарте: вычисляет fraction от позиции клика и скроллит messages area
+3. **Viewport indicator** — полупрозрачный overlay на миникарте показывает текущую видимую область. Позиция и размер обновляются в `onChatScroll` через `tab._mmTop` и `tab._mmHeight` (проценты)
+4. **Template restructure** — messages area обёрнут в `flex-1 overflow-hidden relative` контейнер; messages themselves = `absolute inset-0 overflow-y-auto`; minimap = sibling overlay справа
+5. **CSS** — `.chat-minimap` (28px, полупрозрачный, hover=85%), `.minimap-content` (flex-column), `.minimap-viewport` (overlay с transition)
+
+### Files Modified
+
+- `ui/static/templates/chat-section.js` — messages area wrapper + minimap HTML
+- `ui/static/js/modules/chat.js` — renderMinimap(), minimapClick(), onChatScroll viewport tracking, tab init fields
+- `ui/static/css/main.css` — .chat-minimap, .minimap-content, .minimap-viewport styles
+
+---
+
 ## Experiment 127 — Cat — contextual observation tooltip near companion
 
 **Date:** 2026-03-20

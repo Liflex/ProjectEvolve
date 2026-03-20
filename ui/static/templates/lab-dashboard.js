@@ -304,6 +304,77 @@
             </div>
         </div>
 
+        <!-- Goal Progress Tracker -->
+        <div class="mt-3 pixel-border bg-[var(--bg2)] p-4">
+            <div class="flex items-center justify-between mb-3">
+                <div class="text-[0.5625rem] tracking-widest text-[var(--v3)]">GOAL_PROGRESS_</div>
+                <div class="flex items-center gap-3">
+                    <span class="text-[0.5rem] text-[var(--v3)]" x-text="goalProgressData().completed + '/' + goalProgressData().total + ' DONE'"></span>
+                    <span class="text-lg" :class="goalProgressPct() >= 50 ? 'text-[var(--ng)] glow-green' : goalProgressPct() >= 25 ? 'text-[var(--cyan)]' : 'text-[var(--amber)]'" style="font-family:'Press Start 2P',monospace" x-text="goalProgressPct() + '%'"></span>
+                </div>
+            </div>
+            <!-- Progress bar -->
+            <div class="h-2.5 bg-[var(--bg)] overflow-hidden mb-3" style="border:1px solid var(--v-dim)">
+                <div class="h-full transition-all duration-700"
+                     :class="goalProgressPct() >= 50 ? 'bg-[var(--ng)]' : goalProgressPct() >= 25 ? 'bg-[var(--cyan)]' : 'bg-[var(--amber)]'"
+                     :style="'width:' + goalProgressPct() + '%'"></div>
+            </div>
+            <!-- Project info -->
+            <div x-show="config.name || config.description" class="mb-3 pb-3" style="border-bottom:1px solid var(--v-dim)">
+                <div x-show="config.name" class="text-sm text-[var(--v)] tracking-wider" x-text="config.name"></div>
+                <div x-show="config.description" class="text-[0.625rem] text-[var(--v3)] mt-1 leading-relaxed" x-text="config.description"></div>
+                <!-- Focus areas as tags -->
+                <div x-show="(config.focus_areas || []).length > 0" class="flex flex-wrap gap-1 mt-2">
+                    <template x-for="(area, ai) in (config.focus_areas || [])" :key="ai">
+                        <span class="goal-focus-tag" x-text="'&#x25C6; ' + area"></span>
+                    </template>
+                </div>
+            </div>
+            <!-- Active goals with status classification -->
+            <div x-show="goalProgressData().goals.length > 0">
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="text-[0.5rem] tracking-widest text-[var(--amber)]">ACTIVE_GOALS</span>
+                    <span class="text-[0.5rem] px-1.5 py-px bg-[rgba(255,187,0,0.1)] text-[var(--amber)]" x-text="goalProgressData().active"></span>
+                    <div class="flex-1 h-px bg-[var(--v-dim)]"></div>
+                </div>
+                <div class="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                    <template x-for="goal in goalProgressData().goals.sort((a,b) => goalStatusWeight(a.status) - goalStatusWeight(b.status))" :key="goal.idx">
+                        <div class="goal-item" :style="'border-left:2px solid ' + goalStatusColor(goal.status)">
+                            <span class="goal-status-icon" :style="'color:' + goalStatusColor(goal.status)" x-html="goalStatusIcon(goal.status)"></span>
+                            <span class="goal-text" x-text="goal.label" :title="goal.text"></span>
+                            <span class="goal-status-label" :style="'color:' + goalStatusColor(goal.status)"
+                                  x-text="goal.status === 'in-progress' ? 'WIP' : goal.status === 'needs-backend' ? 'BACKEND' : goal.status === 'done-note' ? 'NOTED' : 'TODO'"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            <!-- Empty state -->
+            <div x-show="goalProgressData().total === 0" class="text-center py-4 text-[var(--v3)] text-sm tracking-widest">NO_GOALS_CONFIGURED</div>
+            <!-- Completed goals (collapsible) -->
+            <div x-show="goalProgressData().completedGoals.length > 0" class="mt-3 pt-3" style="border-top:1px solid var(--v-dim)">
+                <div class="flex items-center gap-2 cursor-pointer select-none" @click="_goalsShowCompleted = !_goalsShowCompleted">
+                    <span class="text-[0.5rem] tracking-widest text-[var(--ng)]">COMPLETED</span>
+                    <span class="text-[0.5rem] px-1.5 py-px bg-[rgba(57,255,20,0.1)] text-[var(--ng)]" x-text="goalProgressData().completed"></span>
+                    <span class="text-[0.5rem] text-[var(--v3)] transition-transform duration-200" :class="_goalsShowCompleted && 'rotate-180'" x-text="'&#x25BC;'"></span>
+                </div>
+                <div x-show="_goalsShowCompleted" x-transition class="space-y-1 mt-2 max-h-48 overflow-y-auto pr-1">
+                    <template x-for="goal in goalProgressData().completedGoals" :key="'c'+goal.idx">
+                        <div class="goal-item" style="border-left:2px solid var(--ng);opacity:0.7">
+                            <span class="goal-status-icon text-[var(--ng)]">&#x2713;</span>
+                            <span class="goal-text" style="color:var(--v3);text-decoration:line-through;text-decoration-color:var(--v-dim)" x-text="goal.label" :title="goal.text"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            <!-- Legend -->
+            <div class="flex items-center gap-4 mt-3 pt-2 text-[0.4375rem] text-[var(--v3)]" style="border-top:1px solid var(--v-dim)">
+                <span class="flex items-center gap-1"><span style="color:var(--cyan)">&#x25C9;</span> WIP</span>
+                <span class="flex items-center gap-1"><span style="color:var(--v3)">&#x25CB;</span> TODO</span>
+                <span class="flex items-center gap-1"><span style="color:var(--amber)">&#x25C7;</span> BACKEND</span>
+                <span class="flex items-center gap-1"><span style="color:var(--ng)">&#x2713;</span> DONE</span>
+            </div>
+        </div>
+
         <!-- Last Experiment -->
         <div x-show="stats.last_experiment && stats.last_experiment.number" class="mt-3 pixel-border bg-[var(--bg2)] p-4">
             <div class="flex items-center justify-between mb-2">

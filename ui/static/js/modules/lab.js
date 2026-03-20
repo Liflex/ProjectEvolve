@@ -240,6 +240,64 @@ window.AppLab = (function() {
             return { current, best, currentDiscard, bestDiscard };
         },
 
+        // --- Goal progress tracker ---
+        goalProgressData() {
+            const goals = this.config?.goals || [];
+            const completed = this.config?.completed_goals || [];
+            const total = goals.length + completed.length;
+            if (total === 0) return { total: 0, active: 0, completed: 0, percent: 0, goals: [], completedGoals: [] };
+            // Classify active goals by status keywords
+            const activeGoals = goals.map((g, i) => {
+                const text = g.toLowerCase();
+                let status = 'pending'; // pending | in-progress | needs-backend
+                if (/реализовано|done|complete|реализован/im.test(g)) status = 'done-note';
+                else if (/осталось|partially|частично/im.test(g)) status = 'in-progress';
+                else if (/система|мультиагент|судей|judgement/im.test(g)) status = 'needs-backend';
+                else if (/улучшени/im.test(g)) status = 'in-progress';
+                // Extract a short label (first ~60 chars)
+                const label = g.length > 80 ? g.slice(0, 77) + '...' : g;
+                return { idx: i, text: g, label, status };
+            });
+            const completedGoals = completed.map((g, i) => {
+                const label = g.length > 80 ? g.slice(0, 77) + '...' : g;
+                return { idx: i, text: g, label };
+            });
+            return {
+                total,
+                active: goals.length,
+                completed: completed.length,
+                percent: total > 0 ? Math.round((completed.length / total) * 100) : 0,
+                goals: activeGoals,
+                completedGoals,
+            };
+        },
+        goalStatusIcon(status) {
+            const icons = {
+                'pending': '&#x25CB;',       // ○
+                'in-progress': '&#x25C9;',   // ◉
+                'needs-backend': '&#x25C7;',  // ◇
+                'done-note': '&#x2713;',      // ✓
+            };
+            return icons[status] || '&#x25CB;';
+        },
+        goalStatusColor(status) {
+            const colors = {
+                'pending': 'var(--v3)',
+                'in-progress': 'var(--cyan)',
+                'needs-backend': 'var(--amber)',
+                'done-note': 'var(--ng)',
+            };
+            return colors[status] || 'var(--v3)';
+        },
+        goalStatusWeight(status) {
+            // Sort order: in-progress first, then pending, needs-backend, done-note
+            const weights = { 'in-progress': 0, 'pending': 1, 'needs-backend': 2, 'done-note': 3 };
+            return weights[status] ?? 1;
+        },
+        goalProgressPct() {
+            return this.goalProgressData().percent;
+        },
+
         // --- Experiment detail ---
         toggleExperiment(n) {
             if (this.selectedExp === n) { this.selectedExp = null; this.selectedExpData = null; this.fileDiffData = null; return; }
