@@ -720,6 +720,9 @@
                                                : settings.chatSendMode === 'ctrlenter' ? 'CTRL+ENTER — send | ENTER — newline | UP/DOWN — history | ALT+UP/DOWN — turns | CTRL+SHIFT+B/I/K/C — format'
                                                : 'ENTER — send | SHIFT+ENTER — newline | UP/DOWN — history | ALT+UP/DOWN — turns | CTRL+SHIFT+B/I/K/C — format'"></span>
                                     <div class="flex items-center gap-2">
+                                        <!-- Live turn elapsed timer -->
+                                        <span class="turn-elapsed-timer tabular-nums" x-show="tab.is_streaming && tab._turnElapsed > 0"
+                                              x-text="'&#x23F1; ' + getTurnElapsedText(tab)"></span>
                                         <span class="text-[0.5rem] text-[var(--v3)] tabular-nums" x-show="(tab.input_text || '').length > 0" x-text="(tab.input_text || '').length + 'ch · ' + (tab.input_text || '').trim().split(/\s+/).filter(Boolean).length + 'w'"></span>
                                         <button class="send-mode-toggle" @click.stop="toggleSendMode()" :title="settings.chatSendMode === 'ctrlenter' ? 'Switch to Enter to send' : 'Switch to Ctrl+Enter to send'"
                                                 :class="settings.chatSendMode === 'ctrlenter' && 'send-mode-ctrlenter'">

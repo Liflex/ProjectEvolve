@@ -78,6 +78,9 @@ window.AppChat = (function() {
                     _catStreamPatienceTimer: null,
                     _agentActivity: { type: 'idle', text: '', icon: '', color: '' },
                     _turnToolCount: 0,
+                    _turnElapsed: 0,          // live elapsed seconds while agent is working
+                    _turnTimerInterval: null,  // interval ref for turn timer
+                    _typingStart: null,        // timestamp when user started typing
                     _editDiffOpen: false,
                     _collapsedTurns: new Set(),
                     _mmTop: 0,
@@ -135,6 +138,7 @@ window.AppChat = (function() {
         async closeChatTab(tabId) {
             const tab = this.chatTabs.find(t => t.tab_id === tabId);
             if (!tab) return;
+            this.stopTurnTimer(tab);
             const ws = this.chatWs[tabId];
             if (ws) { try { ws.close(); } catch (e) { } delete this.chatWs[tabId]; }
             if (window.destroyTerminal) destroyTerminal(tabId);
@@ -508,6 +512,7 @@ window.AppChat = (function() {
                         tab.is_streaming = false;
                         tab._catThinking = false;
                         tab._regenerating = false;
+                        this.stopTurnTimer(tab);
                         // Cat: clear patience timer on stream end
                         if (tab._catStreamPatienceTimer) {
                             clearTimeout(tab._catStreamPatienceTimer);
@@ -565,6 +570,7 @@ window.AppChat = (function() {
                         tab.messages.push({ role: 'assistant', content: '[ERROR] ' + (msg.message || 'Unknown error'), ts: Date.now() });
                         tab.is_streaming = false;
                         tab._regenerating = false;
+                        _app.stopTurnTimer(tab);
                         _app._incrementUnread(tab);
                         if (window.CatModule && CatModule.isActive()) {
                             CatModule.setExpression('surprised');
@@ -584,6 +590,7 @@ window.AppChat = (function() {
                 console.log('[ws] closed:', tab.session_id, 'code:', e.code, 'reason:', e.reason);
                 tab.is_streaming = false;
                 tab.ws_state = 'disconnected';
+                _app.stopTurnTimer(tab);
                 _app.chatTick++;
             };
 
@@ -592,6 +599,7 @@ window.AppChat = (function() {
                 tab.messages.push({ role: 'assistant', content: '[ERROR] WebSocket connection failed', ts: Date.now() });
                 tab.is_streaming = false;
                 tab.ws_state = 'disconnected';
+                _app.stopTurnTimer(tab);
                 _app.chatTick++;
             };
         },
@@ -650,8 +658,11 @@ window.AppChat = (function() {
             this.resizeInputForTab(tab);
             tab.scrolledUp = false;
             // Store message with images for rendering; content includes image markdown for display
-            tab.messages.push({ role: 'user', content: displayContent, id: 'msg-' + Date.now(), ts: Date.now(), edited: wasEditing || undefined, _hasImages: visionImages.length > 0, _replyTo: replyTo });
+            const typingDuration = tab._typingStart ? Date.now() - tab._typingStart : 0;
+            tab._typingStart = null;
+            tab.messages.push({ role: 'user', content: displayContent, id: 'msg-' + Date.now(), ts: Date.now(), edited: wasEditing || undefined, _hasImages: visionImages.length > 0, _replyTo: replyTo, _typingDuration: typingDuration > 2000 ? typingDuration : undefined });
             tab._msgStartTime = Date.now();
+            this.startTurnTimer(tab);
             this.chatNavClear();
             tab._msgTokens = null;
             this.chatTick++;
@@ -713,6 +724,7 @@ window.AppChat = (function() {
                 ws.send(JSON.stringify({ type: 'cancel' }));
             }
             tab.is_streaming = false;
+            this.stopTurnTimer(tab);
             // Mark last streaming message as stopped
             const msgs = tab.messages;
             if (msgs.length > 0) {
@@ -797,6 +809,10 @@ window.AppChat = (function() {
 
         // ========== CHAT: SLASH COMMANDS ==========
         handleChatInput(tab, e) {
+            // Track typing start time for typing duration display
+            if (!tab._typingStart && (tab.input_text || '').length > 0 && !tab.is_streaming) {
+                tab._typingStart = Date.now();
+            }
             // Reset history navigation when user types (stop browsing history)
             if (tab._msgHistoryIdx >= 0) {
                 tab._msgHistoryIdx = -1;
@@ -1967,7 +1983,9 @@ window.AppChat = (function() {
                         + '<div class="chat-role chat-role-user">USER_'
                         + uRefBadge
                         + (turnCount === 1 ? '<span class="turn-collapse-btn" onclick="event.stopPropagation();window._app.toggleTurnCollapse(\'' + tab.tab_id + '\',' + turnCount + ')" title="Collapse turn">[-]</span> ' : '')
-                        + uTimeHtml + uEditedHtml + uVisionHtml + (uFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + uChars + 'ch · ' + uLines + 'ln</span>' : '') + '</div>'
+                        + uTimeHtml + uEditedHtml + uVisionHtml + (uFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + uChars + 'ch · ' + uLines + 'ln</span>' : '')
+                        + (msg._typingDuration ? ' <span class="msg-typing-duration" title="Typing duration">&#x2328; ' + this.fmtDuration(msg._typingDuration) + '</span>' : '')
+                        + '</div>'
                         + '<div class="chat-bubble-user" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit;color:var(--ng2)">'
                         + uReplyHtml
                         + (uCollapsed
@@ -3464,6 +3482,30 @@ window.AppChat = (function() {
             return min + 'm ' + rem + 's';
         },
 
+        // ========== CHAT: LIVE TURN TIMER ==========
+        startTurnTimer(tab) {
+            this.stopTurnTimer(tab);
+            tab._turnElapsed = 0;
+            tab._turnTimerInterval = setInterval(() => {
+                if (tab._msgStartTime) {
+                    tab._turnElapsed = Math.floor((Date.now() - tab._msgStartTime) / 1000);
+                }
+            }, 1000);
+        },
+        stopTurnTimer(tab) {
+            if (tab._turnTimerInterval) {
+                clearInterval(tab._turnTimerInterval);
+                tab._turnTimerInterval = null;
+            }
+        },
+        getTurnElapsedText(tab) {
+            const s = tab._turnElapsed || 0;
+            if (s < 60) return s + 's';
+            const m = Math.floor(s / 60);
+            const rem = s % 60;
+            return m + ':' + (rem < 10 ? '0' : '') + rem;
+        },
+
         // ========== CHAT: CONTEXT MENU (Right-click) ==========
         openContextMenu(tab, event, msgIdx) {
             event.preventDefault();
@@ -3952,6 +3994,7 @@ window.AppChat = (function() {
                             if (m._stopped) out._stopped = true;
                             if (m._hasImages) out._hasImages = true;
                             if (m._replyTo) out._replyTo = m._replyTo;
+                            if (m._typingDuration) out._typingDuration = m._typingDuration;
                             return out;
                         });
                     return {
@@ -4031,6 +4074,9 @@ window.AppChat = (function() {
                         _restoredSessionId: saved.session_id,
                         _editDiffOpen: false,
                         _branchedFrom: saved.branchedFrom || null,
+                        _turnElapsed: 0,
+                        _turnTimerInterval: null,
+                        _typingStart: null,
                     };
                     this.chatTabs.push(tab);
                 }
