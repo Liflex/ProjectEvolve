@@ -1,4 +1,24 @@
 
+## Experiment 169 — Remove IDE-like features from chat
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. Removed 4 IDE-like features from chat MORE dropdown: File Search, Global Search, Command Palette, Stats Panel
+2. Removed panel HTML: Global search panel, File search panel, Stats panel (268 lines)
+3. Removed keyboard handlers: Ctrl+Shift+F, Ctrl+Alt+F and their Escape handlers
+4. Removed from command palette and shortcuts panel
+5. Updated MORE button active state, textarea placeholder, empty state shortcuts
+
+### Files Modified
+
+- `ui/static/templates/chat-section.js` (-368 lines, 27% reduction)
+- `ui/static/js/app.js` (keyboard handlers, palette entries)
+
+---
+
+
 ## Experiment 168 — Judge weight auto-adjustment from verdict history
 
 **Date:** 2026-03-20
