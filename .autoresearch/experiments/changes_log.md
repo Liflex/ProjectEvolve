@@ -4293,3 +4293,150 @@ Results
 4. **Parallel judges refactor** — единый runner с 
 
 
+## Experiment 207 — Forward tool execution results to chat client
+
+**Time:** 2026-03-21 00:34:26
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **session.py**: Добавлена явная обработка `UserMessage` с `ToolResultBlock` из claude-code-sdk. Ранее эти сообщения молча пропускались в блоке `else`. Теперь yield-ятся `tool_result` события с content, `tool_use_id` и флагом `is_error`.
+2. **chat.js**: Добавлен обработчик `tool_result` event — находит tool message по `_toolUseId` и прикрепляет `_toolResult` + `_toolResultError`.
+3. **chat.js**: Tool messages сохраняют `_toolUseId` для матчинга результатов.
+4. **cha
+
+
+## Experiment 208 — Untitled
+
+**Time:** 2026-03-21 00:38:45
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+N/A
+
+
+## Experiment 209 — Untitled
+
+**Time:** 2026-03-21 00:44:26
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+N/A
+
+
+## Experiment 211 — Untitled
+
+**Time:** 2026-03-21 01:01:48
+
+**Files:** 2. Six Checks (`utils/judge.py:176-387`), 2. **file_consistency** (line 187): Compares agent's claimed `files_modified` against actual `git diff --name-only`. Reports matched/unmatched counts., 3. **syntax_check** (line 232): Runs `python -m py_compile` on changed `.py` files. For `.js/.ts/.jsx/.tsx` checks for empty files. Timeout: 10s per file., 4. **diff_size** (line 267): Parses `git diff --shortstat`. Fail if >5000 total lines, warn if >2000, warn if 0.
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.7193
+**Conflicts:** None
+
+**Per-task Results:**
+
+
+## Experiment 212 — Untitled
+
+**Time:** 2026-03-21 01:17:22
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $2.6566
+**Conflicts:** None
+
+**Per-task Results:**
+
+---
+
+## Experiment 213 — Judge fairness evaluation
+
+**Time:** 2026-03-21
+
+**Files:** `.autoresearch.json`, `.autoresearch/experiments/changes_log.md`, `.autoresearch/experiments/last_experiment.md`
+
+**What was done:**
+
+1. Обновлены goals в `.autoresearch.json` — цель "Проверка справедливости судей" подтверждена как активная (exp213 in-progress).
+2. Обновлены experiment logs: `last_experiment.md` и `changes_log.md` приведены в актуальное состояние.
+3. Проверка completed_goals на соответствие accumulation_context — все записи корректны.
+
+**Results:**
+
+В процессе.
+
+
+## Experiment 213 — Untitled
+
+**Time:** 2026-03-21 01:24:27
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.9309
+**Conflicts:** None
+
+**Per-task Results:**
+
+
+## Experiment 214 — Untitled
+
+**Time:** 2026-03-21 01:29:01
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+N/A
+
+

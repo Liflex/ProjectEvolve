@@ -1,4 +1,4 @@
-"""Post-experiment auto-judge — quality evaluator with multiple profiles.
+"""Post-experiment auto-judge — quality evaluator with specialist profiles.
 
 Evaluates experiment results after the agent commits by running
 a set of lightweight checks:
@@ -7,14 +7,23 @@ a set of lightweight checks:
   3. Syntax validation — no obvious errors in changed files
   4. Diff size sanity — not too large, not empty
   5. Report quality — does the experiment report have proper sections?
-  6. Code quality — are there code smells in the diff?
+  6. Code quality — code smells, debug artifacts, commented-out code
+  7. Test safety — no known test breakage patterns in changed files
+  8. Goal alignment — does the change move toward stated project goals?
 
-Three judge profiles with different perspectives:
-  - strict:   Focus on minimal, clean changes. Low tolerance for warnings.
-  - balanced: Equal weight on all checks (default).
-  - lenient:  Focus on functionality. Tolerates larger changes.
+Three specialist judge profiles with distinct perspectives (research-backed):
+  - guardian:   Security & Safety expert. Protects against regressions, broken
+                tests, and unsafe patterns. Low tolerance for safety violations.
+                Based on adversarial review best practices (Fagan Inspection).
+  - architect:  Structure & Maintainability expert. Evaluates code organization,
+                change scope, documentation quality. Focuses on long-term health.
+                Based on software architecture review patterns.
+  - pragmatist: Functionality & Delivery expert. Prioritizes working code,
+                forward progress toward goals, and minimal friction.
+                Based on DORA metrics "change failure rate" philosophy.
 
-Produces a verdict dict with score, decision recommendation, and check details.
+Chief judge provides meta-evaluation with context-aware tiebreaking when
+specialists disagree.
 """
 
 from __future__ import annotations
@@ -59,58 +68,112 @@ class JudgeProfile:
     warn_threshold: int = 3       # warns >= this → REVIEW
     # Score multiplier for final score (profile-specific adjustment)
     score_adjust: float = 0.0
+    # Role-specific system prompt (the "skill" this judge applies)
+    skill: str = ""
+    # Legacy name for backward compatibility
+    legacy_name: str = ""
 
 
 JUDGE_PROFILES: Dict[str, JudgeProfile] = {
-    "strict": JudgeProfile(
-        name="strict",
-        label="STRICT",
-        description="Minimal changes, clean code, low tolerance for warnings",
+    "guardian": JudgeProfile(
+        name="guardian",
+        label="GUARDIAN",
+        legacy_name="strict",
+        description=(
+            "Security & Safety expert. Protects against regressions, broken "
+            "tests, unsafe patterns, and debug artifacts. Based on adversarial "
+            "review methodology (Fagan Inspection). Low tolerance for safety "
+            "violations but accepts larger diffs if they're clean."
+        ),
+        skill=(
+            "You are a security-conscious code reviewer. You look for: "
+            "regression risks (broken tests, deleted assertions), unsafe patterns "
+            "(debug prints, commented-out code), and integrity issues. "
+            "You ask: 'Could this change break something that was working before?' "
+            "You are not pedantic about style — you care about safety."
+        ),
         weights={
             "commit_exists": 1.0,
-            "file_consistency": 2.0,   # must match exactly
-            "syntax_check": 2.0,       # no errors at all
-            "diff_size": 2.0,          # prefer small diffs
-            "report_quality": 0.5,     # less important
-            "code_quality": 2.0,       # code quality matters
+            "file_consistency": 1.5,
+            "syntax_check": 2.0,       # no errors tolerated
+            "diff_size": 1.0,          # size less important than safety
+            "report_quality": 0.5,     # less critical for safety
+            "code_quality": 2.0,       # code quality paramount
+            "test_safety": 2.5,        # tests must not break — highest weight
+            "goal_alignment": 1.0,     # safety of approach matters
         },
-        fail_threshold=1,    # 1 fail → DISCARD
+        fail_threshold=1,    # 1 safety fail → DISCARD
         warn_threshold=2,    # 2 warns → REVIEW
-        score_adjust=-0.05,
+        score_adjust=-0.03,
     ),
-    "balanced": JudgeProfile(
-        name="balanced",
-        label="BALANCED",
-        description="Equal weight on all checks",
+    "architect": JudgeProfile(
+        name="architect",
+        label="ARCHITECT",
+        legacy_name="balanced",
+        description=(
+            "Structure & Maintainability expert. Evaluates code organization, "
+            "change scope, documentation, and architectural coherence. Based on "
+            "software architecture review patterns. Ensures each change has a "
+            "clear single responsibility and doesn't degrade long-term health."
+        ),
+        skill=(
+            "You are a software architect reviewing code changes. You look for: "
+            "change scope (is it focused or scattered?), code organization "
+            "(single responsibility, clear module boundaries), documentation "
+            "(are changes explained?), and structural integrity. "
+            "You ask: 'Does this change make the codebase easier or harder to maintain?' "
+            "You balance rigor with pragmatism."
+        ),
         weights={
             "commit_exists": 1.0,
-            "file_consistency": 1.0,
+            "file_consistency": 1.5,   # claimed vs actual must match
             "syntax_check": 1.0,
-            "diff_size": 1.0,
-            "report_quality": 1.0,
-            "code_quality": 1.0,
+            "diff_size": 2.0,          # prefer focused, small diffs
+            "report_quality": 2.0,     # documentation matters
+            "code_quality": 1.5,       # code smells indicate structural issues
+            "test_safety": 1.0,
+            "goal_alignment": 1.5,     # architectural goals matter
         },
         fail_threshold=2,
         warn_threshold=3,
         score_adjust=0.0,
     ),
-    "lenient": JudgeProfile(
-        name="lenient",
-        label="LENIENT",
-        description="Focus on functionality, tolerates larger changes",
+    "pragmatist": JudgeProfile(
+        name="pragmatist",
+        label="PRAGMATIST",
+        legacy_name="lenient",
+        description=(
+            "Functionality & Delivery expert. Prioritizes working code, forward "
+            "progress toward goals, and minimal friction. Based on DORA metrics "
+            "'change failure rate' philosophy. Tolerates technical debt if "
+            "functionality delivers value and tests pass."
+        ),
+        skill=(
+            "You are a pragmatic product engineer reviewing code changes. You look for: "
+            "does it work? (syntax, tests pass), did it move toward the goal? "
+            "(goal alignment), is it committed properly? You tolerate technical "
+            "debt, larger diffs, and minor code smells if the core functionality "
+            "delivers value. You ask: 'Does this solve the problem?' "
+            "You prefer working code over perfect code."
+        ),
         weights={
-            "commit_exists": 1.5,       # still important
+            "commit_exists": 2.0,       # must be committed
             "file_consistency": 0.5,    # minor mismatches ok
             "syntax_check": 1.5,        # errors still matter
-            "diff_size": 0.5,           # large changes ok
+            "diff_size": 0.5,           # large changes ok if functional
             "report_quality": 1.0,
             "code_quality": 0.5,        # code smells tolerated
+            "test_safety": 1.5,         # tests still matter
+            "goal_alignment": 2.5,      # highest priority — does it deliver?
         },
         fail_threshold=2,
         warn_threshold=4,    # more tolerant
         score_adjust=0.05,
     ),
 }
+
+# Backward compatibility aliases
+_PROFILE_ALIASES = {"strict": "guardian", "balanced": "architect", "lenient": "pragmatist"}
 
 # Snapshot of default weights for reset (taken once at module load)
 _DEFAULT_WEIGHTS: Dict[str, Dict[str, float]] = {
@@ -338,7 +401,7 @@ class ExperimentJudge:
                 f"No required sections found ({found}/{total} total)")
 
     def _check_code_quality(self) -> CheckResult:
-        """Analyze diff for code smells: long lines, binary files."""
+        """Analyze diff for code smells: long lines, binary files, debug artifacts."""
         diff_output = self._run_git("diff", "HEAD~1", "HEAD")
         if not diff_output.strip():
             diff_output = self._run_git("diff", "--cached")
@@ -348,20 +411,46 @@ class ExperimentJudge:
         issues = []
         long_lines = 0
         very_long_lines = 0
+        debug_artifacts = 0
+        commented_code_lines = 0
+        todo_count = 0
 
         for line in diff_output.splitlines():
             if not line.startswith("+") or line.startswith("+++"):
                 continue
-            line_len = len(line[1:])
+            content = line[1:]
+            line_len = len(content)
             if line_len > 200:
                 long_lines += 1
             if line_len > 300:
                 very_long_lines += 1
 
+            # Debug artifacts: print/logging statements that look like debugging
+            stripped = content.strip()
+            if re.search(r'^\s*(print\s*\(|console\.log\s*\(|console\.debug\s*\(|logging\.debug\s*\()', stripped):
+                debug_artifacts += 1
+
+            # Commented-out code lines (heuristic: code-like patterns in comments)
+            if re.match(r'^\s*#\s*(def |class |import |from |return |if |for |while )', stripped):
+                commented_code_lines += 1
+
+            # TODO/FIXME/HACK markers
+            if re.search(r'\b(TODO|FIXME|HACK|XXX|TEMP)\b', stripped):
+                todo_count += 1
+
         if very_long_lines > 5:
             issues.append(f"{very_long_lines} very long lines (>300 chars)")
         elif long_lines > 10:
             issues.append(f"{long_lines} long lines (>200 chars)")
+
+        if debug_artifacts > 0:
+            issues.append(f"{debug_artifacts} debug artifact(s) detected")
+
+        if commented_code_lines > 3:
+            issues.append(f"{commented_code_lines} commented-out code line(s)")
+
+        if todo_count > 2:
+            issues.append(f"{todo_count} TODO/FIXME/HACK marker(s)")
 
         binary_count = diff_output.count("Binary files")
         if binary_count > 0:
@@ -371,10 +460,181 @@ class ExperimentJudge:
             return CheckResult("code_quality", "warn", "; ".join(issues))
         return CheckResult("code_quality", "pass", "No code smells detected")
 
+    def _check_test_safety(self) -> CheckResult:
+        """Check if modified test files have suspicious patterns.
+
+        Detects:
+        - Test functions with empty body (only ``pass``)
+        - ``@pytest.mark.skip`` / ``@unittest.skip`` decorators on test functions
+        - Deleted test assertions (lines starting with ``-`` that contain ``assert``)
+        """
+        diff_output = self._run_git("diff", "HEAD~1", "HEAD")
+        if not diff_output.strip():
+            diff_output = self._run_git("diff", "--cached")
+        if not diff_output.strip():
+            return CheckResult("test_safety", "pass", "No diff available")
+
+        # Find test files modified in this diff
+        test_files: set[str] = set()
+        for line in diff_output.splitlines():
+            if line.startswith("diff --git"):
+                # Extract filename: diff --git a/path/to/file b/path/to/file
+                parts = line.split()
+                if len(parts) >= 4:
+                    fname = parts[3].lstrip("b/")
+                    if (
+                        fname.startswith("test_")
+                        or fname.endswith("_test.py")
+                        or "/tests/" in fname
+                        or fname.startswith("tests/")
+                    ):
+                        test_files.add(fname)
+
+        if not test_files:
+            return CheckResult("test_safety", "pass", "No test files modified")
+
+        issues: list[str] = []
+        deleted_assertions = 0
+        skip_decorators = 0
+        empty_test_bodies = 0
+
+        in_test_file = False
+        current_file = ""
+        in_function = False
+        function_indent = 0
+        function_body_lines = 0
+
+        for line in diff_output.splitlines():
+            # Track which file we're in
+            if line.startswith("diff --git"):
+                parts = line.split()
+                if len(parts) >= 4:
+                    current_file = parts[3].lstrip("b/")
+                    in_test_file = (
+                        current_file.startswith("test_")
+                        or current_file.endswith("_test.py")
+                        or "/tests/" in current_file
+                        or current_file.startswith("tests/")
+                    )
+                in_function = False
+                function_body_lines = 0
+                continue
+
+            if not in_test_file:
+                continue
+
+            # Track deleted assertions
+            if line.startswith("-") and not line.startswith("---"):
+                stripped = line[1:].strip()
+                if re.match(r"assert\s+", stripped):
+                    deleted_assertions += 1
+
+            # Track added skip decorators
+            if line.startswith("+") and not line.startswith("+++"):
+                stripped = line[1:].strip()
+                if re.search(
+                    r"@pytest\.mark\.skip|@pytest\.mark\.xfail|@unittest\.skip",
+                    stripped,
+                ):
+                    skip_decorators += 1
+
+            # Detect empty test function bodies
+            # A test function definition followed by only "pass" is suspicious
+            if line.startswith("+") and not line.startswith("+++"):
+                stripped = line[1:]
+                # Detect function definition: def test_* or async def test_*
+                if re.match(r"\s*(async\s+)?def\s+test_", stripped):
+                    in_function = True
+                    function_indent = len(stripped) - len(stripped.lstrip())
+                    function_body_lines = 0
+                elif in_function:
+                    # Count non-empty, non-comment body lines
+                    if stripped.strip() and not stripped.strip().startswith("#"):
+                        function_body_lines += 1
+                    # Check if indentation returns to function level or less
+                    current_indent = len(stripped) - len(stripped.lstrip()) if stripped.strip() else function_indent + 4
+                    if current_indent <= function_indent and function_body_lines == 0:
+                        # Function ended with no body
+                        empty_test_bodies += 1
+                        in_function = False
+                    elif current_indent <= function_indent:
+                        in_function = False
+
+        if deleted_assertions > 0:
+            issues.append(f"{deleted_assertions} assertion(s) removed from test files")
+        if skip_decorators > 0:
+            issues.append(f"{skip_decorators} skip/xfail decorator(s) added to tests")
+        if empty_test_bodies > 0:
+            issues.append(f"{empty_test_bodies} test function(s) with empty body")
+
+        if issues:
+            return CheckResult("test_safety", "warn", "; ".join(issues))
+        return CheckResult(
+            "test_safety", "pass",
+            f"{len(test_files)} test file(s) modified, no safety issues detected",
+        )
+
+    def _check_goal_alignment(
+        self,
+        report_text: str = "",
+        experiment_goal: str = "",
+    ) -> CheckResult:
+        """Check if the experiment moves toward stated project goals.
+
+        Evaluates:
+        - Does the experiment report mention a goal or project objective?
+        - Does the agent's decision (KEEP) come with a clear reason?
+        - Is there a "Next" step indicating forward progress?
+
+        This is a lightweight heuristic — full goal alignment requires
+        semantic understanding, but keyword/pattern matching catches
+        the most common cases.
+        """
+        if not report_text or not report_text.strip():
+            return CheckResult("goal_alignment", "warn", "No report text for goal analysis")
+
+        text_lower = report_text.lower()
+
+        # Check for goal/project references
+        has_goal = any(
+            kw in text_lower
+            for kw in ("goal:", "цель:", "objective", "target:", "project goal", "цель проекта")
+        )
+        # Check for forward progress indicators
+        has_next = any(
+            kw in text_lower
+            for kw in ("next:", "дальше", "next step", "for next", "following")
+        )
+        # Check for concrete outcome
+        has_result = any(
+            kw in text_lower
+            for kw in ("what was done", "results", "результат", "implemented", "реализовано", "fixed", "исправлено")
+        )
+        # Check for decision rationale
+        has_reason = any(
+            kw in text_lower
+            for kw in ("reason:", "обоснован", "because", "since", "decision:", "решение")
+        )
+
+        score = sum([has_goal, has_next, has_result, has_reason])
+
+        if score >= 3:
+            return CheckResult("goal_alignment", "pass",
+                f"Strong goal alignment ({score}/4 indicators: "
+                f"goal={'Y' if has_goal else 'N'}, result={'Y' if has_result else 'N'}, "
+                f"reason={'Y' if has_reason else 'N'}, next={'Y' if has_next else 'N'})")
+        elif score >= 2:
+            return CheckResult("goal_alignment", "warn",
+                f"Partial goal alignment ({score}/4 indicators)")
+        else:
+            return CheckResult("goal_alignment", "warn",
+                f"Weak goal alignment ({score}/4 indicators — no clear goal, result, or rationale)")
+
     def _run_all_checks(
         self,
         claimed_files: List[str],
         report_text: str,
+        experiment_goal: str = "",
     ) -> List[CheckResult]:
         """Run all checks and return results."""
         checks: List[CheckResult] = []
@@ -384,6 +644,8 @@ class ExperimentJudge:
         checks.append(self._check_diff_size())
         checks.append(self._check_report_quality(report_text))
         checks.append(self._check_code_quality())
+        checks.append(self._check_test_safety())
+        checks.append(self._check_goal_alignment(report_text, experiment_goal))
         return checks
 
     def _compute_verdict(
@@ -458,7 +720,8 @@ class ExperimentJudge:
         agent_decision: str = "",
         agent_score: Optional[float] = None,
         report_text: str = "",
-        profile: str = "balanced",
+        profile: str = "architect",
+        experiment_goal: str = "",
     ) -> Dict[str, Any]:
         """Run all checks and produce a verdict.
 
@@ -467,14 +730,18 @@ class ExperimentJudge:
             agent_decision: Agent's own KEEP/DISCARD decision.
             agent_score: Agent's self-assessed score (0.0-1.0).
             report_text: The experiment report text.
-            profile: Judge profile name ("strict", "balanced", "lenient").
+            profile: Judge profile name ("guardian", "architect", "pragmatist",
+                     or legacy "strict", "balanced", "lenient").
+            experiment_goal: The stated goal of the experiment.
 
         Returns:
             Dict with score, recommendation, checks, summary, profile info.
         """
         claimed_files = claimed_files or []
-        prof = JUDGE_PROFILES.get(profile, JUDGE_PROFILES["balanced"])
-        checks = self._run_all_checks(claimed_files, report_text)
+        # Backward compatibility: map old names to new
+        resolved_profile = _PROFILE_ALIASES.get(profile, profile)
+        prof = JUDGE_PROFILES.get(resolved_profile, JUDGE_PROFILES["architect"])
+        checks = self._run_all_checks(claimed_files, report_text, experiment_goal)
         return self._compute_verdict(checks, prof, agent_decision, agent_score)
 
     def _resolve_conflict(
@@ -483,13 +750,19 @@ class ExperimentJudge:
         agent_decision: str = "",
         agent_score: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Analyze disagreements between judge profiles and resolve conflicts.
+        """Chief judge meta-evaluation when specialist profiles disagree.
 
-        When profiles disagree (SPLIT), this method:
-        1. Identifies which checks caused the divergence
-        2. Uses weighted scoring as tiebreaker
-        3. Compares with agent's own decision
-        4. Produces a final resolution with rationale
+        Resolution strategy (context-aware, research-backed):
+        1. **Safety veto** — If Guardian says DISCARD for safety reasons (test_safety
+           or syntax_check fail), this takes priority regardless of other profiles.
+        2. **Goal delivery** — If Pragmatist says KEEP and goal_alignment passed,
+           the experiment delivered value even if not perfectly clean.
+        3. **Architect tiebreaker** — When safety is not at risk, Architect's
+           structural assessment is the deciding vote.
+        4. **Agent agreement** — If the agent's self-assessment agrees with a
+           majority-leaning profile, use that as tiebreaker.
+        5. **Weighted score** — Final fallback using average scores with
+           profile-specific authority weights.
 
         Returns dict with:
             - resolved: "KEEP" | "DISCARD" | "REVIEW" (final decision)
@@ -514,7 +787,6 @@ class ExperimentJudge:
         for cname, statuses in check_results.items():
             unique_statuses = set(statuses.values())
             if len(unique_statuses) > 1:
-                # This check caused disagreement
                 passing = [p for p, s in statuses.items() if s == "pass"]
                 failing = [p for p, s in statuses.items() if s in ("fail", "warn")]
                 conflicts.append({
@@ -525,7 +797,6 @@ class ExperimentJudge:
                 })
 
         # --- Resolution logic ---
-        # Priority: 1) Agent agreement majority 2) Weighted score 3) Balanced profile tiebreaker
         keep_count = list(recs.values()).count("KEEP")
         discard_count = list(recs.values()).count("DISCARD")
         review_count = list(recs.values()).count("REVIEW")
@@ -534,57 +805,96 @@ class ExperimentJudge:
         resolved = "REVIEW"
         resolution_method = "default_review"
 
-        # Method 1: Agent agreement as tiebreaker
-        agent_dec_upper = agent_decision.upper() if agent_decision else ""
-        if agent_dec_upper in ("KEEP", "DISCARD"):
-            # Check if agent agrees with any majority
-            if agent_dec_upper == "KEEP" and keep_count >= 1 and discard_count <= 1:
-                resolved = "KEEP"
-                resolution_method = "agent_tiebreaker_keep"
-            elif agent_dec_upper == "DISCARD" and discard_count >= 1 and keep_count <= 1:
-                resolved = "DISCARD"
-                resolution_method = "agent_tiebreaker_discard"
+        # --- Method 1: Safety veto (Guardian DISCARD for safety-critical fails) ---
+        guardian_verdict = profiles.get("guardian", {})
+        guardian_checks = {c["name"]: c["status"] for c in guardian_verdict.get("checks", [])}
+        guardian_rec = recs.get("guardian", "REVIEW")
 
-        # Method 2: Weighted score
-        if resolved == "REVIEW":
-            # balanced profile has most authority (weight 1.0, no adjustment)
-            balanced_score = scores.get("balanced", avg_score)
-            if balanced_score >= 0.7:
-                resolved = "KEEP"
-                resolution_method = "balanced_score_keep"
-            elif balanced_score <= 0.35:
+        if guardian_rec == "DISCARD":
+            # Check if DISCARD is due to safety-critical failures
+            safety_fails = [
+                name for name, status in guardian_checks.items()
+                if status == "fail" and name in ("test_safety", "syntax_check")
+            ]
+            if safety_fails:
                 resolved = "DISCARD"
-                resolution_method = "balanced_score_discard"
-            elif avg_score >= 0.65:
+                resolution_method = "safety_veto"
+            else:
+                # Guardian DISCARD for non-safety reasons (code_quality, diff_size)
+                # — only override if both other profiles agree to KEEP
+                if keep_count >= 2:
+                    resolved = "KEEP"
+                    resolution_method = "majority_override_safety"
+
+        # --- Method 2: Goal delivery (Pragmatist KEEP + goal_alignment pass) ---
+        if resolved == "REVIEW" and recs.get("pragmatist") == "KEEP":
+            prag_checks = {c["name"]: c["status"] for c in profiles.get("pragmatist", {}).get("checks", [])}
+            if prag_checks.get("goal_alignment") == "pass":
+                # Experiment delivered value — only DISCARD if safety issue
+                if guardian_rec != "DISCARD":
+                    resolved = "KEEP"
+                    resolution_method = "goal_delivery"
+
+        # --- Method 3: Architect tiebreaker ---
+        if resolved == "REVIEW":
+            architect_score = scores.get("architect", avg_score)
+            if architect_score >= 0.7:
+                resolved = "KEEP"
+                resolution_method = "architect_score_keep"
+            elif architect_score <= 0.35:
+                resolved = "DISCARD"
+                resolution_method = "architect_score_discard"
+
+        # --- Method 4: Agent agreement ---
+        if resolved == "REVIEW":
+            agent_dec_upper = agent_decision.upper() if agent_decision else ""
+            if agent_dec_upper in ("KEEP", "DISCARD"):
+                if agent_dec_upper == "KEEP" and keep_count >= 1 and discard_count <= 1:
+                    resolved = "KEEP"
+                    resolution_method = "agent_tiebreaker_keep"
+                elif agent_dec_upper == "DISCARD" and discard_count >= 1 and keep_count <= 1:
+                    resolved = "DISCARD"
+                    resolution_method = "agent_tiebreaker_discard"
+
+        # --- Method 5: Weighted score fallback ---
+        if resolved == "REVIEW":
+            # Authority weights: Guardian=1.3, Architect=1.1, Pragmatist=0.9
+            authority = {"guardian": 1.3, "architect": 1.1, "pragmatist": 0.9}
+            weighted_score = sum(
+                scores.get(name, 0) * authority.get(name, 1.0)
+                for name in scores
+            ) / sum(authority.get(name, 1.0) for name in scores)
+
+            if weighted_score >= 0.6:
+                resolved = "KEEP"
+                resolution_method = "authority_weighted_keep"
+            elif weighted_score <= 0.35:
+                resolved = "DISCARD"
+                resolution_method = "authority_weighted_discard"
+            elif avg_score > 0.5:
                 resolved = "KEEP"
                 resolution_method = "avg_score_keep"
-            elif avg_score <= 0.4:
+            else:
                 resolved = "DISCARD"
                 resolution_method = "avg_score_discard"
 
-        # Method 3: If still REVIEW, look at conflict severity
-        if resolved == "REVIEW":
-            high_severity = sum(1 for c in conflicts if c["severity"] == "high")
-            if high_severity == 0 and avg_score > 0.5:
-                resolved = "KEEP"
-                resolution_method = "no_high_severity_conflicts"
-            elif high_severity >= 2:
-                resolved = "DISCARD"
-                resolution_method = "high_severity_conflicts"
-
         # --- Agent agreement check ---
         agent_agreement = "unknown"
+        agent_dec_upper = agent_decision.upper() if agent_decision else ""
         if agent_dec_upper in ("KEEP", "DISCARD"):
             agent_agreement = "agrees" if agent_dec_upper == resolved else "disagrees"
 
         # --- Rationale ---
         rationale_parts = [
-            f"Profiles disagree: {dict(recs)}",
-            f"Scores: strict={scores.get('strict', 0):.2f}, balanced={scores.get('balanced', 0):.2f}, lenient={scores.get('lenient', 0):.2f}",
+            f"Specialists disagree: guardian={recs.get('guardian', '?')}, "
+            f"architect={recs.get('architect', '?')}, pragmatist={recs.get('pragmatist', '?')}",
+            f"Scores: guardian={scores.get('guardian', 0):.2f}, "
+            f"architect={scores.get('architect', 0):.2f}, "
+            f"pragmatist={scores.get('pragmatist', 0):.2f}",
         ]
         if conflicts:
             rationale_parts.append(f"Conflicting checks: {', '.join(c['check'] for c in conflicts)}")
-        rationale_parts.append(f"Resolution: {resolved} via {resolution_method}")
+        rationale_parts.append(f"Chief judge: {resolved} via {resolution_method}")
         if agent_agreement != "unknown":
             rationale_parts.append(f"Agent {agent_agreement}")
 
@@ -603,6 +913,7 @@ class ExperimentJudge:
         agent_decision: str = "",
         agent_score: Optional[float] = None,
         report_text: str = "",
+        experiment_goal: str = "",
     ) -> Dict[str, Any]:
         """Run all judge profiles and return combined verdicts.
 
@@ -614,7 +925,7 @@ class ExperimentJudge:
             - conflict_resolution: when judges disagree, how it was resolved
         """
         claimed_files = claimed_files or []
-        checks = self._run_all_checks(claimed_files, report_text)
+        checks = self._run_all_checks(claimed_files, report_text, experiment_goal)
 
         profiles: Dict[str, Dict[str, Any]] = {}
         for name, prof in JUDGE_PROFILES.items():

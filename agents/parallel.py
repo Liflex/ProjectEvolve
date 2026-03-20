@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
@@ -162,6 +163,17 @@ class ParallelAgentRunner:
 
         task.status = "running"
 
+        # Diagnostic: log env state before SDK call
+        _env_snapshot = {k: (v[:50] + '...' if len(v) > 50 else v)
+                         for k, v in os.environ.items()
+                         if k.startswith("CLAUDE") or k.startswith("ANTHROPIC") or k == "PATH"}
+        logger.info(
+            "Agent %s (%s) starting — env: %s, cwd: %s, max_turns: %s, disallowed_tools: %s",
+            task.agent_id, task.label, _env_snapshot,
+            task.cwd, task.max_turns,
+            ["Bash","Write","Edit","WebFetch","WebSearch"] if task.label.startswith("judge-") else [],
+        )
+
         # Clean env to prevent nested session errors
         clean_env = {}
         for var in ("CLAUDECODE", "CLAUDE_SESSION_ID"):
@@ -187,9 +199,11 @@ class ParallelAgentRunner:
             options.append_system_prompt = task.append_system_prompt
 
         output_parts: list[str] = []
+        _start_time = time.monotonic()
 
         try:
             prompt_stream = self._prompt_as_stream(task.prompt)
+            logger.info("Agent %s (%s): calling SDK query()...", task.agent_id, task.label)
             async for message in query(prompt=prompt_stream, options=options):
                 if self._cancelled:
                     task.status = "cancelled"
@@ -227,13 +241,31 @@ class ParallelAgentRunner:
 
             task.output = "\n".join(output_parts)
             task.status = "completed"
+            _elapsed = time.monotonic() - _start_time
+            logger.info("Agent %s (%s) completed in %.1fs, output=%d chars",
+                        task.agent_id, task.label, _elapsed, len(task.output))
 
         except asyncio.CancelledError:
             task.status = "cancelled"
         except Exception as e:
+            _elapsed = time.monotonic() - _start_time
             task.status = "error"
             task.error = str(e)
-            logger.error("Agent %s (%s) error: %s", task.agent_id, task.label, e)
+            logger.error(
+                "Agent %s (%s) FAILED after %.1fs: %s\n"
+                "  error type: %s\n"
+                "  cwd exists: %s\n"
+                "  prompt length: %d\n"
+                "  env CLAUDECODE=%r CLAUDE_SESSION_ID=%r",
+                task.agent_id, task.label, _elapsed, e,
+                type(e).__name__,
+                os.path.isdir(task.cwd) if task.cwd else "N/A",
+                len(task.prompt) if task.prompt else 0,
+                os.environ.get("CLAUDECODE", "<not set>"),
+                os.environ.get("CLAUDE_SESSION_ID", "<not set>"),
+            )
+            import traceback
+            logger.error("Agent %s traceback:\n%s", task.agent_id, traceback.format_exc())
 
         return task
 
@@ -268,6 +300,17 @@ class ParallelAgentRunner:
             concurrency=conc,
             task_labels=[t.label for t in tasks],
         ))
+
+        # Temporarily remove CLAUDECODE/CLAUDE_SESSION_ID from os.environ.
+        # options.env only affects the child subprocess, but the SDK itself
+        # reads os.environ to decide between "nested session" (talk to parent
+        # Claude process) and "standalone" (spawn independent subprocess).
+        # If CLAUDECODE is set, the SDK tries the nested path which fails
+        # with "Control request timeout: initialize" when the parent is busy.
+        _saved_env: Dict[str, str] = {}
+        for _var in ("CLAUDECODE", "CLAUDE_SESSION_ID"):
+            if _var in os.environ:
+                _saved_env[_var] = os.environ.pop(_var)
 
         # Semaphore to limit concurrency
         sem = asyncio.Semaphore(conc)
@@ -331,6 +374,9 @@ class ParallelAgentRunner:
 
         finally:
             self._running = False
+            # Restore env vars after all tasks complete
+            for _var, _val in _saved_env.items():
+                os.environ[_var] = _val
 
         completed = sum(1 for t in final_tasks if t.status == "completed")
         errors = sum(1 for t in final_tasks if t.status == "error")
@@ -435,10 +481,15 @@ class TaskDecomposer:
         try:
             from claude_code_sdk import ClaudeCodeOptions, query
 
-            clean_env = {}
-            for var in ("CLAUDECODE", "CLAUDE_SESSION_ID"):
-                if var in os.environ:
-                    clean_env[var] = ""
+            # Temporarily remove Claude Code env vars to force standalone mode
+            _saved_env: Dict[str, str] = {}
+            for _var in ("CLAUDECODE", "CLAUDE_SESSION_ID"):
+                if _var in os.environ:
+                    _saved_env[_var] = os.environ.pop(_var)
+
+            clean_env = dict(_saved_env)
+            for _k in clean_env:
+                clean_env[_k] = ""
 
             options = ClaudeCodeOptions(
                 cwd=str(self.project_dir),
@@ -468,6 +519,13 @@ class TaskDecomposer:
         except Exception as e:
             logger.error("Task decomposition failed: %s", e)
             return []
+        finally:
+            # Restore env vars
+            try:
+                for _var, _val in _saved_env.items():
+                    os.environ[_var] = _val
+            except Exception:
+                pass
 
     @staticmethod
     async def _prompt_as_stream(text: str):
@@ -1086,27 +1144,37 @@ async def _run_chief_judge(
     summary = "\n".join(profiles_summary)
 
     prompt = (
-        "You are the CHIEF JUDGE — the final decision maker.\n"
-        "Three independent judges reviewed this experiment and DISAGREED.\n"
-        "Your job is to make the FINAL decision after reviewing all arguments.\n\n"
+        "You are the CHIEF JUDGE — a meta-evaluator resolving disagreements between specialists.\n"
+        "Three specialist judges reviewed this experiment and DISAGREED:\n"
+        "- GUARDIAN (security & safety expert) — protects against regressions\n"
+        "- ARCHITECT (structure & maintainability expert) — evaluates code organization\n"
+        "- PRAGMATIST (functionality & delivery expert) — prioritizes working code\n\n"
         f"Experiment report:\n```\n{report_text[:6000]}\n```\n\n"
-        f"Judges' decisions:\n{summary}\n\n"
-        "Analyze the disagreement fairly. Which side has stronger arguments?\n"
-        "Consider: Does the value delivered outweigh the concerns?\n"
-        "Is the feature useful enough to keep even with imperfections?\n\n"
+        f"Specialists' decisions:\n{summary}\n\n"
+        "Resolution strategy:\n"
+        "1. SAFETY VETO: If Guardian flagged safety issues (broken tests, syntax errors), "
+        "these take priority — DISCARD unless the feature is critical.\n"
+        "2. GOAL DELIVERY: If Pragmatist says KEEP and the experiment clearly moves toward "
+        "its stated goal, prefer KEEP — working code is the top priority.\n"
+        "3. STRUCTURAL CONCERNS: Architect's concerns about scope and organization matter "
+        "but are less urgent than safety or functionality.\n"
+        "4. NET VALUE: Weigh value delivered against concerns. A useful feature with "
+        "fixable issues is better than no feature.\n\n"
         "IMPORTANT: Your response MUST be ONLY a single JSON object on the last line.\n"
         'Format: {"verdict": "KEEP|REWORK|DISCARD", "score": 0.0-1.0, "reason": "your final reasoning"}\n'
         "verdict: KEEP (good enough), REWORK (useful but needs fixes), DISCARD (remove)\n"
         "score: confidence in your decision (0.0-1.0)\n"
-        "reason: 1-3 sentences explaining why, acknowledging both sides"
+        "reason: 1-3 sentences explaining why, referencing which specialist you agree with"
     )
 
     system_prompt = (
-        "You are the chief judge making the FINAL decision on a disputed experiment.\n"
-        "Be fair and objective. Weigh all arguments carefully.\n"
-        "KEEP: the experiment provides enough value to keep despite concerns.\n"
-        "REWORK: the feature is useful but has specific issues that should be addressed.\n"
-        "DISCARD: the concerns are fundamental and the experiment should be removed.\n"
+        "You are the chief judge — a senior meta-evaluator with 20+ years of experience.\n"
+        "You have seen thousands of code reviews and understand that different perspectives "
+        "have different value depending on context.\n"
+        "Your job is NOT to re-review the code, but to resolve disagreements between specialists.\n"
+        "You respect each specialist's domain expertise but recognize that priorities conflict.\n"
+        "Default to KEEP when in doubt — experiments are iterative and can be improved later.\n"
+        "Only DISCARD if the concerns are fundamental (broken code, safety risks).\n"
     )
 
     try:
@@ -1172,34 +1240,45 @@ async def run_parallel_judges(
         Dict with per-profile verdicts and consensus.
     """
     if profiles is None:
-        profiles = ["strict", "balanced", "lenient"]
+        profiles = ["guardian", "architect", "pragmatist"]
 
-    # Build individual prompts per profile
+    # Build individual prompts per profile — research-backed specialist roles
     profile_prompts = {
-        "strict": (
-            "You are a THOROUGH code review judge. You pay close attention to details.\n"
-            "Your role is to catch real problems, not to be harsh for the sake of it.\n"
-            "Be objective: acknowledge what works well before pointing out issues.\n"
-            "Score fairly — a working feature with minor issues still deserves a decent score.\n"
+        "guardian": (
+            "You are the GUARDIAN — a security & safety expert judge.\n"
+            "Your primary concern is: 'Could this change break something that was working?'\n"
+            "You focus on: regression risks, broken tests, deleted assertions, debug artifacts, "
+            "unsafe patterns, and syntax errors.\n"
+            "You are NOT pedantic about style — you care about safety and correctness.\n"
+            "A change can be large and messy but still safe. A small change can be dangerous.\n"
+            "Score based on safety risk: low risk = high score, even if code is imperfect.\n"
+            "Based on adversarial review methodology (Fagan Inspection).\n"
         ),
-        "balanced": (
-            "You are a FAIR code review judge. You weigh value vs. concerns objectively.\n"
-            "Consider: Does the experiment achieve its goal? Are the issues fixable?\n"
-            "A feature that works but needs polish is better than a perfect feature that doesn't exist.\n"
-            "Score based on net value delivered, not on perfection.\n"
+        "architect": (
+            "You are the ARCHITECT — a structure & maintainability expert judge.\n"
+            "Your primary concern is: 'Does this change make the codebase easier or harder to maintain?'\n"
+            "You focus on: change scope (focused vs scattered), code organization (single responsibility), "
+            "documentation quality, and structural integrity.\n"
+            "You balance rigor with pragmatism — a well-scoped large change is fine.\n"
+            "A scattered change touching many unrelated modules is worse than a focused large one.\n"
+            "Score based on structural health: good organization + clear docs = high score.\n"
+            "Based on software architecture review patterns.\n"
         ),
-        "lenient": (
-            "You are a SUPPORTIVE code review judge. You focus on what was accomplished.\n"
-            "Celebrate progress. Only flag issues that are genuinely problematic.\n"
-            "Remember: experiments are iterative by nature — perfection is not the goal.\n"
-            "Give credit for effort and direction, not just for flawless execution.\n"
+        "pragmatist": (
+            "You are the PRAGMATIST — a functionality & delivery expert judge.\n"
+            "Your primary concern is: 'Does this solve the problem and move toward the goal?'\n"
+            "You focus on: working code, forward progress, goal alignment, and delivery value.\n"
+            "You tolerate technical debt, larger diffs, and minor code smells.\n"
+            "A working feature with rough edges beats a perfect concept that doesn't exist.\n"
+            "Score based on value delivered: does it work? Is it committed? Does it progress?\n"
+            "Based on DORA metrics 'change failure rate' philosophy.\n"
         ),
     }
 
     # Build all judge tasks upfront
     judge_tasks: List[AgentTask] = []
     for profile in profiles:
-        system = profile_prompts.get(profile, profile_prompts["balanced"])
+        system = profile_prompts.get(profile, profile_prompts["architect"])
         prompt = (
             f"Project: {project_dir}\n\n"
             f"Experiment report:\n```\n{report_text[:8000]}\n```\n\n"
@@ -1230,12 +1309,43 @@ async def run_parallel_judges(
         )
         judge_tasks.append(task)
 
+    # Diagnostic: check if claude CLI is accessible and no stale processes
+    try:
+        import subprocess as _sp_diag
+        _diag = _sp_diag.run(
+            ["where", "claude" if os.name != "nt" else "claude.exe"],
+            capture_output=True, text=True, timeout=5,
+            encoding="utf-8", errors="replace",
+        )
+        logger.info("Claude CLI location: %s", (_diag.stdout or "").strip()[:200])
+        _diag2 = _sp_diag.run(
+            ["tasklist", "/FI", "IMAGENAME eq node.exe", "/FO", "CSV", "/NH"],
+            capture_output=True, text=True, timeout=5,
+            encoding="utf-8", errors="replace",
+        )
+        _node_procs = (_diag2.stdout or "").strip().split("\n")
+        logger.info("Node.js processes: %d running", len([p for p in _node_procs if p.strip()]))
+    except Exception as _diag_err:
+        logger.warning("Diagnostic check failed: %s", _diag_err)
+
     # Run all judges through a SINGLE runner — same infrastructure as sub-tasks.
     # Concurrency=1 with delay_between_tasks ensures sequential execution with
     # proper SDK subprocess cleanup between sessions.
-    logger.info("Running %d judges through single runner (delay=%.0fs)...", len(judge_tasks), 3)
+    logger.info(
+        "Running %d judges through single runner (delay=%.0fs)... "
+        "env CLAUDECODE=%r CLAUDE_SESSION_ID=%r, cwd=%s, report_len=%d",
+        len(judge_tasks), 3,
+        os.environ.get("CLAUDECODE", "<not set>"),
+        os.environ.get("CLAUDE_SESSION_ID", "<not set>"),
+        str(project_dir),
+        len(report_text),
+    )
     runner = ParallelAgentRunner(max_concurrency=1, delay_between_tasks=3)
+    _judge_start = time.monotonic()
     results = await runner.run(judge_tasks)
+    _judge_elapsed = time.monotonic() - _judge_start
+    logger.info("Judges finished in %.1fs, statuses: %s",
+                _judge_elapsed, [r.status for r in results])
 
     # Parse verdicts from all results
     verdicts: Dict[str, Any] = {}

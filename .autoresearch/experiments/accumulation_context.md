@@ -5,6 +5,51 @@
 
 ---
 
+## Experiment 215 — Judge system redesign: specialist profiles with research-backed skills
+
+**Date:** 2026-03-21
+
+### What Was Done
+
+1. Replaced 3 generic profiles (strict/balanced/lenient) with 3 specialist roles based on code review research:
+   - **Guardian** (Security & Safety) — adversarial review, Fagan Inspection methodology
+   - **Architect** (Structure & Maintainability) — architecture review patterns
+   - **Pragmatist** (Functionality & Delivery) — DORA metrics "change failure rate" philosophy
+2. Each profile has a `skill` attribute — research-backed system prompt describing judge philosophy
+3. Added `goal_alignment` check — evaluates if experiment moves toward stated project goals (4 indicators)
+4. Improved chief judge conflict resolution with 5-tier context-aware strategy:
+   - Safety veto → Goal delivery → Architect tiebreaker → Agent agreement → Authority-weighted scoring
+5. Updated parallel judge prompts and chief judge prompt in `parallel.py`
+6. Backward compatibility via `_PROFILE_ALIASES`
+
+### Files Modified
+
+- `utils/judge.py` (rewritten profiles, added goal_alignment, improved _resolve_conflict)
+- `agents/parallel.py` (profile names + research-backed prompts)
+- `ui/server.py` (default profile: architect)
+
+---
+
+## Experiment 207 — Forward tool execution results to chat client
+
+**Date:** 2026-03-21
+
+### What Was Done
+
+1. **session.py**: Added explicit handling for `UserMessage` with `ToolResultBlock` from claude-code-sdk. Previously these messages were silently dropped in the `else` catch-all. Now yields `tool_result` events with content, `tool_use_id`, and `is_error` flag.
+2. **chat.js**: Added `tool_result` event handler in WebSocket message processing. Matches result to tool message via `_toolUseId` and attaches `_toolResult` + `_toolResultError` properties.
+3. **chat.js**: Tool messages now store `_toolUseId` (from SDK `ToolUseBlock.id`) for result matching.
+4. **chat.js**: Bash command output rendered inline in tool detail panel — monospace font, truncated to 20 lines with "N more lines" indicator.
+5. **chat.js**: Error results for read/edit/write tools shown with red border and error text (truncated to 500 chars).
+6. **chat.js**: `ERR` badge on collapsed tool group header when any tool in the group returned an error.
+
+### Files Modified
+
+- `agents/session.py` (+35 lines: UserMessage/ToolResultBlock handling)
+- `ui/static/js/modules/chat.js` (+30 lines: tool_result event handler + rendering)
+
+---
+
 ## Experiment 195 — Streaming text buffer for smoother chat rendering
 
 **Date:** 2026-03-20
@@ -519,6 +564,187 @@ Results
 2. **Интеграция в research loop** — логирование revert events с per-profile scores, file changes, conflict reasons
 3. **Conflict revert logging** — из `parallel.py` при merge conflicts между sub-tasks
 4. **Parallel judges refactor** — единый runner с 
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 207 — Forward tool execution results to chat client
+
+**Date:** 2026-03-21 00:34:26
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+Results
+
+**What was done:**
+1. **session.py**: Добавлена явная обработка `UserMessage` с `ToolResultBlock` из claude-code-sdk. Ранее эти сообщения молча пропускались в блоке `else`. Теперь yield-ятся `tool_result` события с content, `tool_use_id` и флагом `is_error`.
+2. **chat.js**: Добавлен обработчик `tool_result` event — находит tool message по `_toolUseId` и прикрепляет `_toolResult` + `_toolResultError`.
+3. **chat.js**: Tool messages сохраняют `_toolUseId` для матчинга результатов.
+4. **cha
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 208 — Untitled
+
+**Date:** 2026-03-21 00:38:45
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+N/A
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 209 — Untitled
+
+**Date:** 2026-03-21 00:44:26
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+N/A
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 211 — Untitled
+
+**Date:** 2026-03-21 01:01:48
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- 2. Six Checks (`utils/judge.py:176-387`)
+- 2. **file_consistency** (line 187): Compares agent's claimed `files_modified` against actual `git diff --name-only`. Reports matched/unmatched counts.
+- 3. **syntax_check** (line 232): Runs `python -m py_compile` on changed `.py` files. For `.js/.ts/.jsx/.tsx` checks for empty files. Timeout: 10s per file.
+- 4. **diff_size** (line 267): Parses `git diff --shortstat`. Fail if >5000 total lines, warn if >2000, warn if 0.
+
+### Results
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.7193
+**Conflicts:** None
+
+**Per-task Results:**
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 212 — Untitled
+
+**Date:** 2026-03-21 01:17:22
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $2.6566
+**Conflicts:** None
+
+**Per-task Results:**
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 213 — Untitled
+
+**Date:** 2026-03-21 01:24:27
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $1.9309
+**Conflicts:** None
+
+**Per-task Results:**
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 214 — Untitled
+
+**Date:** 2026-03-21 01:29:01
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+N/A
 
 ### Notes for Next
 

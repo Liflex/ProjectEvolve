@@ -109,16 +109,21 @@ class ClaudeSession:
             from claude_code_sdk import ClaudeCodeOptions, ClaudeSDKClient
             import os
 
-            clean_env = {}
-            for var in ("CLAUDECODE", "CLAUDE_SESSION_ID"):
-                if var in os.environ:
-                    clean_env[var] = ""
+            # Temporarily remove CLAUDECODE/CLAUDE_SESSION_ID from os.environ.
+            # options.env only affects the child subprocess, but the SDK itself
+            # reads os.environ to decide between "nested session" (talk to parent
+            # Claude process) and "standalone" (spawn independent subprocess).
+            # If CLAUDECODE is set, the SDK tries the nested path which fails
+            # with "Control request timeout: initialize" when the parent is busy.
+            _saved_env: dict[str, str] = {}
+            for _var in ("CLAUDECODE", "CLAUDE_SESSION_ID"):
+                if _var in os.environ:
+                    _saved_env[_var] = os.environ.pop(_var)
 
             options = ClaudeCodeOptions(
                 cwd=self.cwd,
                 max_turns=self.max_turns,
                 permission_mode=self.permission_mode,
-                env=clean_env,
             )
 
             if self.append_system_prompt:
@@ -249,6 +254,10 @@ class ClaudeSession:
             self._error = str(e)
             logger.error("Session %s: error on turn %d: %s", self.session_id, self.message_count, e)
             yield {"type": "error", "message": str(e)}
+        finally:
+            # Restore env vars after SDK call completes
+            for _var, _val in _saved_env.items():
+                os.environ[_var] = _val
 
     async def cancel(self) -> None:
         """Interrupt the running query via ClaudeSDKClient.interrupt().

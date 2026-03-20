@@ -585,7 +585,7 @@ async def get_experiment(n: int):
 
 
 @app.get("/api/judge/{n}")
-async def judge_experiment(n: int, profile: str = "balanced"):
+async def judge_experiment(n: int, profile: str = "architect"):
     """Run post-experiment judge on experiment N with optional profile."""
     import json as _json
     from utils.judge import ExperimentJudge

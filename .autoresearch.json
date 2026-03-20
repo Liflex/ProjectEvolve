@@ -32,6 +32,7 @@
     "Настройки ALT+9 глобальные — exp102: кнопка Settings перенесена в нижнюю часть sidebar, видна всегда",
     "Почистить chat от лишних функций — toolbar cleanup (exp163), removed IDE features: File Search, Global Search, Command Palette, Stats Panel (exp169). MORE dropdown now contains only chat-relevant tools.",
     "Самосовершенствование judgement — RevertAnalytics класс с JSONL хранилищем, логирование revert events в research loop с per-profile scores и file changes, conflict revert logging, revert analytics dashboard в lab UI (exp206). Параллельные судьи через единый runner с delay_between_tasks, chief judge через ParallelAgentRunner (exp206)",
-    "Мультиагентность для исследования — ParallelAgentRunner (exp170), TaskDecomposer (exp173), ResultAggregator (exp173), decompose UI toggle (exp174). Тесты decomposition: 12 production validation тестов для _parse_decomposition() (scripts/test_decomposition.py) (exp206)"
+    "Мультиагентность для исследования — ParallelAgentRunner (exp170), TaskDecomposer (exp173), ResultAggregator (exp173), decompose UI toggle (exp174). Тесты decomposition: 12 production validation тестов для _parse_decomposition() (scripts/test_decomposition.py) (exp206)",
+    "Проверка справедливости судей и оптимизация системы судейства — реализовано в exp215: заменены 3 универсальных профиля (strict/balanced/lenient) на 3 специалиста с уникальными ролями (guardian/architect/pragmatist) с research-backed навыками. Добавлена проверка goal_alignment. Улучшен chief judge с context-aware мета-анализом (safety veto, goal delivery, architect tiebreaker, authority-weighted scoring). Backward compatibility через aliases."
   ]
 }

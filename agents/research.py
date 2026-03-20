@@ -723,13 +723,20 @@ class ResearchRunner:
         """
         from claude_code_sdk import ClaudeCodeOptions, query
 
-        # Unset CLAUDECODE/CLAUDE_SESSION_ID to prevent "nested session" error.
-        # The SDK merges options.env on top of os.environ, so setting empty
-        # strings effectively removes these vars from the child process.
-        clean_env = {}
-        for var in ("CLAUDECODE", "CLAUDE_SESSION_ID"):
-            if var in os.environ:
-                clean_env[var] = ""
+        # Temporarily remove CLAUDECODE/CLAUDE_SESSION_ID from os.environ.
+        # options.env only affects the child subprocess, but the SDK itself
+        # reads os.environ to decide between "nested session" (talk to parent
+        # Claude process) and "standalone" (spawn independent subprocess).
+        # Removing from os.environ forces standalone mode for every call.
+        _saved_env: Dict[str, str] = {}
+        for _var in ("CLAUDECODE", "CLAUDE_SESSION_ID"):
+            if _var in os.environ:
+                _saved_env[_var] = os.environ.pop(_var)
+
+        # Also pass empty strings in options.env for the child process
+        clean_env = dict(_saved_env)
+        for _k in clean_env:
+            clean_env[_k] = ""
 
         options = ClaudeCodeOptions(
             cwd=str(self.project_dir),
@@ -802,6 +809,10 @@ class ResearchRunner:
             logger.error("Experiment %d error: %s", iteration, e)
             await self._emit(_make_event(EVENT_ERROR, message=str(e), experiment=iteration))
             return {"status": "error", "error": str(e), "session_id": self._session_id}
+        finally:
+            # Restore env vars after SDK call completes
+            for _var, _val in _saved_env.items():
+                os.environ[_var] = _val
 
         full_output = "\n".join(output_parts)
         is_complete = ">>>EXPERIMENT_COMPLETE<<<" in full_output
@@ -921,7 +932,12 @@ class ResearchRunner:
                     # Wait for experiment session to fully exit before spawning
                     # judge sessions — otherwise SDK gets
                     # "Control request timeout: initialize".
-                    logger.info("Waiting for experiment session to fully exit before judging...")
+                    logger.info(
+                        "Experiment %d done. Session_id=%s, env CLAUDECODE=%r. "
+                        "Waiting 5s before judging...",
+                        i, self._session_id,
+                        os.environ.get("CLAUDECODE", "<not set>"),
+                    )
                     await asyncio.sleep(5)
 
                     judge_verdict = await self._run_judge(i, result.get("output", ""))
