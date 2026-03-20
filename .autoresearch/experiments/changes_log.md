@@ -1,3 +1,21 @@
+## Experiment 156 — Chat Ctrl+Up to edit last user message
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **Ctrl+Up shortcut** — Нажатие Ctrl+Up (Cmd+Up на Mac) мгновенно входит в режим редактирования последнего сообщения пользователя в чате.
+2. **Справочник горячих клавиш** — Добавлено "Ctrl+Up: Edit last user message" в CHAT секцию.
+3. **Welcome screen** — Добавлена подсказка Ctrl+Up в список шорткатов.
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` — Ctrl+Up handler в `handleChatKeydown`
+- `ui/static/js/app.js` — keyboardShortcuts
+- `ui/static/templates/chat-section.js` — welcome screen shortcuts
+
+---
+
 ## Experiment 154 — Chat STOP button replaces SEND during streaming + ESC shortcut
 
 **Date:** 2026-03-20
@@ -3331,5 +3349,25 @@ Results
 3. `evaluate_all()` запускает все профили, вычисляет consensus (majority vote) и средний score
 4. Новый API endpoint `/api/judge/{n}/all` + параметр `profile` для `/api/judge/{n}`
 5. UI: кнопка `[ALL JUDGES]` показывает con
+
+
+## Experiment 156 — Chat Ctrl+Up to edit last user message
+
+**Time:** 2026-03-20 18:03:45
+
+**Files:** Target:** chat.js, app.js, chat-section.js, Files Modified:** ui/static/js/modules/chat.js, ui/static/js/app.js, ui/static/templates/chat-section.js
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **Ctrl+Up shortcut** — Нажатие Ctrl+Up (Cmd+Up на Mac) мгновенно входит в режим редактирования последнего сообщения пользователя. Находит последнее user-сообщение и вызывает `editUserMsg()`. Защита: не работает во время стриминга и когда уже в режиме редактирования.
+2. **Keyboard shortcuts reference** — Добавлено "Ctrl+Up: Edit last user message" в CHAT секцию панели горячих клавиш.
+3. **Welcome screen** — Добавлена подсказка Ctrl+Up в список шорткатов пустого чата
 
 

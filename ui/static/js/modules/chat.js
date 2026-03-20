@@ -619,10 +619,12 @@ window.AppChat = (function() {
             if (feedbackPrefix) {
                 content = feedbackPrefix + content;
             }
-            // Prepend quoted message if present
+            // Prepend quoted message if present, store reply-to for display
+            let replyTo = null;
             if (tab._quotedMsg) {
                 const quotePrefix = '> [' + tab._quotedMsg.role + ']: ' + tab._quotedMsg.text.split('\n').join('\n> ') + '\n\n';
                 content = quotePrefix + content;
+                replyTo = { msgIdx: tab._quotedMsg.msgIdx, role: tab._quotedMsg.role, preview: tab._quotedMsg.text.slice(0, 60) };
                 tab._quotedMsg = null;
             }
             tab._msgHistoryIdx = -1;
@@ -633,7 +635,7 @@ window.AppChat = (function() {
             this.resizeInputForTab(tab);
             tab.scrolledUp = false;
             // Store message with images for rendering; content includes image markdown for display
-            tab.messages.push({ role: 'user', content: displayContent, id: 'msg-' + Date.now(), ts: Date.now(), edited: wasEditing || undefined, _hasImages: visionImages.length > 0 });
+            tab.messages.push({ role: 'user', content: displayContent, id: 'msg-' + Date.now(), ts: Date.now(), edited: wasEditing || undefined, _hasImages: visionImages.length > 0, _replyTo: replyTo });
             tab._msgStartTime = Date.now();
             this.chatNavClear();
             tab._msgTokens = null;
@@ -1901,7 +1903,15 @@ window.AppChat = (function() {
                     const uCollapsed = msg.collapsed && uFold;
                     const uChars = (msg.content || '').length;
                     const uLines = (msg.content || '').split('\n').length;
-                    html += '<div class="msg-wrap chat-msg-fadein chat-msg-row chat-msg-row-user" data-msg-idx="' + i + '" data-turn="' + turnCount + '">'
+                    // Reply-to indicator
+                    const uReplyHtml = msg._replyTo
+                        ? '<div class="msg-reply-indicator" onclick="event.stopPropagation();window._app.scrollToMsg(\'' + tab.tab_id + '\',' + msg._replyTo.msgIdx + ')">'
+                        + '<span class="msg-reply-arrow">&#x21A9;</span>'
+                        + '<span class="msg-reply-label">' + this.escHtml(msg._replyTo.role) + ' #' + msg._replyTo.msgIdx + '</span>'
+                        + '<span class="msg-reply-preview">' + this.escHtml(msg._replyTo.preview) + '</span>'
+                        + '</div>'
+                        : '';
+                    html += '<div class="msg-wrap chat-msg-fadein chat-msg-row chat-msg-row-user' + (msg._replyTo ? ' msg-has-reply' : '') + '" data-msg-idx="' + i + '" data-turn="' + turnCount + '">'
                         + '<div class="chat-avatar chat-avatar-user">' + avatarUser + '</div>'
                         + '<div class="chat-body">'
                         + '<div class="msg-actions">'
@@ -1916,6 +1926,7 @@ window.AppChat = (function() {
                         + (turnCount === 1 ? '<span class="turn-collapse-btn" onclick="event.stopPropagation();window._app.toggleTurnCollapse(\'' + tab.tab_id + '\',' + turnCount + ')" title="Collapse turn">[-]</span> ' : '')
                         + uTimeHtml + uEditedHtml + uVisionHtml + (uFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + uChars + 'ch · ' + uLines + 'ln</span>' : '') + '</div>'
                         + '<div class="chat-bubble-user" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit;color:var(--ng2)">'
+                        + uReplyHtml
                         + (uCollapsed
                             ? '<div class="chat-collapsed-preview">' + this.linkMsgRefs(this.renderUserContent(msg.content.slice(0, 200)), tab.tab_id) + '</div>'
                               + '<div class="chat-expand-btn" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + i + ')">&#x25BC; EXPAND (' + uChars + ' chars)</div>'
@@ -2840,7 +2851,7 @@ window.AppChat = (function() {
             let quote = lines.join('\n');
             if (quote.length > 300) quote = quote.slice(0, 300) + '...';
             const role = msg.role === 'user' ? 'USER' : msg.role === 'assistant' ? 'CLAUDE' : 'TOOL';
-            tab._quotedMsg = { role: role, text: quote };
+            tab._quotedMsg = { role: role, text: quote, msgIdx: msgIdx };
             tab.input_text = '';
             this.chatTick++;
             // Cat: react to quote
@@ -3277,7 +3288,11 @@ window.AppChat = (function() {
             let md = '# Chat Export: ' + (tab.label || tab.project_path || 'session') + '\n\n';
             md += '_Exported: ' + new Date().toISOString() + '_\n\n---\n\n';
             for (const msg of tab.messages) {
-                if (msg.role === 'user') { md += '## User\n\n' + (msg.content || '') + '\n\n'; }
+                if (msg.role === 'user') {
+                    let header = '## User';
+                    if (msg._replyTo) header += ' ↩ ' + msg._replyTo.role + ' #' + msg._replyTo.msgIdx;
+                    md += header + '\n\n' + (msg.content || '') + '\n\n';
+                }
                 else if (msg.role === 'assistant') {
                     let meta = '';
                     if (msg.duration) meta += ' ⏱ ' + this.fmtDuration(msg.duration);
@@ -3732,6 +3747,7 @@ window.AppChat = (function() {
                 const role = msg.role === 'user' ? '**User**' : '**Claude**';
                 const ts = msg.ts ? new Date(msg.ts).toLocaleString('ru-RU') : '';
                 md += '### ' + role;
+                if (msg._replyTo) md += ' ↩ ' + msg._replyTo.role + ' #' + msg._replyTo.msgIdx;
                 if (ts) md += ' _' + ts + '_';
                 if (msg.reaction) md += ' ' + (msg.reaction === 'up' ? ':thumbsup:' : ':thumbsdown:');
                 md += '\n\n';
@@ -3892,6 +3908,7 @@ window.AppChat = (function() {
                             if (m._regenOriginal) out._regenOriginal = (m._regenOriginal || '').slice(0, MAX_CONTENT_LEN);
                             if (m._stopped) out._stopped = true;
                             if (m._hasImages) out._hasImages = true;
+                            if (m._replyTo) out._replyTo = m._replyTo;
                             return out;
                         });
                     return {

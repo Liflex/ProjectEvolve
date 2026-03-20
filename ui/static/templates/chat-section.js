@@ -692,6 +692,14 @@
                                     <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '> ', '')" title="Blockquote"><span class="fmt-icon">&gt;</span></button>
                                     <button class="md-format-btn" @mousedown.prevent="insertMarkdown(tab, '---\n', '')" title="Horizontal rule"><span class="fmt-icon">&#x2500;</span></button>
                                 </div>
+                                <!-- Reply-to indicator bar -->
+                                <div x-show="tab._quotedMsg" x-transition.duration.150ms
+                                     class="reply-bar">
+                                    <span class="reply-bar-icon">&#x21A9;</span>
+                                    <span class="reply-bar-label" x-text="'Replying to ' + (tab._quotedMsg.role || '?') + ' #' + (tab._quotedMsg.msgIdx ?? '?')"></span>
+                                    <span class="reply-bar-preview" x-text="(tab._quotedMsg.text || '').slice(0, 50) + ((tab._quotedMsg.text || '').length > 50 ? '...' : '')"></span>
+                                    <button class="reply-bar-dismiss" @click.stop="clearQuote(tab.tab_id)" title="Cancel reply">&#x2715;</button>
+                                </div>
                                 <textarea x-model="tab.input_text"
                                           @keydown="handleChatKeydown(tab, $event)"
                                           @input="handleChatInput(tab, $event); autoResizeTextarea($event)"
@@ -700,7 +708,7 @@
                                           placeholder="Message_ (/ commands, @ file mention, paste images, drag files, Ctrl+Shift+F search files)"
                                           rows="1"
                                           class="chat-input-area w-full bg-[var(--bg)] border px-3 py-2 text-sm text-[var(--ng2)] tracking-wider resize-none editor"
-                                          :class="tab._editMode ? 'border-[var(--yellow)]' : 'border-[var(--v-dim)]'"
+                                          :class="tab._editMode ? 'border-[var(--yellow)]' : tab._quotedMsg ? 'border-[var(--v2)] rounded-t-none' : 'border-[var(--v-dim)]'"
                                           style="min-height:2.25rem;max-height:200px;overflow-y:hidden"
                                           :disabled="tab.is_streaming"></textarea>
                                 <div class="flex items-center justify-between px-1 mt-0.5">

@@ -371,6 +371,95 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     border-bottom-color: var(--v);
 }
 
+/* === REPLY-TO INDICATOR (in message bubble) === */
+.msg-reply-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    margin-bottom: 6px;
+    border-left: 2px solid var(--v);
+    background: rgba(180, 74, 255, 0.06);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    font-size: 0.625rem;
+}
+.msg-reply-indicator:hover {
+    background: rgba(180, 74, 255, 0.12);
+    border-left-color: var(--cyan);
+}
+.msg-reply-arrow {
+    color: var(--v);
+    font-size: 0.75rem;
+    flex-shrink: 0;
+}
+.msg-reply-label {
+    color: var(--cyan);
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+    font-family: monospace;
+}
+.msg-reply-preview {
+    color: var(--v3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+    font-style: italic;
+}
+.msg-has-reply { border-left: 2px solid rgba(180, 74, 255, 0.3); }
+
+/* === REPLY BAR (input area) === */
+.reply-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border: 1px solid var(--v2);
+    border-bottom: none;
+    background: rgba(180, 74, 255, 0.06);
+    border-radius: 4px 4px 0 0;
+    font-size: 0.5625rem;
+    letter-spacing: 0.08em;
+}
+.reply-bar-icon {
+    color: var(--v);
+    font-size: 0.75rem;
+    flex-shrink: 0;
+}
+.reply-bar-label {
+    color: var(--cyan);
+    font-weight: bold;
+    font-family: monospace;
+    flex-shrink: 0;
+}
+.reply-bar-preview {
+    color: var(--v3);
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+.reply-bar-dismiss {
+    color: var(--v3);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.625rem;
+    padding: 0 4px;
+    line-height: 1;
+    flex-shrink: 0;
+    transition: color 0.15s;
+}
+.reply-bar-dismiss:hover {
+    color: var(--red);
+}
+
 /* === MESSAGE REFERENCE HIGHLIGHT FLASH === */
 .msg-ref-highlight {
     animation: msg-ref-flash 2s ease-out;
