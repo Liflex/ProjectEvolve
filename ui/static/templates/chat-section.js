@@ -703,6 +703,11 @@
                         <span style="color:var(--yellow)" x-text="'$' + activeTab.tokens.cost.toFixed(4)"></span>
                     </span>
                 </template>
+                <!-- Activity sparkline: token output per response -->
+                <span x-show="activeTab && renderActivitySparkline(activeTab)" x-cloak>
+                    <span class="status-separator"></span>
+                    <span x-html="renderActivitySparkline(activeTab)"></span>
+                </span>
             </div>
         </div>
 

@@ -2648,3 +2648,44 @@ Results
 4. **CSS стили** — минималистичный стиль с l
 
 
+## Experiment 131 — Dashboard — score distribution histogram + score by type analysis
+
+**Time:** 2026-03-20 04:23:41
+
+**Files:** Target:** lab.js, lab-dashboard.js, Files Modified:** `ui/static/js/modules/lab.js`, `ui/static/templates/lab-dashboard.js`
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **`scoreDistribution()`** — гистограмма распределения оценок по 5 бакетам (0.0-0.2, 0.2-0.4, 0.4-0.6, 0.6-0.8, 0.8-1.0) с цветовыми барами от красного до зелёного
+2. **`scoreByType()`** — средний score для каждого типа эксперимента (Feature, Bug Fix, etc.) с метаданными: count, keep/discard, min/max range
+3. **Score Distribution panel** — вертикальные бары с подписями бакетов, count над каждым баром, легенда BAD→GOOD
+4. **Score by Type panel** — список типов с prog
+
+
+## Experiment 132 — Dashboard — Goal Progress Tracker with status classification
+
+**Time:** 2026-03-20 04:28:27
+
+**Files:** Target:** lab.js, lab-dashboard.js, main.css, app.js, Files Modified:** `ui/static/js/modules/lab.js`, `ui/static/templates/lab-dashboard.js`, `ui/static/css/main.css`, `ui/static/js/app.js`
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **`goalProgressData()`** — вычисляет прогресс целей: total/active/completed, процент, классификация активных целей по статусу (WIP/TODO/BACKEND/NOTED)
+2. **`goalStatusIcon()` / `goalStatusColor()` / `goalStatusWeight()`** — иконки и цвета для каждого статуса цели: ◉ cyan = in-progress, ○ gray = pending, ◇ amber = needs-backend, ✓ green = done-note
+3. **Goal Progress Tracker panel** — прогресс-бар с процентом (48% для текущего проекта), информация о проекте (name, d
+
+

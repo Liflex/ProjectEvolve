@@ -1,26 +1,25 @@
 # Last Experiment Summary
 
-**Experiment #131** — Dashboard — score distribution histogram + score by type analysis
-**Date:** 2026-03-20
+**Experiment #132** — Dashboard — Goal Progress Tracker with status classification
+**Date:** 2026-03-20 04:28:27
 
 ## What Was Done
 
-1. **`scoreDistribution()`** — histogram with 5 score buckets (0.0-0.2 through 0.8-1.0)
-2. **`scoreByType()`** — average score per experiment type with keep/discard stats
-3. **Score Distribution panel** — vertical bar chart with color-coded bars (red→green)
-4. **Score by Type panel** — type list with progress bars, metadata (count, keep, discard, range)
+N/A
 
 ## Files Modified
 
-- `ui/static/js/modules/lab.js` — 4 new methods
-- `ui/static/templates/lab-dashboard.js` — 2 new dashboard panels
+- Target:** lab.js, lab-dashboard.js, main.css, app.js
+- Files Modified:** `ui/static/js/modules/lab.js`, `ui/static/templates/lab-dashboard.js`, `ui/static/css/main.css`, `ui/static/js/app.js`
 
 ## Key Results
 
-- Score distribution histogram shows quality landscape at a glance
-- Score by type reveals which experiment types perform best
-- Color coding: ≥0.7 green, ≥0.5 cyan, ≥0.3 amber, <0.3 red
-- Both panels use existing Alpine.js helpers (typeBadgeCls, scoreCls)
+Results
+
+**What was done:**
+1. **`goalProgressData()`** — вычисляет прогресс целей: total/active/completed, процент, классификация активных целей по статусу (WIP/TODO/BACKEND/NOTED)
+2. **`goalStatusIcon()` / `goalStatusColor()` / `goalStatusWeight()`** — иконки и цвета для каждого статуса цели: ◉ cyan = in-progress, ○ gray = pending, ◇ amber = needs-backend, ✓ green = done-note
+3. **Goal Progress Tracker panel** — прогресс-бар с процентом (48% для текущего проекта), информация о проекте (name, d
 
 ## For Next Iteration
 

@@ -3498,5 +3498,38 @@ window.AppChat = (function() {
                 if (result) this.goToGlobalResult(result);
             }
         },
+
+        // ========== CHAT: ACTIVITY SPARKLINE ==========
+
+        /** Generate SVG sparkline of token usage per assistant response in the session.
+         *  Each bar represents one assistant message's output token count.
+         *  Color encodes relative cost intensity (green→cyan→amber→red).
+         */
+        renderActivitySparkline(tab) {
+            if (!tab || !tab.messages) return '';
+            const assistantMsgs = tab.messages.filter(m => m.role === 'assistant' && m.msgTokens && m.msgTokens.output > 0);
+            if (assistantMsgs.length < 2) return '';
+            const maxBars = 20;
+            const data = assistantMsgs.slice(-maxBars).map(m => m.msgTokens.output);
+            const maxVal = Math.max(...data, 1);
+            const barW = 3, gap = 1, h = 14;
+            const svgW = data.length * (barW + gap) - gap;
+            let bars = '';
+            for (let i = 0; i < data.length; i++) {
+                const pct = data[i] / maxVal;
+                const barH = Math.max(1, Math.round(pct * h));
+                const y = h - barH;
+                const x = i * (barW + gap);
+                // Color: green (<33%), cyan (33-66%), amber (66-90%), red (>90%)
+                let color;
+                if (pct < 0.33) color = 'var(--ng)';
+                else if (pct < 0.66) color = 'var(--cyan)';
+                else if (pct < 0.90) color = 'var(--amber)';
+                else color = 'var(--red)';
+                bars += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + barH + '" fill="' + color + '" rx="0.5" opacity="0.85"/>';
+            }
+            const totalOut = data.reduce((s, v) => s + v, 0);
+            return '<svg width="' + svgW + '" height="' + h + '" viewBox="0 0 ' + svgW + ' ' + h + '" style="vertical-align:middle;margin:0 4px;cursor:help" title="Token output per response — ' + data.length + ' responses, ' + (totalOut / 1000).toFixed(1) + 'K total output tokens">' + bars + '</svg>';
+        },
     };
 })();

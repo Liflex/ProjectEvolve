@@ -1,4 +1,24 @@
 
+## Experiment 130 — Chat — message minimap sidebar (IDE-style)
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`renderMinimap(tab)`** — renders HTML blocks for chat minimap. Each message = colored div with height proportional to content length. Colors: user=green, assistant=cyan, tool=pink, system=gray
+2. **`minimapClick(tab, event)`** — click navigation: computes fraction from click position, scrolls messages area
+3. **Viewport indicator** — semi-transparent overlay on minimap shows current visible area. Position/size updated in `onChatScroll` via `tab._mmTop` and `tab._mmHeight` (percentages)
+4. **Template restructure** — messages area wrapped in `flex-1 overflow-hidden relative` container; messages = `absolute inset-0 overflow-y-auto`; minimap = sibling overlay on right
+5. **CSS** — `.chat-minimap` (28px, semi-transparent, hover=85%), `.minimap-content` (flex-column), `.minimap-viewport` (overlay with transition)
+
+### Files Modified
+
+- `ui/static/templates/chat-section.js` — messages area wrapper + minimap HTML
+- `ui/static/js/modules/chat.js` — renderMinimap(), minimapClick(), onChatScroll viewport tracking, tab init fields
+- `ui/static/css/main.css` — .chat-minimap, .minimap-content, .minimap-viewport styles
+
+---
+
 ## Experiment 127 — Cat — contextual observation tooltip near companion
 
 **Date:** 2026-03-20
@@ -5227,6 +5247,63 @@ Results
 2. **File preview panel** — третья вкладка "FILE PREVIEW" в bottom panel чата с заголовком файла, постраничной навигацией, нумерацией строк
 3. **File path click behavior** — клик = preview, Ctrl+click = copy. Контекстное меню: "PREVIEW FILE"
 4. **CSS стили** — минималистичный стиль с l
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 131 — Dashboard — score distribution histogram + score by type analysis
+
+**Date:** 2026-03-20 04:23:41
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- Target:** lab.js, lab-dashboard.js
+- Files Modified:** `ui/static/js/modules/lab.js`, `ui/static/templates/lab-dashboard.js`
+
+### Results
+
+Results
+
+**What was done:**
+1. **`scoreDistribution()`** — гистограмма распределения оценок по 5 бакетам (0.0-0.2, 0.2-0.4, 0.4-0.6, 0.6-0.8, 0.8-1.0) с цветовыми барами от красного до зелёного
+2. **`scoreByType()`** — средний score для каждого типа эксперимента (Feature, Bug Fix, etc.) с метаданными: count, keep/discard, min/max range
+3. **Score Distribution panel** — вертикальные бары с подписями бакетов, count над каждым баром, легенда BAD→GOOD
+4. **Score by Type panel** — список типов с prog
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 132 — Dashboard — Goal Progress Tracker with status classification
+
+**Date:** 2026-03-20 04:28:27
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- Target:** lab.js, lab-dashboard.js, main.css, app.js
+- Files Modified:** `ui/static/js/modules/lab.js`, `ui/static/templates/lab-dashboard.js`, `ui/static/css/main.css`, `ui/static/js/app.js`
+
+### Results
+
+Results
+
+**What was done:**
+1. **`goalProgressData()`** — вычисляет прогресс целей: total/active/completed, процент, классификация активных целей по статусу (WIP/TODO/BACKEND/NOTED)
+2. **`goalStatusIcon()` / `goalStatusColor()` / `goalStatusWeight()`** — иконки и цвета для каждого статуса цели: ◉ cyan = in-progress, ○ gray = pending, ◇ amber = needs-backend, ✓ green = done-note
+3. **Goal Progress Tracker panel** — прогресс-бар с процентом (48% для текущего проекта), информация о проекте (name, d
 
 ### Notes for Next
 
