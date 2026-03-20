@@ -20,7 +20,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, AsyncIterator, Optional
 
-from claude_code_sdk.types import AssistantMessage, ResultMessage, ToolUseBlock
+from claude_code_sdk.types import AssistantMessage, ResultMessage, ToolResultBlock, ToolUseBlock, UserMessage
 
 logger = logging.getLogger(__name__)
 
@@ -189,8 +189,46 @@ class ClaudeSession:
                     self._output_lines.append(json.dumps(event, default=str))
                     yield event
 
+                elif isinstance(message, UserMessage):
+                    # UserMessage with ToolResultBlock = tool execution result.
+                    # Forward to client so it can display output.
+                    if message.parent_tool_use_id:
+                        result_content = ""
+                        if isinstance(message.content, str):
+                            result_content = message.content
+                        elif isinstance(message.content, list):
+                            parts = []
+                            for block in message.content:
+                                if isinstance(block, ToolResultBlock):
+                                    if isinstance(block.content, str):
+                                        parts.append(block.content)
+                                    elif isinstance(block.content, list):
+                                        for sub in block.content:
+                                            if isinstance(sub, dict) and sub.get("text"):
+                                                parts.append(sub["text"])
+                                            elif isinstance(sub, str):
+                                                parts.append(sub)
+                                    if block.is_error:
+                                        parts.append("[ERROR]")
+                                elif isinstance(block, dict) and block.get("text"):
+                                    parts.append(block["text"])
+                            result_content = "\n".join(parts)
+
+                        tool_result_evt = {
+                            "type": "tool_result",
+                            "tool_use_id": message.parent_tool_use_id,
+                            "content": result_content,
+                            "is_error": any(
+                                isinstance(b, ToolResultBlock) and b.is_error
+                                for b in (message.content if isinstance(message.content, list) else [])
+                            ),
+                        }
+                        self._output_lines.append(json.dumps(tool_result_evt, default=str))
+                        yield tool_result_evt
+                    # Non-tool UserMessage (initial prompt echo) — skip silently
+
                 else:
-                    # SystemMessage, UserMessage, StreamEvent, etc.
+                    # SystemMessage, StreamEvent, etc.
                     try:
                         event = asdict(message)
                     except Exception:

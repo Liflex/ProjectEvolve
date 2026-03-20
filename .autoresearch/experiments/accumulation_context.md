@@ -497,3 +497,31 @@ N/A
 N/A
 
 ---
+
+## Experiment 206 — Revert analytics system, parallel execution improvements, cat fixes
+
+**Date:** 2026-03-21 00:26:05
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+Results
+
+**What was done:**
+1. **RevertAnalytics** — новый модуль `agents/revert_analytics.py` с JSONL хранилищем, миграцией с legacy JSON, статистикой (revert_rate, avg_score, common_reasons, affected_files, per_profile_discard_rate, success_rate)
+2. **Интеграция в research loop** — логирование revert events с per-profile scores, file changes, conflict reasons
+3. **Conflict revert logging** — из `parallel.py` при merge conflicts между sub-tasks
+4. **Parallel judges refactor** — единый runner с 
+
+### Notes for Next
+
+N/A
+
+---

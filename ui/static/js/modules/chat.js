@@ -456,7 +456,7 @@ window.AppChat = (function() {
                             } else {
                                 toolDetail = name;
                             }
-                            tab.messages.push({ role: 'tool', content: name, toolType, toolDetail, toolPath, toolEditOld: _toolEditOld || '', toolEditNew: _toolEditNew || '', toolWriteContent: _toolWriteContent || '' });
+                            tab.messages.push({ role: 'tool', content: name, toolType, toolDetail, toolPath, toolEditOld: _toolEditOld || '', toolEditNew: _toolEditNew || '', toolWriteContent: _toolWriteContent || '', _toolUseId: data.tool_use_id || '' });
                             _app._trackNewMsg(tab);
                             // Agent activity status bar
                             tab._turnToolCount = (tab._turnToolCount || 0) + 1;
@@ -469,6 +469,29 @@ window.AppChat = (function() {
                             // Cat: react to tool call in real-time
                             if (window.CatModule && CatModule.isActive() && CatModule.reactToToolCall) {
                                 CatModule.reactToToolCall(toolType, toolDetail || '');
+                            }
+                        } else if (etype === 'tool_result') {
+                            // Attach tool execution result to the matching tool message
+                            const resultUseId = data.tool_use_id || '';
+                            const resultContent = data.content || '';
+                            const resultIsError = data.is_error || false;
+                            // Find the most recent tool message with matching tool_use_id
+                            for (let ti = tab.messages.length - 1; ti >= 0; ti--) {
+                                const tm = tab.messages[ti];
+                                if (tm.role === 'tool' && tm._toolUseId === resultUseId) {
+                                    tm._toolResult = resultContent;
+                                    tm._toolResultError = resultIsError;
+                                    break;
+                                }
+                            }
+                            // Batch DOM update via rAF
+                            if (!tab._streamRafPending) {
+                                tab._streamRafPending = true;
+                                requestAnimationFrame(() => {
+                                    tab._streamRafPending = false;
+                                    _app.chatTick++;
+                                    _app.smartScroll(tab);
+                                });
                             }
                         } else if (etype === 'error') {
                             // SDK error mid-stream — show as assistant error message
@@ -1981,6 +2004,12 @@ window.AppChat = (function() {
                             + '<span class="fp-link" style="font-size:0.625rem" title="' + this.escHtml(tp) + ' — click: preview | Ctrl+click: copy" onclick="event.stopPropagation();if(event.ctrlKey||event.metaKey){navigator.clipboard.writeText(\'' + this.escHtml(tp).replace(/'/g, "\\'") + '\').then(function(){window._app&&window._app.showToast(\'Путь скопирован\')})}else{window._app&&window._app.previewFile(\'' + this.escHtml(tp).replace(/'/g, "\\'") + '\')}">' + this.escHtml(tp.split(/[\\/]/).pop()) + '</span>'
                             + '<span style="font-size:0.5625rem;color:var(--v3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0" title="' + this.escHtml(tp) + '">' + this.escHtml(tp) + '</span>'
                             + '</div>';
+                        // Show error result for read/edit/write if tool failed
+                        if (t._toolResult && t._toolResultError) {
+                            detailHtml += '<div style="margin-left:42px;padding:4px 8px;background:var(--code-bg, var(--bg));border:1px solid var(--red);border-radius:2px">'
+                                + '<div style="font-size:0.625rem;color:var(--red);font-family:monospace;white-space:pre-wrap">' + this.escHtml(t._toolResult.slice(0, 500)) + '</div>'
+                                + '</div>';
+                        }
                         if (tt === 'edit' && (t.toolEditOld || t.toolEditNew)) {
                             detailHtml += '<div style="margin-left:18px">' + this.renderInlineDiff(t.toolEditOld, t.toolEditNew) + '</div>';
                         }
@@ -1993,6 +2022,22 @@ window.AppChat = (function() {
                             + '<span style="font-size:0.5rem;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.12em;font-weight:bold;min-width:36px;margin-top:1px">[' + (labels[tt] || 'TOOL') + ']</span>'
                             + '<code style="font-size:0.625rem;color:var(--tok-str, var(--ng2));background:var(--code-bg, var(--bg));padding:1px 6px;border:1px solid var(--v-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60ch;display:inline-block" title="' + this.escHtml(td) + '">$ ' + this.escHtml(td) + '</code>'
                             + '</div>';
+                        // Render bash tool result (stdout/stderr) if available
+                        if (t._toolResult) {
+                            const resultLines = t._toolResult.split('\n');
+                            const maxResultLines = 20;
+                            const resultTruncated = resultLines.length > maxResultLines;
+                            const displayLines = resultLines.slice(0, maxResultLines);
+                            const resultColor = t._toolResultError ? 'var(--red)' : 'var(--ng3)';
+                            detailHtml += '<div style="margin-left:42px;padding:4px 8px;background:var(--code-bg, var(--bg));border:1px solid var(--v-dim);border-radius:2px;max-height:200px;overflow-y:auto">';
+                            for (const rl of displayLines) {
+                                detailHtml += '<div style="white-space:pre-wrap;word-break:break-all;line-height:1.4;font-size:0.625rem;color:' + resultColor + ';font-family:monospace">' + this.escHtml(rl || ' ') + '</div>';
+                            }
+                            if (resultTruncated) {
+                                detailHtml += '<div style="font-size:0.5rem;color:var(--v3);padding-top:2px">... ' + (resultLines.length - maxResultLines) + ' more lines</div>';
+                            }
+                            detailHtml += '</div>';
+                        }
                     } else if (tt === 'search') {
                         detailHtml += '<div style="display:flex;align-items:center;gap:6px;padding:2px 0 2px 18px">'
                             + '<span style="font-size:0.625rem">' + (icons[tt] || icons.other) + '</span>'
@@ -2012,7 +2057,9 @@ window.AppChat = (function() {
                 const detailDisplay = collapsed ? 'none' : 'block';
                 const typeIcons = [...new Set(toolGroup.map(t => icons[t.toolType || 'other'] || icons.other))].join(' ');
                 let diffBadge = '';
+                let hasError = false;
                 for (const t of toolGroup) {
+                    if (t._toolResultError) hasError = true;
                     if (t.toolType === 'edit' && (t.toolEditOld || t.toolEditNew)) {
                         const oldL = (t.toolEditOld || '').split('\n').length;
                         const newL = (t.toolEditNew || '').split('\n').length;
@@ -2037,6 +2084,7 @@ window.AppChat = (function() {
                     + '<span style="font-size:0.625rem">' + typeIcons + '</span>'
                     + '<span style="font-size:0.5625rem;color:var(--v);letter-spacing:0.12em;font-weight:bold">' + countLabel + '</span>'
                     + headerTarget
+                    + (hasError ? '<span style="font-size:0.5rem;color:var(--red);margin-left:4px;font-weight:bold">ERR</span>' : '')
                     + '</div>'
                     + '<div style="display:' + detailDisplay + ';border:1px solid var(--v-dim);border-top:none;background:var(--tool-detail-bg);padding:4px 6px">'
                     + detailHtml

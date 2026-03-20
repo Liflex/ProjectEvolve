@@ -1,10 +1,7 @@
 {
   "name": "autoresearch",
   "description": "CLI-инструмент для автономного AI-исследования и улучшения любых проектов через итеративные эксперименты с Claude Code. Запускает цикл: анализ → предложение → реализация → оценка → решение.",
-  "goals": [
-    "Самосовершенствование системы judgement, критериев приемки и оценки. Запуск Параллельных агентов для независимой оценки. Влияние на score — реализовано: JudgeHistory аналитика (exp165), weight auto-adjustment с persistence и blend factor (exp168), parallel judge evaluation (exp170), conflict resolution с tiebreaker (exp172). Осталось: накопление данных для анализа эффективности auto-revert",
-    "Мультиагентность для исследования — ParallelAgentRunner (exp170), parallel judges (exp171), TaskDecomposer (exp173), ResultAggregator (exp173), decompose UI toggle в lab (exp174). API: /api/parallel/decompose, /api/parallel/decompose-and-run. Осталось: реальные тесты decomposition в production"
-  ],
+  "goals": [],
   "constraints": [
     "В первую очередь chat это - chat. Не нужно перегружать его лишними функциями что не нужны чату. Это не ide для программирования кода, а наша сессия общения с агентом, и она должна быть удобная и покрывать возможности claude sdk для тщательной настройки. Удобный чат - залог успеха."
   ],
@@ -33,6 +30,8 @@
     "Skill autocomplete в чате — exp64: slash menu с локальными командами + Claude Code skills (/commit, /speckit.*, /simplify и др.)",
     "Память сессий и чатов — exp101: localStorage persistence для sessions и tabs, auto-reconnect. WebSocket auto-reconnect с exponential backoff (exp182)",
     "Настройки ALT+9 глобальные — exp102: кнопка Settings перенесена в нижнюю часть sidebar, видна всегда",
-    "Почистить chat от лишних функций — toolbar cleanup (exp163), removed IDE features: File Search, Global Search, Command Palette, Stats Panel (exp169). MORE dropdown now contains only chat-relevant tools."
+    "Почистить chat от лишних функций — toolbar cleanup (exp163), removed IDE features: File Search, Global Search, Command Palette, Stats Panel (exp169). MORE dropdown now contains only chat-relevant tools.",
+    "Самосовершенствование judgement — RevertAnalytics класс с JSONL хранилищем, логирование revert events в research loop с per-profile scores и file changes, conflict revert logging, revert analytics dashboard в lab UI (exp206). Параллельные судьи через единый runner с delay_between_tasks, chief judge через ParallelAgentRunner (exp206)",
+    "Мультиагентность для исследования — ParallelAgentRunner (exp170), TaskDecomposer (exp173), ResultAggregator (exp173), decompose UI toggle (exp174). Тесты decomposition: 12 production validation тестов для _parse_decomposition() (scripts/test_decomposition.py) (exp206)"
   ]
 }
