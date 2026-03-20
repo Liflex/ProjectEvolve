@@ -1,4 +1,42 @@
 
+## Experiment 152 — Chat send mode toggle (Enter/Ctrl+Enter to send)
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`chatSendMode` setting** — настройка в settings (default: 'enter'). Два режима: 'enter' и 'ctrlenter'. Persisted в localStorage.
+2. **`handleChatKeydown` update** — логика отправки проверяет `settings.chatSendMode`.
+3. **Toggle button** — кнопка ENT/CTRL+ENT рядом со счётчиком символов в инпуте.
+4. **Hint text** — динамическая подсказка под инпутом в зависимости от режима.
+5. **Welcome screen** — шорткаты обновляются в зависимости от режима.
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` — send mode logic, toggleSendMode()
+- `ui/static/templates/chat-section.js` — toggle button UI, dynamic hints
+- `ui/static/css/main.css` — .send-mode-toggle styles
+- `ui/static/js/app.js` — chatSendMode default in settings
+
+---
+
+## Experiment 151 — Chat smart collapsed preview (conclusion-first extraction)
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`_buildSmartCollapsedPreview(content)`** — анализирует контент ассистент-сообщения: извлекает title (первая строка), conclusion (последний параграф), summary (статистика code blocks/строк/секций).
+2. **Updated collapsed assistant message rendering** — вместо `content.slice(0, 300)` показывает title + summary + conclusion. Позволяет быстро понять суть свёрнутого ответа без раскрытия.
+3. **CSS** — `.smart-preview`, `.smart-preview-title`, `.smart-preview-summary`, `.smart-preview-conclusion`.
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` — _buildSmartCollapsedPreview(), updated renderAssistantMsg
+- `ui/static/css/main.css` — smart-preview styles
+
+---
+
 ## Experiment 147 — Project documentation search with TF-IDF ranking (Ctrl+Shift+D)
 
 **Date:** 2026-03-20
@@ -5977,6 +6015,36 @@ Results
 
 1. **Backend `session.py`**: `send()` принимает prompt как `str` или `list` (мультимодальные content blocks). Streaming mode передаёт multimodal content через `_single_message()`.
 2. **Backend `server.py`**: WS handler извлекает `images` из сообщения, строит массив `[text_block, image_block, ...]` и переда
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 151 — Chat smart collapsed preview (conclusion-first extraction)
+
+**Date:** 2026-03-20 17:29:16
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+Results
+
+**What was done:**
+Ранее при сворачивании (FOLD) ассистент-сообщений показывались первые 300 символов контента — часто это заголовок или приветствие, не дающие понимания сути ответа. Теперь:
+
+1. **`_buildSmartCollapsedPreview(content)`** — анализирует контент и извлекает 3 компонента:
+   - **title** — первая строка (заголовок/начало)
+   - **summary** — статистика скрытого контента: "2 code blocks · 45 lines · 3 more sections"
+   - **conclusion** — последний нетривиальный параграф (заклю
 
 ### Notes for Next
 
