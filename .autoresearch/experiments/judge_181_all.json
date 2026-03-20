@@ -1,0 +1,44 @@
+{
+  "profiles": {
+    "strict": {
+      "recommendation": "KEEP",
+      "score": 0.85,
+      "reason": "Could not parse judge output",
+      "risks": [],
+      "source": "parallel_agent"
+    },
+    "balanced": {
+      "recommendation": "KEEP",
+      "score": 0.85,
+      "reason": "Исследовательский эксперимент с 3 параллельными аналитическими задачами. Задача research-memory-and-context произвела качественный и структурированный анализ: определены пробелы в разнообразии экспериментов (60% UX/Cat, 0% тестирование/CI/performance), 5 конкретных идей с приоритизацией. Задачи audit-ui-and-server-code и assess-goals-and-priorities частично обрезаны в summary — их полные выводы не видны, но трейлы чтения файлов показывают, что аудит реально проводился. Стоимость $1.26 за параллельный анализ 3 задач — приемлемо. Ценность эксперимента в аналитическом выводе: проект нуждается в смещении фокуса от фич-разработки к инженерному фундаменту.",
+      "risks": [
+        "Анаитический эксперимент без код-изменений — прямого риска регрессии нет",
+        "2 из 3 задач имеют обрезанный вывод в summary — невозможно полностью оценить качество их работы",
+        "Рекомендации (тесты, rate limiting, рефакторинг chat.js) не реализованы — остаются лишь предложениями без действий",
+        "Cost $1.26 за исследования без код-изменений — на грани оправданности, польза зависит от того, будут ли рекомендации реализованы"
+      ],
+      "source": "parallel_agent"
+    },
+    "lenient": {
+      "recommendation": "KEEP",
+      "score": 0.85,
+      "reason": "Could not parse judge output",
+      "risks": [],
+      "source": "parallel_agent"
+    }
+  },
+  "consensus": "KEEP",
+  "consensus_score": 0.85,
+  "agent_decision": "",
+  "agent_score": null,
+  "available_profiles": [
+    "strict",
+    "balanced",
+    "lenient"
+  ],
+  "parallel_mode": true,
+  "total_agents": 3,
+  "completed_agents": 3,
+  "false_positive": true,
+  "false_positive_reason": "JSON parser bug — judges could not return valid response"
+}

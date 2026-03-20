@@ -1,0 +1,39 @@
+{
+  "profiles": {
+    "strict": {
+      "recommendation": "KEEP",
+      "score": 0.85,
+      "reason": "Could not parse judge output",
+      "risks": [],
+      "source": "parallel_agent"
+    },
+    "balanced": {
+      "recommendation": "KEEP",
+      "score": 0.85,
+      "reason": "Could not parse judge output",
+      "risks": [],
+      "source": "parallel_agent"
+    },
+    "lenient": {
+      "recommendation": "KEEP",
+      "score": 0.85,
+      "reason": "Could not parse judge output",
+      "risks": [],
+      "source": "parallel_agent"
+    }
+  },
+  "consensus": "KEEP",
+  "consensus_score": 0.85,
+  "agent_decision": "",
+  "agent_score": null,
+  "available_profiles": [
+    "strict",
+    "balanced",
+    "lenient"
+  ],
+  "parallel_mode": true,
+  "total_agents": 3,
+  "completed_agents": 3,
+  "false_positive": true,
+  "false_positive_reason": "JSON parser bug — judges could not return valid response"
+}

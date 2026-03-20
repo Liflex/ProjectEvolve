@@ -18,6 +18,31 @@
 
 ---
 
+## Experiment 192 — Fix SDK event format — yield tool events from AssistantMessage
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **Root cause**: After exp190 migration to ClaudeSDKClient, AssistantMessage contains ToolUseBlock in its `content` array. The client's `assistant` handler extracts only `text` and `thinking` from blocks — ToolUseBlocks were silently dropped. Users saw agent text but NO tool calls.
+2. **session.py event decomposition**: Instead of blindly using `asdict()` for all messages, now handles each SDK type explicitly:
+   - `AssistantMessage`: yields full event (type="assistant") + separate `tool` events for each ToolUseBlock
+   - `ResultMessage`: yields with type="result"
+   - Others: fallback with `setdefault("type", ...)`
+3. **SDK error handling in chat.js**: Added `etype === 'error'` handler within `claude_event` block. Previously, SDK mid-stream errors were silently dropped.
+4. **parallel.py safety**: `disallowed_tools` for judge agents, skip verbose judge events, serial judge execution.
+5. **cat.js**: new internal `setSpeechText(text, duration)` helper.
+
+### Files Modified
+
+- `agents/session.py` (+25/-5 lines)
+- `ui/static/js/modules/chat.js` (+13 lines)
+- `agents/parallel.py` (+6/-3 lines)
+- `ui/static/modules/cat.js` (+8 lines)
+- `ui/static/js/modules/lab.js` (+2/-2 lines)
+
+---
+
 ## Experiment 185 — Structured system messages in chat with actionable buttons
 
 **Date:** 2026-03-20

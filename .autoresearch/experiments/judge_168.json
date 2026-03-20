@@ -1,0 +1,47 @@
+{
+  "score": 0.92,
+  "recommendation": "KEEP",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "pass",
+      "message": "Experiment commit found: exp #168: judge weight auto-adjustment from verdict history",
+      "weight": 1.0
+    },
+    {
+      "name": "file_consistency",
+      "status": "warn",
+      "message": "Agent claimed no files but 3 actually changed: agents/research.py, ui/server.py, utils/judge.py",
+      "weight": 1.0
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected",
+      "weight": 1.0
+    },
+    {
+      "name": "diff_size",
+      "status": "pass",
+      "message": "3 file(s), +224/-1 lines",
+      "weight": 1.0
+    },
+    {
+      "name": "report_quality",
+      "status": "pass",
+      "message": "All required sections present (5/5 total)",
+      "weight": 1.0
+    },
+    {
+      "name": "code_quality",
+      "status": "pass",
+      "message": "No code smells detected",
+      "weight": 1.0
+    }
+  ],
+  "summary": "5/6 checks passed, 1 warnings",
+  "profile": "balanced",
+  "profile_label": "BALANCED",
+  "agent_decision": "",
+  "agent_score": null
+}

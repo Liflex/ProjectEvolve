@@ -1,0 +1,47 @@
+{
+  "score": 0.92,
+  "recommendation": "KEEP",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "pass",
+      "message": "Experiment commit found: exp #163: compact chat toolbar \u2014 primary row + MORE dropdown",
+      "weight": 1.0
+    },
+    {
+      "name": "file_consistency",
+      "status": "warn",
+      "message": "Agent claimed no files but 6 actually changed: ui/static/templates/chat-section.js, ui/static/js/app.js, autoresearch/experiments/last_experiment.md, autoresearch/experiments/changes_log.md, ui/static/css/main.css",
+      "weight": 1.0
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected",
+      "weight": 1.0
+    },
+    {
+      "name": "diff_size",
+      "status": "pass",
+      "message": "6 file(s), +299/-149 lines",
+      "weight": 1.0
+    },
+    {
+      "name": "report_quality",
+      "status": "pass",
+      "message": "All required sections present (4/5 total)",
+      "weight": 1.0
+    },
+    {
+      "name": "code_quality",
+      "status": "pass",
+      "message": "No code smells detected",
+      "weight": 1.0
+    }
+  ],
+  "summary": "5/6 checks passed, 1 warnings",
+  "profile": "balanced",
+  "profile_label": "BALANCED",
+  "agent_decision": "",
+  "agent_score": null
+}

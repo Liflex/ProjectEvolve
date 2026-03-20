@@ -1,0 +1,45 @@
+{
+  "profiles": {
+    "strict": {
+      "recommendation": "KEEP",
+      "score": 0.85,
+      "reason": "Could not parse judge output",
+      "risks": [],
+      "source": "parallel_agent"
+    },
+    "balanced": {
+      "recommendation": "KEEP",
+      "score": 0.85,
+      "reason": "Could not parse judge output",
+      "risks": [],
+      "source": "parallel_agent"
+    },
+    "lenient": {
+      "recommendation": "KEEP",
+      "score": 0.85,
+      "reason": "Эксперимент решает реальные проблемы безопасности: path traversal в /api/sessions (POST) и слабые проверки '..' in parts в 4 endpoint'ах, утечка .env через search/read API. Централизованные _validate_project_path() и _is_subpath() корректно заменяют дублированный код в 10 endpoint'ах. Использование Path.relative_to() для subpath-проверки — правильный подход, надёжнее строкового prefix matching. Блокировка секретных файлов по расширениям и именам — разумная защита. Payload limit 500KB для /api/prompt — адекватная мера.",
+      "risks": [
+        "Тест test_parent_is_not_subpath утверждает True (path IS under C:\\), что противоречит названию — путаница, не баг, но затрудняет чтение",
+        "_is_subpath не вызывает resolve() самостоятельно — полагается на вызывающий код. Если кто-то вызовет без resolve(), проверка будет некорректной. Нет guard/документации об этом контракте",
+        "allowed_bases включает и project_dir и cwd() — если они разные, доступ шире чем ожидается. Сохраняет предыдущее поведение, но стоит аудировать",
+        "Нет интеграционных тестов для endpoint'ов (только unit-тесты для helper-функций) — реальный путь запроса через FastAPI router не проверен",
+        "SECRET_EXTS содержит '.env' — Path.suffix для файла '.env' возвращает '.env', поэтому работает, но семантически это filename а не extension"
+      ],
+      "source": "parallel_agent"
+    }
+  },
+  "consensus": "KEEP",
+  "consensus_score": 0.85,
+  "agent_decision": "",
+  "agent_score": null,
+  "available_profiles": [
+    "strict",
+    "balanced",
+    "lenient"
+  ],
+  "parallel_mode": true,
+  "total_agents": 3,
+  "completed_agents": 3,
+  "false_positive": true,
+  "false_positive_reason": "JSON parser bug — judges could not return valid response"
+}

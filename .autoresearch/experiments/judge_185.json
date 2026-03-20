@@ -1,0 +1,47 @@
+{
+  "score": 0.72,
+  "recommendation": "REVIEW",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "pass",
+      "message": "Experiment commit found: exp #185: update experiment logs",
+      "weight": 0.63
+    },
+    {
+      "name": "file_consistency",
+      "status": "fail",
+      "message": "No claimed files found in diff. Actual: autoresearch/experiments/accumulation_context.md, autoresearch/experiments/changes_log.md, autoresearch/experiments/last_experiment.md",
+      "weight": 1.0
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected",
+      "weight": 0.44
+    },
+    {
+      "name": "diff_size",
+      "status": "pass",
+      "message": "3 file(s), +209/-17 lines",
+      "weight": 0.44
+    },
+    {
+      "name": "report_quality",
+      "status": "pass",
+      "message": "All required sections present (4/5 total)",
+      "weight": 0.44
+    },
+    {
+      "name": "code_quality",
+      "status": "pass",
+      "message": "No code smells detected",
+      "weight": 0.63
+    }
+  ],
+  "summary": "5/6 checks passed, 1 failed",
+  "profile": "balanced",
+  "profile_label": "BALANCED",
+  "agent_decision": "",
+  "agent_score": null
+}

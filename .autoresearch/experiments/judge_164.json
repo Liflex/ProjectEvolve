@@ -1,0 +1,47 @@
+{
+  "score": 0.83,
+  "recommendation": "REVIEW",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "pass",
+      "message": "Experiment commit found: exp #164: auto-judge integration in research loop \u2014 automati",
+      "weight": 1.0
+    },
+    {
+      "name": "file_consistency",
+      "status": "fail",
+      "message": "No claimed files found in diff. Actual: ui/static/js/modules/lab.js, agents/research.py, ui/server.py",
+      "weight": 1.0
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected",
+      "weight": 1.0
+    },
+    {
+      "name": "diff_size",
+      "status": "pass",
+      "message": "3 file(s), +79/-0 lines",
+      "weight": 1.0
+    },
+    {
+      "name": "report_quality",
+      "status": "pass",
+      "message": "All required sections present (5/5 total)",
+      "weight": 1.0
+    },
+    {
+      "name": "code_quality",
+      "status": "pass",
+      "message": "No code smells detected",
+      "weight": 1.0
+    }
+  ],
+  "summary": "5/6 checks passed, 1 failed",
+  "profile": "balanced",
+  "profile_label": "BALANCED",
+  "agent_decision": "",
+  "agent_score": null
+}

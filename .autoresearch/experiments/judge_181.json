@@ -1,0 +1,47 @@
+{
+  "score": 0.74,
+  "recommendation": "REVIEW",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "pass",
+      "message": "Experiment commit found: exp #180: security hardening \u2014 path traversal fix, secret fi",
+      "weight": 0.91
+    },
+    {
+      "name": "file_consistency",
+      "status": "warn",
+      "message": "Agent claimed no files but 2 actually changed: ui/server.py, tests/test_server_path_validation.py",
+      "weight": 1.0
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected",
+      "weight": 0.85
+    },
+    {
+      "name": "diff_size",
+      "status": "pass",
+      "message": "2 file(s), +172/-30 lines",
+      "weight": 0.85
+    },
+    {
+      "name": "report_quality",
+      "status": "warn",
+      "message": "Missing sections: Decision (1/5 found)",
+      "weight": 0.85
+    },
+    {
+      "name": "code_quality",
+      "status": "warn",
+      "message": "1 binary file(s)",
+      "weight": 0.91
+    }
+  ],
+  "summary": "3/6 checks passed, 3 warnings",
+  "profile": "balanced",
+  "profile_label": "BALANCED",
+  "agent_decision": "",
+  "agent_score": null
+}

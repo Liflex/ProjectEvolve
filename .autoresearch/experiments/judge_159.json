@@ -1,0 +1,39 @@
+{
+  "score": 0.58,
+  "recommendation": "REVIEW",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "warn",
+      "message": "Last commit is not an experiment: docs: update experiment logs for exp #159"
+    },
+    {
+      "name": "file_consistency",
+      "status": "warn",
+      "message": "Agent claimed no files but 18 actually changed: autoresearch/experiments/judge_158.json, autoresearch/experiments/judge_156.json, autoresearch/experiments/prompt_155.md, autoresearch/experiments/prompt_158.md, autoresearch/experiments/output_156.md"
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected"
+    },
+    {
+      "name": "diff_size",
+      "status": "warn",
+      "message": "Large change: 18 files, +3494/-12 lines"
+    },
+    {
+      "name": "report_quality",
+      "status": "warn",
+      "message": "No report text provided"
+    },
+    {
+      "name": "code_quality",
+      "status": "warn",
+      "message": "11 very long lines (>300 chars)"
+    }
+  ],
+  "summary": "1/6 checks passed, 5 warnings",
+  "agent_decision": "",
+  "agent_score": null
+}

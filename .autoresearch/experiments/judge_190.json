@@ -1,0 +1,47 @@
+{
+  "score": 0.71,
+  "recommendation": "REVIEW",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "pass",
+      "message": "Experiment commit found: exp #190: update experiment logs and goals",
+      "weight": 0.43
+    },
+    {
+      "name": "file_consistency",
+      "status": "warn",
+      "message": "Agent claimed no files but 3 actually changed: autoresearch.json, autoresearch/experiments/accumulation_context.md, autoresearch/experiments/last_experiment.md",
+      "weight": 1.0
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected",
+      "weight": 0.22
+    },
+    {
+      "name": "diff_size",
+      "status": "fail",
+      "message": "Very large change: 3 files, +128/-7206 lines",
+      "weight": 0.22
+    },
+    {
+      "name": "report_quality",
+      "status": "pass",
+      "message": "All required sections present (5/5 total)",
+      "weight": 0.22
+    },
+    {
+      "name": "code_quality",
+      "status": "pass",
+      "message": "No code smells detected",
+      "weight": 0.43
+    }
+  ],
+  "summary": "4/6 checks passed, 1 failed, 1 warnings",
+  "profile": "balanced",
+  "profile_label": "BALANCED",
+  "agent_decision": "",
+  "agent_score": null
+}

@@ -1,0 +1,154 @@
+{
+  "profiles": {
+    "strict": {
+      "score": 0.74,
+      "recommendation": "DISCARD",
+      "checks": [
+        {
+          "name": "commit_exists",
+          "status": "pass",
+          "message": "Experiment commit found: exp #171: integrate parallel judges into research loop",
+          "weight": 1.0
+        },
+        {
+          "name": "file_consistency",
+          "status": "fail",
+          "message": "No claimed files found in diff. Actual: ui/static/js/app.js, ui/server.py, autoresearch/experiments/last_experiment.md, autoresearch/experiments/changes_log.md, autoresearch/experiments/accumulation_context.md",
+          "weight": 2.0
+        },
+        {
+          "name": "syntax_check",
+          "status": "pass",
+          "message": "No syntax errors detected",
+          "weight": 2.0
+        },
+        {
+          "name": "diff_size",
+          "status": "pass",
+          "message": "7 file(s), +247/-30 lines",
+          "weight": 2.0
+        },
+        {
+          "name": "report_quality",
+          "status": "pass",
+          "message": "All required sections present (5/5 total)",
+          "weight": 0.5
+        },
+        {
+          "name": "code_quality",
+          "status": "pass",
+          "message": "No code smells detected",
+          "weight": 2.0
+        }
+      ],
+      "summary": "5/6 checks passed, 1 failed",
+      "profile": "strict",
+      "profile_label": "STRICT",
+      "agent_decision": "",
+      "agent_score": null
+    },
+    "balanced": {
+      "score": 0.83,
+      "recommendation": "REVIEW",
+      "checks": [
+        {
+          "name": "commit_exists",
+          "status": "pass",
+          "message": "Experiment commit found: exp #171: integrate parallel judges into research loop",
+          "weight": 1.0
+        },
+        {
+          "name": "file_consistency",
+          "status": "fail",
+          "message": "No claimed files found in diff. Actual: ui/static/js/app.js, ui/server.py, autoresearch/experiments/last_experiment.md, autoresearch/experiments/changes_log.md, autoresearch/experiments/accumulation_context.md",
+          "weight": 1.0
+        },
+        {
+          "name": "syntax_check",
+          "status": "pass",
+          "message": "No syntax errors detected",
+          "weight": 1.0
+        },
+        {
+          "name": "diff_size",
+          "status": "pass",
+          "message": "7 file(s), +247/-30 lines",
+          "weight": 1.0
+        },
+        {
+          "name": "report_quality",
+          "status": "pass",
+          "message": "All required sections present (5/5 total)",
+          "weight": 1.0
+        },
+        {
+          "name": "code_quality",
+          "status": "pass",
+          "message": "No code smells detected",
+          "weight": 1.0
+        }
+      ],
+      "summary": "5/6 checks passed, 1 failed",
+      "profile": "balanced",
+      "profile_label": "BALANCED",
+      "agent_decision": "",
+      "agent_score": null
+    },
+    "lenient": {
+      "score": 0.96,
+      "recommendation": "REVIEW",
+      "checks": [
+        {
+          "name": "commit_exists",
+          "status": "pass",
+          "message": "Experiment commit found: exp #171: integrate parallel judges into research loop",
+          "weight": 1.5
+        },
+        {
+          "name": "file_consistency",
+          "status": "fail",
+          "message": "No claimed files found in diff. Actual: ui/static/js/app.js, ui/server.py, autoresearch/experiments/last_experiment.md, autoresearch/experiments/changes_log.md, autoresearch/experiments/accumulation_context.md",
+          "weight": 0.5
+        },
+        {
+          "name": "syntax_check",
+          "status": "pass",
+          "message": "No syntax errors detected",
+          "weight": 1.5
+        },
+        {
+          "name": "diff_size",
+          "status": "pass",
+          "message": "7 file(s), +247/-30 lines",
+          "weight": 0.5
+        },
+        {
+          "name": "report_quality",
+          "status": "pass",
+          "message": "All required sections present (5/5 total)",
+          "weight": 1.0
+        },
+        {
+          "name": "code_quality",
+          "status": "pass",
+          "message": "No code smells detected",
+          "weight": 0.5
+        }
+      ],
+      "summary": "5/6 checks passed, 1 failed",
+      "profile": "lenient",
+      "profile_label": "LENIENT",
+      "agent_decision": "",
+      "agent_score": null
+    }
+  },
+  "consensus": "REVIEW",
+  "consensus_score": 0.84,
+  "agent_decision": "",
+  "agent_score": null,
+  "available_profiles": [
+    "strict",
+    "balanced",
+    "lenient"
+  ]
+}

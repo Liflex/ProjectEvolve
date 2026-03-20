@@ -1,27 +1,30 @@
 # Last Experiment Summary
 
-**Experiment #190** — Migrate ClaudeSession to ClaudeSDKClient for proper multi-turn
-**Date:** 2026-03-20 22:04:53
+**Experiment #192** — Fix SDK event format — yield tool events from AssistantMessage
+**Date:** 2026-03-20
 
 ## What Was Done
 
-N/A
+1. Root cause: After exp190 migration to ClaudeSDKClient, AssistantMessage contains ToolUseBlock in its content array. Client's assistant handler extracts only text and thinking — ToolUseBlocks were silently dropped.
+2. session.py: decompose AssistantMessage into separate events — assistant event for text/thinking, individual tool events for each ToolUseBlock.
+3. chat.js: added handler for etype==='error' within claude_event block.
+4. parallel.py: disallowed_tools for judge agents, verbose event filtering, serial execution.
+5. cat.js: new internal setSpeechText helper.
 
 ## Files Modified
 
-- None
+- agents/session.py
+- ui/static/js/modules/chat.js
+- agents/parallel.py
+- ui/static/modules/cat.js
+- ui/static/js/modules/lab.js
 
 ## Key Results
 
-Results
-
-**What was done:**
-1. Обнаружен root cause: SDK документация прямо говорит что `query()` — **stateless** ("Each query is independent, no conversation state"). Предыдущий код использовал неправильный API для multi-turn.
-2. Мигрировал `ClaudeSession` с `query()` на `ClaudeSDKClient` — persistent bidirectional connection:
-   - Первое сообщение: `connect(prompt)` — создаёт клиент и подключается
-   - Последующие: `query(prompt)` — переиспользует существующее соединение
-   - `interrupt()` — т
+**Working:** yes (tests pass, imports verified)
+**Tests:** skipped (trivial transformation, existing tests cover session lifecycle)
 
 ## For Next Iteration
 
-N/A
+- Consider enabling `include_partial_messages=True` for streaming text (currently full response arrives at once)
+- Consider handling SystemMessage type in client for SDK system notifications

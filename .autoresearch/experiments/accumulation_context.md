@@ -5,6 +5,28 @@
 
 ---
 
+## Experiment 192 — Fix SDK event format — yield tool events from AssistantMessage
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **Root cause**: After exp190 migration, AssistantMessage bundles ToolUseBlocks in `content` array. Client's `assistant` handler only extracts text/thinking — tool calls were silently dropped.
+2. **session.py decomposition**: `isinstance` checks for AssistantMessage/ResultMessage. Yields full assistant event + separate tool events for each ToolUseBlock.
+3. **chat.js error handler**: Added `etype === 'error'` within claude_event block — SDK mid-stream errors no longer silently dropped.
+4. **parallel.py**: disallowed_tools for judges, skip verbose events, serial execution.
+5. **cat.js**: new `setSpeechText(text, duration)` internal helper.
+
+### Files Modified
+
+- `agents/session.py` (+25/-5 lines)
+- `ui/static/js/modules/chat.js` (+13 lines)
+- `agents/parallel.py` (+6/-3 lines)
+- `ui/static/modules/cat.js` (+8 lines)
+- `ui/static/js/modules/lab.js` (+2/-2 lines)
+
+---
+
 ## Experiment 190 — Migrate ClaudeSession to ClaudeSDKClient for proper multi-turn
 
 **Date:** 2026-03-20

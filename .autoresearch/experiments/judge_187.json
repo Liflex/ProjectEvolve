@@ -1,0 +1,47 @@
+{
+  "score": 0.66,
+  "recommendation": "REVIEW",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "pass",
+      "message": "Experiment commit found: exp #187: session grace period on WebSocket disconnect \u2014 60s",
+      "weight": 0.52
+    },
+    {
+      "name": "file_consistency",
+      "status": "fail",
+      "message": "No claimed files found in diff. Actual: tests/test_session_grace_period.py, autoresearch/experiments/changes_log.md, autoresearch/experiments/last_experiment.md, ui/server.py, autoresearch/experiments/accumulation_context.md",
+      "weight": 1.0
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected",
+      "weight": 0.31
+    },
+    {
+      "name": "diff_size",
+      "status": "pass",
+      "message": "6 file(s), +399/-20 lines",
+      "weight": 0.31
+    },
+    {
+      "name": "report_quality",
+      "status": "pass",
+      "message": "All required sections present (4/5 total)",
+      "weight": 0.31
+    },
+    {
+      "name": "code_quality",
+      "status": "pass",
+      "message": "No code smells detected",
+      "weight": 0.52
+    }
+  ],
+  "summary": "5/6 checks passed, 1 failed",
+  "profile": "balanced",
+  "profile_label": "BALANCED",
+  "agent_decision": "",
+  "agent_score": null
+}

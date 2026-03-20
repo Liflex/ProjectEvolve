@@ -1,0 +1,47 @@
+{
+  "score": 0.75,
+  "recommendation": "REVIEW",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "warn",
+      "message": "Last commit is not an experiment: update default prompt",
+      "weight": 1.0
+    },
+    {
+      "name": "file_consistency",
+      "status": "fail",
+      "message": "No claimed files found in diff. Actual: ui/static/js/modules/lab.js, ui/static/js/app.js, ui/static/templates/lab-minor.js, ui/server.py, config/prompt_quality.md",
+      "weight": 1.0
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected",
+      "weight": 1.0
+    },
+    {
+      "name": "diff_size",
+      "status": "pass",
+      "message": "13 file(s), +150/-119 lines",
+      "weight": 1.0
+    },
+    {
+      "name": "report_quality",
+      "status": "pass",
+      "message": "All required sections present (5/5 total)",
+      "weight": 1.0
+    },
+    {
+      "name": "code_quality",
+      "status": "pass",
+      "message": "No code smells detected",
+      "weight": 1.0
+    }
+  ],
+  "summary": "4/6 checks passed, 1 failed, 1 warnings",
+  "profile": "balanced",
+  "profile_label": "BALANCED",
+  "agent_decision": "",
+  "agent_score": null
+}

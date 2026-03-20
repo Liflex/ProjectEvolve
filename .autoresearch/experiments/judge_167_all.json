@@ -1,0 +1,154 @@
+{
+  "profiles": {
+    "strict": {
+      "score": 0.84,
+      "recommendation": "KEEP",
+      "checks": [
+        {
+          "name": "commit_exists",
+          "status": "pass",
+          "message": "Experiment commit found: exp #167: update goals and experiment logs",
+          "weight": 1.0
+        },
+        {
+          "name": "file_consistency",
+          "status": "warn",
+          "message": "Agent claimed no files but 2 actually changed: autoresearch/experiments/changes_log.md, autoresearch/experiments/last_experiment.md",
+          "weight": 2.0
+        },
+        {
+          "name": "syntax_check",
+          "status": "pass",
+          "message": "No syntax errors detected",
+          "weight": 2.0
+        },
+        {
+          "name": "diff_size",
+          "status": "pass",
+          "message": "2 file(s), +42/-14 lines",
+          "weight": 2.0
+        },
+        {
+          "name": "report_quality",
+          "status": "pass",
+          "message": "All required sections present (5/5 total)",
+          "weight": 0.5
+        },
+        {
+          "name": "code_quality",
+          "status": "pass",
+          "message": "No code smells detected",
+          "weight": 2.0
+        }
+      ],
+      "summary": "5/6 checks passed, 1 warnings",
+      "profile": "strict",
+      "profile_label": "STRICT",
+      "agent_decision": "",
+      "agent_score": null
+    },
+    "balanced": {
+      "score": 0.92,
+      "recommendation": "KEEP",
+      "checks": [
+        {
+          "name": "commit_exists",
+          "status": "pass",
+          "message": "Experiment commit found: exp #167: update goals and experiment logs",
+          "weight": 1.0
+        },
+        {
+          "name": "file_consistency",
+          "status": "warn",
+          "message": "Agent claimed no files but 2 actually changed: autoresearch/experiments/changes_log.md, autoresearch/experiments/last_experiment.md",
+          "weight": 1.0
+        },
+        {
+          "name": "syntax_check",
+          "status": "pass",
+          "message": "No syntax errors detected",
+          "weight": 1.0
+        },
+        {
+          "name": "diff_size",
+          "status": "pass",
+          "message": "2 file(s), +42/-14 lines",
+          "weight": 1.0
+        },
+        {
+          "name": "report_quality",
+          "status": "pass",
+          "message": "All required sections present (5/5 total)",
+          "weight": 1.0
+        },
+        {
+          "name": "code_quality",
+          "status": "pass",
+          "message": "No code smells detected",
+          "weight": 1.0
+        }
+      ],
+      "summary": "5/6 checks passed, 1 warnings",
+      "profile": "balanced",
+      "profile_label": "BALANCED",
+      "agent_decision": "",
+      "agent_score": null
+    },
+    "lenient": {
+      "score": 1.0,
+      "recommendation": "KEEP",
+      "checks": [
+        {
+          "name": "commit_exists",
+          "status": "pass",
+          "message": "Experiment commit found: exp #167: update goals and experiment logs",
+          "weight": 1.5
+        },
+        {
+          "name": "file_consistency",
+          "status": "warn",
+          "message": "Agent claimed no files but 2 actually changed: autoresearch/experiments/changes_log.md, autoresearch/experiments/last_experiment.md",
+          "weight": 0.5
+        },
+        {
+          "name": "syntax_check",
+          "status": "pass",
+          "message": "No syntax errors detected",
+          "weight": 1.5
+        },
+        {
+          "name": "diff_size",
+          "status": "pass",
+          "message": "2 file(s), +42/-14 lines",
+          "weight": 0.5
+        },
+        {
+          "name": "report_quality",
+          "status": "pass",
+          "message": "All required sections present (5/5 total)",
+          "weight": 1.0
+        },
+        {
+          "name": "code_quality",
+          "status": "pass",
+          "message": "No code smells detected",
+          "weight": 0.5
+        }
+      ],
+      "summary": "5/6 checks passed, 1 warnings",
+      "profile": "lenient",
+      "profile_label": "LENIENT",
+      "agent_decision": "",
+      "agent_score": null
+    }
+  },
+  "consensus": "KEEP",
+  "consensus_score": 0.92,
+  "agent_decision": "",
+  "agent_score": null,
+  "available_profiles": [
+    "strict",
+    "balanced",
+    "lenient"
+  ]
+}

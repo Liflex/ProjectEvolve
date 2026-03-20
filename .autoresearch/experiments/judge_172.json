@@ -1,0 +1,47 @@
+{
+  "score": 0.83,
+  "recommendation": "KEEP",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "pass",
+      "message": "Experiment commit found: exp #172: judge conflict resolution & auto-revert on DISCARD",
+      "weight": 1.0
+    },
+    {
+      "name": "file_consistency",
+      "status": "warn",
+      "message": "Agent claimed no files but 10 actually changed: ui/static/js/modules/lab.js, ui/static/templates/lab-experiments.js, ui/server.py, autoresearch/experiments/last_experiment.md, autoresearch/experiments/changes_log.md",
+      "weight": 1.0
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected",
+      "weight": 1.0
+    },
+    {
+      "name": "diff_size",
+      "status": "pass",
+      "message": "10 file(s), +457/-24 lines",
+      "weight": 1.0
+    },
+    {
+      "name": "report_quality",
+      "status": "pass",
+      "message": "All required sections present (5/5 total)",
+      "weight": 1.0
+    },
+    {
+      "name": "code_quality",
+      "status": "warn",
+      "message": "8 very long lines (>300 chars)",
+      "weight": 1.0
+    }
+  ],
+  "summary": "4/6 checks passed, 2 warnings",
+  "profile": "balanced",
+  "profile_label": "BALANCED",
+  "agent_decision": "",
+  "agent_score": null
+}
