@@ -3583,3 +3583,46 @@ Results
 6.
 
 
+## Experiment 167 — Cat lying down pose — horizontal body, front paws, auto-lie on deep sleep
+
+**Time:** 2026-03-20 19:48:28
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **BODY_LYING** — горизонтальное тело (26×10 px), outline + fill, 1bpp encoded
+2. **PAWS_LYING** — передние лапы (13×4 px) между головой и телом
+3. **Позиции lying pose** — LIE_HEAD_POS, LIE_BODY_POS, LIE_PAWS_POS, LIE_TAIL_POS
+4. **Состояние pose** — `_pose` ('sitting' | 'lying') управляет выбором спрайтов/позиций
+5. **Рефакторинг render()** — динамический выбор спрайтов и позиций по pose, глаза вычисляются относительно головы
+6. **Auto-lie при глубоком сне** — кот
+
+
+## Experiment 168 — Judge weight auto-adjustment from verdict history
+
+**Time:** 2026-03-20 19:53:42
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **Weight persistence** — `save_custom_weights()` / `load_custom_weights()` сохраняют кастомные веса в `.autoresearch/judge_weights.json`
+2. **Auto-apply logic** — `apply_weight_adjustments()` вычисляет корректировки из check reliability (discriminative score, pass/fail rates) и применяет с blend factor 0.3, зажатый в [0.2, 3.0]. Запускается после 5+ вердиктов
+3. **ExperimentJudge загружает кастомные веса** — `_load_custom_weights()` в `__init__` применяет сохранённ
+
+

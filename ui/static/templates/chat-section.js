@@ -164,7 +164,7 @@
             </template>
             <!-- MORE dropdown — all advanced/IDE features consolidated -->
             <div class="relative">
-                <button class="chat-toolbar-btn" :class="(_tbMoreOpen || showPinsPanel || showStatsPanel || _tbPanelOpen || _tbMsgOpen || showExportMenu || _globalSearch.show || _fileSearch.show) && 'active'" @click.stop="_tbMoreOpen = !_tbMoreOpen" title="More tools & options">
+                <button class="chat-toolbar-btn" :class="(_tbMoreOpen || showPinsPanel || _tbPanelOpen || _tbMsgOpen || showExportMenu) && 'active'" @click.stop="_tbMoreOpen = !_tbMoreOpen" title="More tools & options">
                     &#x22EF; MORE
                 </button>
                 <div x-show="_tbMoreOpen" x-cloak x-transition.duration.150ms
@@ -190,23 +190,7 @@
                     <button class="tb-dropdown-item" @click.stop="_tbMoreOpen = false; showExportMenu = !showExportMenu">
                         <span style="color:var(--v3)">&#x1f4e4;</span> EXPORT
                     </button>
-                    <button class="tb-dropdown-item" :class="showStatsPanel && 'active'" @click.stop="_tbMoreOpen = false; showStatsPanel = !showStatsPanel">
-                        <span style="color:var(--v3)">&#x1f4ca;</span> STATS
-                    </button>
                     <div class="tb-dropdown-sep"></div>
-                    <button class="tb-dropdown-item" :class="_fileSearch.show && 'active'" @click.stop="_tbMoreOpen = false; toggleFileSearch()">
-                        <span style="color:var(--v3)">&#x1f4c2;</span> FILE SEARCH
-                        <span class="tb-dropdown-hint">Ctrl+Shift+F</span>
-                    </button>
-                    <button class="tb-dropdown-item" :class="_globalSearch.show && 'active'" @click.stop="_tbMoreOpen = false; toggleGlobalSearch()">
-                        <span style="color:var(--v3)">&#x1f50e;</span> GLOBAL SEARCH
-                        <span class="tb-dropdown-hint">Ctrl+Alt+F</span>
-                    </button>
-                    <div class="tb-dropdown-sep"></div>
-                    <button class="tb-dropdown-item" @click.stop="_tbMoreOpen = false; openCmdPalette()">
-                        <span style="color:var(--v3)">&#x2328;</span> COMMAND PALETTE
-                        <span class="tb-dropdown-hint">Ctrl+K</span>
-                    </button>
                     <button class="tb-dropdown-item" @click.stop="_tbMoreOpen = false; openShortcuts()">
                         <span style="color:var(--v3)">?</span> KEYBOARD SHORTCUTS
                     </button>
@@ -301,48 +285,7 @@
                 </div>
             </div>
         </div>
-        <!-- Global search panel (detached from toolbar, positioned absolutely) -->
-        <div x-show="_globalSearch.show && activeTab" x-cloak x-transition.duration.150ms
-             @click.outside="closeGlobalSearch()"
-             class="global-search-panel-detached">
-            <div class="global-search-header">
-                <span>&#x1f50e; GLOBAL_SEARCH</span>
-                <span class="text-[0.5rem] text-[var(--v3)]" x-text="_globalSearch.results.length + ' results'"></span>
-            </div>
-            <div class="global-search-input-wrap">
-                <input id="global-search-input"
-                       x-model="_globalSearch.query"
-                       @input="executeGlobalSearch()"
-                       @keydown="globalSearchKeyDown($event)"
-                       placeholder="Search all sessions..."
-                       class="global-search-input"
-                       autocomplete="off" spellcheck="false">
-                <span x-show="_globalSearch.query.length < 2" class="global-search-hint">min 2 chars</span>
-            </div>
-            <div class="global-search-results">
-                <template x-for="(result, idx) in _globalSearch.results" :key="idx">
-                    <div class="global-search-item"
-                         :class="idx === _globalSearch.selectedIdx && 'selected'"
-                         @click="goToGlobalResult(result)"
-                         @mouseenter="_globalSearch.selectedIdx = idx">
-                        <div class="global-search-item-header">
-                            <span class="global-search-item-tab" x-text="result.tabLabel"></span>
-                            <span class="global-search-item-role"
-                                  :class="'role-' + result.role"
-                                  x-text="result.role === 'user' ? 'USER' : result.role === 'assistant' ? 'CLAUDE' : 'SYSTEM'"></span>
-                            <span class="global-search-item-time" x-text="relativeTime(result.ts)"></span>
-                        </div>
-                        <div class="global-search-item-snippet" x-text="result.snippet"></div>
-                    </div>
-                </template>
-                <div x-show="_globalSearch.query.length >= 2 && _globalSearch.results.length === 0" class="global-search-empty">
-                    No matches found_
-                </div>
-                <div x-show="_globalSearch.query.length < 2 && _globalSearch.results.length === 0" class="global-search-empty">
-                    Type to search across all sessions_ <span class="text-[var(--v3)]">Ctrl+Alt+F</span>
-                </div>
-            </div>
-        </div>
+
 
         <!-- Chat Search Bar (Ctrl+F) -->
         <div x-show="chatSearch.show && activeTab" x-cloak x-transition.duration.150ms
@@ -376,47 +319,6 @@
                    autocomplete="off" spellcheck="false">
             <span class="goto-msg-hint" x-text="activeTab ? '0-' + (activeTab.messages.length - 1) : ''"></span>
             <button @click="closeGoToMsg()" class="goto-msg-close" title="Close (Escape)">[X]</button>
-        </div>
-
-        <!-- File Search Panel -->
-        <div x-show="_fileSearch.show && activeTab" x-cloak x-transition.duration.150ms
-             class="file-search-panel" @click.outside="closeFileSearch()">
-            <div class="file-search-header">
-                <span class="file-search-icon">&#x1f4c2;</span>
-                <input id="file-search-input"
-                       :value="_fileSearch.query"
-                       @input="onFileSearchInput(activeTab, $event)"
-                       @keydown="onFileSearchKeydown(activeTab, $event)"
-                       placeholder="Search project files..."
-                       class="file-search-input"
-                       autocomplete="off" spellcheck="false">
-                <span x-show="_fileSearch.loading" class="file-search-loading">&#x23f3;</span>
-                <span x-show="!_fileSearch.loading && _fileSearch.results.length > 0"
-                      class="file-search-count"
-                      x-text="_fileSearch.results.length + ' hits'"></span>
-                <button @click="closeFileSearch()" class="file-search-close" title="Close (Escape)">[X]</button>
-            </div>
-            <div class="file-search-results">
-                <template x-for="(r, idx) in _fileSearch.results" :key="idx">
-                    <div class="file-search-item"
-                         @click="insertSearchResult(activeTab, r)"
-                         @contextmenu.prevent="copySearchResult(r)"
-                         :title="r.file + ':' + r.line + ' — click to insert ref, right-click to copy'">
-                        <div class="file-search-item-path">
-                            <span class="file-search-item-lang" x-text="'[' + (r.lang || '?') + ']'"></span>
-                            <span class="file-search-item-file" x-text="r.file"></span>
-                            <span class="file-search-item-line" x-text="':' + r.line"></span>
-                        </div>
-                        <div class="file-search-item-text" x-text="r.text"></div>
-                    </div>
-                </template>
-                <div x-show="_fileSearch.error && !_fileSearch.loading" class="file-search-empty">
-                    <span x-text="_fileSearch.error"></span>
-                </div>
-                <div x-show="!_fileSearch.loading && !_fileSearch.error && _fileSearch.query.length < 2" class="file-search-empty">
-                    Type 2+ chars to search_
-                </div>
-            </div>
         </div>
 
         <!-- Chat Tab Content -->
@@ -733,7 +635,7 @@
                                           @input="handleChatInput(tab, $event); autoResizeTextarea($event)"
                                           @focus="chatNavClear()"
                                           @paste="handleChatPaste(tab, $event)"
-                                          placeholder="Message_ (/ commands, @ file mention, paste images, drag files, Ctrl+Shift+F search files)"
+                                          placeholder="Message_ (/ commands, @ file mention, paste images, drag files)"
                                           rows="1"
                                           class="chat-input-area w-full bg-[var(--bg)] border px-3 py-2 text-sm text-[var(--ng2)] tracking-wider resize-none editor"
                                           :class="tab._editMode ? 'border-[var(--yellow)]' : tab._quotedMsg ? 'border-[var(--v2)] rounded-t-none' : 'border-[var(--v-dim)]'"
@@ -844,7 +746,6 @@
                     <div class="text-[0.625rem] text-[var(--v3)] mt-3 tracking-wider">&#x2191; resume past session from sidebar</div>
                     <div class="chat-empty-shortcuts">
                         <div class="text-[0.5rem] text-[var(--v3)] tracking-widest mt-6 mb-3">KEYBOARD_SHORTCUTS</div>
-                        <div class="chat-shortcut-row"><kbd>Ctrl+K</kbd><span>Command Palette</span></div>
                         <div class="chat-shortcut-row"><kbd>Ctrl+F</kbd><span>Search in chat</span></div>
                         <div class="chat-shortcut-row"><kbd>/</kbd><span>Skill autocomplete</span></div>
                         <div class="chat-shortcut-row"><kbd>Up/Down</kbd><span>Message history</span></div>
@@ -921,275 +822,6 @@
             </div>
         </div>
 
-        <!-- Session Stats Panel -->
-        <div x-show="showStatsPanel && activeTab" x-cloak x-transition.duration.150ms
-             @click.outside="showStatsPanel = false"
-             class="stats-panel">
-            <div class="stats-panel-header">
-                <span>&#x1f4ca; <span x-text="statsView === 'all' ? 'ALL_SESSIONS' : 'SESSION_STATS'"></span></span>
-                <div class="stats-view-toggle">
-                    <button class="stats-view-btn" :class="statsView === 'session' && 'active'" @click="statsView = 'session'" title="This session only">THIS</button>
-                    <button class="stats-view-btn" :class="statsView === 'all' && 'active'" @click="statsView = 'all'" title="All sessions combined">ALL</button>
-                </div>
-                <button @click="showStatsPanel = false" class="stats-panel-close" title="Close">[X]</button>
-            </div>
-
-            <!-- ALL SESSIONS VIEW -->
-            <div class="stats-panel-body" x-show="statsView === 'all' && getAllSessionsStats()">
-                <template x-if="statsView === 'all' && getAllSessionsStats()">
-                    <div>
-                        <!-- Aggregate overview -->
-                        <div class="stats-row">
-                            <div class="stats-card">
-                                <div class="stats-card-label">SESSIONS</div>
-                                <div class="stats-card-value" x-text="getAllSessionsStats().totalSessions"></div>
-                            </div>
-                            <div class="stats-card">
-                                <div class="stats-card-label">MESSAGES</div>
-                                <div class="stats-card-value" x-text="getAllSessionsStats().totalMessages"></div>
-                            </div>
-                            <div class="stats-card">
-                                <div class="stats-card-label">TOOLS</div>
-                                <div class="stats-card-value" style="color:var(--pink)" x-text="getAllSessionsStats().totalTools"></div>
-                            </div>
-                            <div class="stats-card">
-                                <div class="stats-card-label">TOTAL COST</div>
-                                <div class="stats-card-value stats-card-value-sm" style="color:var(--yellow)" x-text="'$' + getAllSessionsStats().totalCost.toFixed(4)"></div>
-                            </div>
-                        </div>
-                        <!-- Aggregate tokens -->
-                        <div class="stats-section">
-                            <div class="stats-section-title">AGGREGATE_TOKENS</div>
-                            <div class="stats-tokens-row">
-                                <span class="stats-token-label">INPUT</span>
-                                <span class="stats-token-value" style="color:var(--cyan)" x-text="(getAllSessionsStats().totalInputTokens / 1000).toFixed(1) + 'K'"></span>
-                                <span class="stats-token-label">OUTPUT</span>
-                                <span class="stats-token-value" style="color:var(--ng2)" x-text="(getAllSessionsStats().totalOutputTokens / 1000).toFixed(1) + 'K'"></span>
-                                <span class="stats-token-label">TURNS</span>
-                                <span class="stats-token-value" style="color:var(--v)" x-text="getAllSessionsStats().totalTurns"></span>
-                            </div>
-                        </div>
-                        <!-- Per-session cards -->
-                        <div class="stats-section">
-                            <div class="stats-section-title">SESSION_BREAKDOWN</div>
-                            <div class="dashboard-session-list">
-                                <template x-for="(sess, idx) in getAllSessionsStats().sessions" :key="sess.tabId">
-                                    <div class="dashboard-session-card" :class="sess.active && 'dashboard-session-active'" @click="activateChatTab(sess.tabId); statsView = 'session'">
-                                        <div class="dsc-header">
-                                            <span class="dsc-dot" :class="sess.active ? 'dsc-dot-active' : 'dsc-dot-idle'"></span>
-                                            <span class="dsc-label" x-text="sess.label"></span>
-                                            <span x-show="sess.active" class="dsc-badge-streaming">STREAMING</span>
-                                            <span class="dsc-rank" x-text="'#' + (idx + 1)"></span>
-                                        </div>
-                                        <div class="dsc-metrics">
-                                            <span class="dsc-metric" title="Messages">&#x1f4ac; <span x-text="sess.messages"></span></span>
-                                            <span class="dsc-metric" title="Turns">&#x21a9; <span x-text="sess.turns"></span></span>
-                                            <span class="dsc-metric" title="Tools">&#x2328; <span x-text="sess.tools"></span></span>
-                                            <span class="dsc-metric" title="Duration">&#x23f1; <span x-text="sess.duration"></span></span>
-                                        </div>
-                                        <div class="dsc-cost-bar">
-                                            <span class="dsc-cost-label" x-text="'$' + sess.cost.toFixed(4)"></span>
-                                            <div class="dsc-cost-track">
-                                                <div class="dsc-cost-fill" :style="'width:' + (getAllSessionsStats().totalCost > 0 ? Math.max(2, (sess.cost / getAllSessionsStats().totalCost) * 100) : 0) + '%'"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-                        <!-- Activity feed -->
-                        <div class="stats-section">
-                            <div class="stats-section-title">RECENT_ACTIVITY</div>
-                            <div class="dashboard-activity-feed">
-                                <template x-for="(evt, idx) in getActivityFeed(25)" :key="idx">
-                                    <div class="dash-activity-item" :class="evt.isError && 'dash-activity-error'">
-                                        <span class="dai-icon" x-text="evt.role === 'user' ? '&#x1f464;' : evt.isError ? '&#x26a0;' : '&#x2b50;'"></span>
-                                        <span class="dai-tab" x-text="evt.tabLabel" :style="'color:' + (evt.tabId === activeChatTab ? 'var(--v)' : 'var(--v3)')"></span>
-                                        <span class="dai-content" x-text="evt.content"></span>
-                                        <span class="dai-meta">
-                                            <span x-show="evt.duration > 0" x-text="fmtDuration(evt.duration)"></span>
-                                            <span x-show="evt.cost > 0" style="color:var(--yellow)" x-text="'$' + evt.cost.toFixed(4)"></span>
-                                        </span>
-                                        <span class="dai-time" x-text="fmtTime(evt.ts)"></span>
-                                    </div>
-                                </template>
-                                <div x-show="getActivityFeed(25).length === 0" class="text-center py-3 text-[0.625rem] text-[var(--v3)] tracking-wider">NO_ACTIVITY_YET_</div>
-                            </div>
-                        </div>
-                    </div>
-                </template>
-            </div>
-
-            <!-- THIS SESSION VIEW (original stats) -->
-            <div class="stats-panel-body" x-show="statsView === 'session'">
-                <div x-show="!getSessionStats(activeTab)" class="stats-panel-empty">
-                    NO_DATA_YET_ — Send a message to start tracking_
-                </div>
-                <template x-if="statsView === 'session' && getSessionStats(activeTab)">
-                    <div>
-                        <!-- Overview row -->
-                        <div class="stats-row">
-                            <div class="stats-card">
-                                <div class="stats-card-label">TURNS</div>
-                                <div class="stats-card-value" x-text="getSessionStats(activeTab).turns"></div>
-                            </div>
-                            <div class="stats-card">
-                                <div class="stats-card-label">MESSAGES</div>
-                                <div class="stats-card-value" x-text="getSessionStats(activeTab).total"></div>
-                            </div>
-                            <div class="stats-card">
-                                <div class="stats-card-label">TOOLS</div>
-                                <div class="stats-card-value" style="color:var(--pink)" x-text="getSessionStats(activeTab).toolCount"></div>
-                            </div>
-                            <div class="stats-card">
-                                <div class="stats-card-label">DURATION</div>
-                                <div class="stats-card-value stats-card-value-sm" x-text="getSessionStats(activeTab).duration"></div>
-                            </div>
-                        </div>
-                        <!-- Message breakdown -->
-                        <div class="stats-section">
-                            <div class="stats-section-title">MESSAGE_BREAKDOWN</div>
-                            <div class="stats-bar-row">
-                                <span class="stats-bar-label">USER</span>
-                                <div class="stats-bar-track">
-                                    <div class="stats-bar-fill" style="background:var(--v)" :style="'width:' + Math.round((getSessionStats(activeTab).userCount / getSessionStats(activeTab).total) * 100) + '%'"></div>
-                                </div>
-                                <span class="stats-bar-count" x-text="getSessionStats(activeTab).userCount"></span>
-                            </div>
-                            <div class="stats-bar-row">
-                                <span class="stats-bar-label">ASSISTANT</span>
-                                <div class="stats-bar-track">
-                                    <div class="stats-bar-fill" style="background:var(--cyan)" :style="'width:' + Math.round((getSessionStats(activeTab).asstCount / getSessionStats(activeTab).total) * 100) + '%'"></div>
-                                </div>
-                                <span class="stats-bar-count" x-text="getSessionStats(activeTab).asstCount"></span>
-                            </div>
-                            <div class="stats-bar-row">
-                                <span class="stats-bar-label">TOOL</span>
-                                <div class="stats-bar-track">
-                                    <div class="stats-bar-fill" style="background:var(--pink)" :style="'width:' + Math.round((getSessionStats(activeTab).toolCount / getSessionStats(activeTab).total) * 100) + '%'"></div>
-                                </div>
-                                <span class="stats-bar-count" x-text="getSessionStats(activeTab).toolCount"></span>
-                            </div>
-                        </div>
-                        <!-- Tool usage breakdown -->
-                        <div class="stats-section" x-show="getSessionStats(activeTab).toolEntries.length > 0">
-                            <div class="stats-section-title">TOOL_USAGE</div>
-                            <template x-for="(tool, idx) in getSessionStats(activeTab).toolEntries" :key="idx">
-                                <div class="stats-bar-row">
-                                    <span class="stats-bar-label" :style="'color:' + tool.color" x-text="tool.label"></span>
-                                    <div class="stats-bar-track">
-                                        <div class="stats-bar-fill" :style="'background:' + tool.color + ';width:' + tool.pct + '%'"></div>
-                                    </div>
-                                    <span class="stats-bar-count" x-text="'x' + tool.count"></span>
-                                </div>
-                            </template>
-                        </div>
-                        <!-- Tokens & Cost -->
-                        <div class="stats-section">
-                            <div class="stats-section-title">TOKENS_&_COST</div>
-                            <div class="stats-tokens-row">
-                                <span class="stats-token-label">INPUT</span>
-                                <span class="stats-token-value" :style="'color:' + (getSessionStats(activeTab).tokens.input > getSessionStats(activeTab).tokens.threshold * 0.8 ? 'var(--amber)' : 'var(--cyan)')"
-                                      x-text="(getSessionStats(activeTab).tokens.input / 1000).toFixed(1) + 'K'"></span>
-                                <span class="stats-token-label">OUTPUT</span>
-                                <span class="stats-token-value" style="color:var(--ng2)" x-text="(getSessionStats(activeTab).tokens.output / 1000).toFixed(1) + 'K'"></span>
-                                <span class="stats-token-label">COST</span>
-                                <span class="stats-token-value" style="color:var(--yellow)" x-text="'$' + getSessionStats(activeTab).tokens.cost.toFixed(4)"></span>
-                            </div>
-                            <!-- Context window bar -->
-                            <div class="stats-ctx-bar">
-                                <div class="stats-ctx-track">
-                                    <div class="stats-ctx-fill" :style="'width:' + Math.min(100, (getSessionStats(activeTab).tokens.input / getSessionStats(activeTab).tokens.threshold) * 100) + '%;' +
-                                        'background:' + (getSessionStats(activeTab).tokens.input > getSessionStats(activeTab).tokens.threshold * 0.9 ? 'var(--red)' : getSessionStats(activeTab).tokens.input > getSessionStats(activeTab).tokens.threshold * 0.7 ? 'var(--amber)' : 'var(--cyan)')"></div>
-                                </div>
-                                <span class="stats-ctx-label" x-text="'CTX ' + Math.round((getSessionStats(activeTab).tokens.input / getSessionStats(activeTab).tokens.threshold) * 100) + '%'"></span>
-                            </div>
-                        </div>
-                        <!-- Response times -->
-                        <div class="stats-section" x-show="getSessionStats(activeTab).responseTimes > 0">
-                            <div class="stats-section-title">RESPONSE_TIMES</div>
-                            <div class="stats-timing-grid">
-                                <div class="stats-timing-item">
-                                    <span class="stats-timing-label">AVG</span>
-                                    <span class="stats-timing-value" x-text="fmtDuration(Math.round(getSessionStats(activeTab).avgResponse))"></span>
-                                </div>
-                                <div class="stats-timing-item">
-                                    <span class="stats-timing-label">MIN</span>
-                                    <span class="stats-timing-value" style="color:var(--ng)" x-text="fmtDuration(Math.round(getSessionStats(activeTab).minResponse))"></span>
-                                </div>
-                                <div class="stats-timing-item">
-                                    <span class="stats-timing-label">MAX</span>
-                                    <span class="stats-timing-value" style="color:var(--red)" x-text="fmtDuration(Math.round(getSessionStats(activeTab).maxResponse))"></span>
-                                </div>
-                                <div class="stats-timing-item">
-                                    <span class="stats-timing-label">SAMPLES</span>
-                                    <span class="stats-timing-value" x-text="getSessionStats(activeTab).responseTimes"></span>
-                                </div>
-                            </div>
-                            <!-- Response time sparkline -->
-                            <div x-show="getSessionStats(activeTab).recentTurns.length >= 2" class="stats-sparkline-wrap">
-                                <span class="stats-sparkline-label">LATENCY_TREND</span>
-                                <span class="stats-sparkline-hint" x-text="'last ' + getSessionStats(activeTab).recentTurns.length + ' of ' + getSessionStats(activeTab).totalTurns + ' turns'"></span>
-                                <div x-html="renderResponseSparkline(getSessionStats(activeTab).recentTurns, 260, 32)"></div>
-                            </div>
-                        </div>
-                        <!-- Token per-turn visualization -->
-                        <div class="stats-section" x-show="getSessionStats(activeTab).recentTurns.length > 0">
-                            <div class="stats-section-title">TOKEN_PER_TURN</div>
-                            <div x-html="renderTokenMiniBars(getSessionStats(activeTab).recentTurns)"></div>
-                            <div class="token-mini-legend">
-                                <span class="token-mini-legend-item"><span class="token-mini-legend-dot" style="background:var(--cyan)"></span>INPUT</span>
-                                <span class="token-mini-legend-item"><span class="token-mini-legend-dot" style="background:var(--ng2)"></span>OUTPUT</span>
-                            </div>
-                        </div>
-                        <!-- Cost trend sparkline -->
-                        <div class="stats-section" x-show="getSessionStats(activeTab).recentTurns.length >= 2 && getSessionStats(activeTab).tokens.cost > 0">
-                            <div class="stats-section-title">COST_TREND</div>
-                            <div class="stats-sparkline-wrap">
-                                <span class="stats-sparkline-label">CUMULATIVE_COST</span>
-                                <span class="stats-sparkline-hint" x-text="'$' + getSessionStats(activeTab).tokens.cost.toFixed(4) + ' total'"></span>
-                                <div x-html="renderCostSparkline(getSessionStats(activeTab).recentTurns, 260, 32)"></div>
-                            </div>
-                        </div>
-                        <!-- Footer stats -->
-                        <div class="stats-footer">
-                            <span x-show="getSessionStats(activeTab).errorCount > 0" style="color:var(--red)">
-                                &#x26a0; <span x-text="getSessionStats(activeTab).errorCount + ' ERRORS'"></span>
-                            </span>
-                            <span x-show="getSessionStats(activeTab).pinnedCount > 0" style="color:var(--amber)">
-                                &#x1f4cc; <span x-text="getSessionStats(activeTab).pinnedCount + ' PINNED'"></span>
-                            </span>
-                            <span x-show="getSessionStats(activeTab).upCount > 0 || getSessionStats(activeTab).downCount > 0">
-                                <span x-show="getSessionStats(activeTab).upCount > 0" style="color:var(--ng)">&#x1f44d;<span x-text="getSessionStats(activeTab).upCount"></span></span>
-                                <span x-show="getSessionStats(activeTab).downCount > 0" style="color:var(--red);margin-left:4px">&#x1f44e;<span x-text="getSessionStats(activeTab).downCount"></span></span>
-                            </span>
-                        </div>
-                        <!-- Message length & session info -->
-                        <div class="stats-section">
-                            <div class="stats-section-title">CONTENT_METRICS</div>
-                            <div class="stats-timing-grid">
-                                <div class="stats-timing-item">
-                                    <span class="stats-timing-label">AVG USER</span>
-                                    <span class="stats-timing-value" style="color:var(--v)" x-text="getSessionStats(activeTab).avgUserLen + 'ch'"></span>
-                                </div>
-                                <div class="stats-timing-item">
-                                    <span class="stats-timing-label">AVG CLAUDE</span>
-                                    <span class="stats-timing-value" style="color:var(--cyan)" x-text="getSessionStats(activeTab).avgAsstLen + 'ch'"></span>
-                                </div>
-                                <div class="stats-timing-item">
-                                    <span class="stats-timing-label">SESSION START</span>
-                                    <span class="stats-timing-value" style="color:var(--v3)" x-text="getSessionStats(activeTab).sessionStartStr"></span>
-                                </div>
-                                <div class="stats-timing-item">
-                                    <span class="stats-timing-label">THROUGHPUT</span>
-                                    <span class="stats-timing-value" x-text="getThroughput(activeTab)"></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </template>
-            </div>
-        </div>
 
         <!-- Context Menu (right-click on messages) -->
         <div x-show="ctxMenu.show" x-cloak

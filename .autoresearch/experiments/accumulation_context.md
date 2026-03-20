@@ -1,4 +1,24 @@
 
+## Experiment 168 — Judge weight auto-adjustment from verdict history
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **Weight persistence** — `save_custom_weights()` / `load_custom_weights()` in `JudgeHistory` saves per-profile custom weights to `.autoresearch/judge_weights.json`.
+2. **Auto-apply logic** — `apply_weight_adjustments()` computes adjustments from check reliability (discriminative score, pass/fail rates) and applies them with blend factor (0.3), clamped to [0.2, 3.0] range. Triggers after 5+ verdicts.
+3. **ExperimentJudge loads custom weights** — `_load_custom_weights()` in `__init__` applies persisted overrides to `JUDGE_PROFILES` at startup.
+4. **_DEFAULT_WEIGHTS snapshot** — Module-level dict preserving original weights for reset.
+5. **Reset support** — `reset_weights()` deletes the file, server endpoint restores defaults.
+6. **Research loop integration** — After each judge evaluation, `auto_adjust()` is called (non-fatal).
+7. **API endpoints** — `GET /api/judge/weights`, `POST /api/judge/weights/adjust`, `POST /api/judge/weights/reset`.
+
+### Files Modified
+
+- `utils/judge.py`, `agents/research.py`, `ui/server.py`
+
+---
+
 ## Experiment 164 — Auto-judge integration in research loop
 
 **Date:** 2026-03-20
@@ -6602,6 +6622,63 @@ Results
 4. **MOUTH_SAD** — перевёрнутая улыбка/гримаса (7x2).
 5. **Конфигурации** — EYE_CFG, MOUTH_CFG, WHISKER_CFG, EYE_GLINT для обоих новых выражений.
 6.
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 167 — Cat lying down pose — horizontal body, front paws, auto-lie on deep sleep
+
+**Date:** 2026-03-20 19:48:28
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+Results
+
+**What was done:**
+1. **BODY_LYING** — горизонтальное тело (26×10 px), outline + fill, 1bpp encoded
+2. **PAWS_LYING** — передние лапы (13×4 px) между головой и телом
+3. **Позиции lying pose** — LIE_HEAD_POS, LIE_BODY_POS, LIE_PAWS_POS, LIE_TAIL_POS
+4. **Состояние pose** — `_pose` ('sitting' | 'lying') управляет выбором спрайтов/позиций
+5. **Рефакторинг render()** — динамический выбор спрайтов и позиций по pose, глаза вычисляются относительно головы
+6. **Auto-lie при глубоком сне** — кот
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 168 — Judge weight auto-adjustment from verdict history
+
+**Date:** 2026-03-20 19:53:42
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+Results
+
+**What was done:**
+1. **Weight persistence** — `save_custom_weights()` / `load_custom_weights()` сохраняют кастомные веса в `.autoresearch/judge_weights.json`
+2. **Auto-apply logic** — `apply_weight_adjustments()` вычисляет корректировки из check reliability (discriminative score, pass/fail rates) и применяет с blend factor 0.3, зажатый в [0.2, 3.0]. Запускается после 5+ вердиктов
+3. **ExperimentJudge загружает кастомные веса** — `_load_custom_weights()` в `__init__` применяет сохранённ
 
 ### Notes for Next
 

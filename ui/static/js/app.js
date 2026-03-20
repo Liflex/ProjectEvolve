@@ -411,9 +411,7 @@ function _buildAppData() {
             { id: 'chat-raw-log', label: 'Chat: Toggle Raw Tool Log', category: 'CHAT', action: () => { this.toggleBottomPanel('rawlog'); } },
             { id: 'chat-tools', label: 'Chat: Toggle Tools Summary', category: 'CHAT', action: () => { this.toggleBottomPanel('summary'); } },
             { id: 'chat-search', label: 'Chat: Search in Messages', shortcut: 'Ctrl+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.openChatSearch()); } },
-            { id: 'chat-file-search', label: 'Chat: Search Project Files', shortcut: 'Ctrl+Shift+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.toggleFileSearch()); } },
             { id: 'docs-search', label: 'Search: Project Documentation', shortcut: 'Ctrl+Shift+D', category: 'SEARCH', action: () => { this.openDocsSearch(); } },
-            { id: 'chat-global-search', label: 'Chat: Search All Sessions', shortcut: 'Ctrl+Alt+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.toggleGlobalSearch()); } },
             { id: 'chat-goto-msg', label: 'Chat: Go to Message', shortcut: 'Ctrl+G', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.openGoToMsg()); } },
             { id: 'chat-branch', label: 'Chat: Branch from Last Message', category: 'CHAT', action: () => { if (this.section === 'chat' && this.activeTab) { const t = this.activeTab; let lastIdx = -1; for (let i = t.messages.length - 1; i >= 0; i--) { if (t.messages[i].role === 'assistant') { lastIdx = i; break; } } if (lastIdx >= 0) this.branchFrom(t.tab_id, lastIdx); else this.showToast('No assistant message to branch from', 'error'); } } },
             // Themes
@@ -439,8 +437,6 @@ function _buildAppData() {
             ]},
             { category: 'CHAT', items: [
                 { keys: 'Ctrl+F', desc: 'Search in messages' },
-                { keys: 'Ctrl+Alt+F', desc: 'Search all sessions' },
-                { keys: 'Ctrl+Shift+F', desc: 'Search project files' },
                 { keys: 'Enter', desc: 'Send message' },
                 { keys: 'Shift+Enter', desc: 'New line' },
                 { keys: 'Up / Down', desc: 'Message history (shell-style)' },
@@ -484,9 +480,7 @@ function _buildAppData() {
             ]},
             { category: 'SEARCH', items: [
                 { keys: 'Ctrl+F', desc: 'Search in chat messages' },
-                { keys: 'Ctrl+Shift+F', desc: 'Search project files (grep)' },
                 { keys: 'Ctrl+Shift+D', desc: 'Search project documentation (ranked)' },
-                { keys: 'Ctrl+Alt+F', desc: 'Search all chat sessions' },
                 { keys: 'Ctrl+G', desc: 'Go to message by number' },
             ]},
         ],
@@ -659,18 +653,7 @@ function _buildAppData() {
                     e.preventDefault();
                     this.openChatSearch();
                 }
-                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F' && this.section === 'chat' && this.activeTab) {
-                    e.preventDefault();
-                    this.toggleFileSearch();
-                }
-                // Ctrl+Alt+F — global search across all sessions
-                if ((e.ctrlKey || e.metaKey) && e.altKey && e.key === 'f' && this.section === 'chat') {
-                    e.preventDefault();
-                    this.toggleGlobalSearch();
-                }
                 if (e.key === 'Escape' && this.chatSearch.show) { this.closeChatSearch(); }
-                if (e.key === 'Escape' && this._fileSearch.show) { this.closeFileSearch(); }
-                if (e.key === 'Escape' && this._globalSearch.show) { this.closeGlobalSearch(); }
                 // Ctrl+Shift+D — docs search
                 if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
                     e.preventDefault();
@@ -706,8 +689,7 @@ function _buildAppData() {
                     const inSlashMenu = this.slashMenu.show;
                     const inCmdPalette = this.cmdPalette.show;
                     const inSearch = this.chatSearch.show;
-                    const inFileSearch = this._fileSearch.show;
-                    if (!inInput && !inSlashMenu && !inCmdPalette && !inSearch && !inFileSearch && !this._gotoMsg.show) {
+                    if (!inInput && !inSlashMenu && !inCmdPalette && !inSearch && !this._gotoMsg.show) {
                         if (e.key === 'j') { e.preventDefault(); this.chatNavFocus(1); }
                         else if (e.key === 'k') { e.preventDefault(); this.chatNavFocus(-1); }
                         else if (e.key === 'g' && !e.shiftKey) { e.preventDefault(); this.openGoToMsg(); }
