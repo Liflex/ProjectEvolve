@@ -760,6 +760,11 @@ function _buildAppData() {
                 ctx.messageCount = activeTab ? (activeTab.messages || []).length : 0;
                 ctx.isStreaming = activeTab ? activeTab.is_streaming : false;
                 ctx.totalCost = this.chatTabs.reduce((sum, t) => sum + (t.tokens?.cost || 0), 0);
+                ctx.isEditMode = activeTab ? !!activeTab._editMode : false;
+                ctx.pinnedCount = activeTab ? (this.pinnedMessages || []).filter(p => p.tabId === activeTab.tab_id).length : 0;
+                if (activeTab && this.settings.costBudget > 0) {
+                    ctx.budgetPct = (activeTab.tokens?.cost || 0) / this.settings.costBudget;
+                }
             } else if (this.page === 'settings') {
                 ctx.theme = this.settings.theme || 'synthwave';
                 ctx.fontSize = this.settings.fontSize || 16;

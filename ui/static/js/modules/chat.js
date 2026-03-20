@@ -139,6 +139,13 @@ window.AppChat = (function() {
             if (this.activeChatTab === tabId) {
                 this.activeChatTab = this.chatTabs.length > 0 ? this.chatTabs[this.chatTabs.length - 1].tab_id : null;
             }
+            // Cat: react to tab close
+            if (window.CatModule && CatModule.isActive()) {
+                const tips = ['Прощай, сессия_ *махнул лапой*', 'Закрыл вкладку... *зевнул*', 'Ещё одна закрылась_ Мяу...'];
+                CatModule.setExpression('sleepy');
+                CatModule.setSpeechText(tips[Math.floor(Math.random() * tips.length)], 2500);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2500);
+            }
         },
 
         // ========== CHAT: TAB RENAME ==========
@@ -655,6 +662,13 @@ window.AppChat = (function() {
                 ws.send(JSON.stringify({ type: 'cancel' }));
             }
             tab.is_streaming = false;
+            // Cat: react to cancel
+            if (window.CatModule && CatModule.isActive()) {
+                const tips = ['Стоп! *встал на задние лапы*', 'Хватит! *прижал уши*', 'Отменил_ *облегчённо* Мяу!'];
+                CatModule.setExpression('surprised');
+                CatModule.setSpeechText(tips[Math.floor(Math.random() * tips.length)], 2500);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2500);
+            }
         },
 
         // ========== CHAT: TEXTAREA AUTO-RESIZE ==========
@@ -988,6 +1002,14 @@ window.AppChat = (function() {
             const files = e.dataTransfer?.files;
             if (!files || files.length === 0) return;
             await this._attachFiles(tab, files);
+            // Cat: react to file drop
+            if (window.CatModule && CatModule.isActive()) {
+                const tips = ['Файл! *принюхался* Что принесли?', 'Перетащили! *интересно*', '*обнюхал* Новый файл_ Мяу!'];
+                CatModule.setExpression('surprised');
+                if (CatModule.triggerEarTwitch) CatModule.triggerEarTwitch();
+                CatModule.setSpeechText(tips[Math.floor(Math.random() * tips.length)], 2500);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2500);
+            }
         },
 
         // ========== CHAT: PASTE IMAGE ==========
@@ -1004,6 +1026,13 @@ window.AppChat = (function() {
             if (files.length === 0) return; // text paste — do nothing
             e.preventDefault();
             await this._attachFiles(tab, files);
+            // Cat: react to image paste
+            if (window.CatModule && CatModule.isActive() && Math.random() < 0.5) {
+                const tips = ['Картинка! *заинтересовался*', 'Вставил изображение! *рассматривает*', '*щурится* Что на картинке? Мяу!'];
+                CatModule.setExpression('thinking');
+                CatModule.setSpeechText(tips[Math.floor(Math.random() * tips.length)], 2500);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2500);
+            }
         },
 
         // ========== CHAT: FILE ATTACHMENT BUTTON ==========
@@ -2646,6 +2675,13 @@ window.AppChat = (function() {
                 const regenContent = this._buildFeedbackPrefix(tab) + tab.messages[lastUserIdx].content;
                 ws.send(JSON.stringify({ type: 'message', content: regenContent }));
                 this.showToast('Regenerating response...', 'success');
+                // Cat: react to regeneration
+                if (window.CatModule && CatModule.isActive()) {
+                    const tips = ['Переделываем! *радостно виляет хвостом*', 'Ещё разок! *потирает лапки*', 'Попробуем иначе_ Мяу!'];
+                    CatModule.setExpression('happy');
+                    CatModule.setSpeechText(tips[Math.floor(Math.random() * tips.length)], 3000);
+                    setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 3000);
+                }
             } else {
                 // Remove regenerating indicator and restore
                 tab.messages = tab._editMode.originalMessages;
@@ -2660,6 +2696,13 @@ window.AppChat = (function() {
             if (!tab || !tab.messages[msgIdx]) return;
             tab.messages.splice(msgIdx, 1);
             this.chatTick++;
+            // Cat: react to message deletion
+            if (window.CatModule && CatModule.isActive() && Math.random() < 0.5) {
+                const tips = ['*испугался* Удалил сообщение!', 'Стираем историю_ *прищурился*', '*хлопает глазами* Пропало... Мяу!'];
+                CatModule.setExpression('surprised');
+                CatModule.setSpeechText(tips[Math.floor(Math.random() * tips.length)], 2500);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2500);
+            }
         },
         quoteMessage(tabId, msgIdx) {
             const tab = this.chatTabs.find(t => t.tab_id === tabId);
@@ -2674,6 +2717,13 @@ window.AppChat = (function() {
             tab._quotedMsg = { role: role, text: quote };
             tab.input_text = '';
             this.chatTick++;
+            // Cat: react to quote
+            if (window.CatModule && CatModule.isActive() && Math.random() < 0.3) {
+                const tips = ['Цитируешь? *наклонил голову* Хорошо_', 'Ссылка на сообщение! *уши вперёд*', '*внимательно слушает* Что ответим? Мяу!'];
+                CatModule.setExpression('thinking');
+                CatModule.setSpeechText(tips[Math.floor(Math.random() * tips.length)], 2500);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2500);
+            }
             this.$nextTick(() => {
                 const textarea = document.querySelector('#chat-messages-' + tabId)?.closest('.flex.flex-col')?.querySelector('textarea');
                 if (textarea) textarea.focus();
@@ -2734,6 +2784,13 @@ window.AppChat = (function() {
             if (!tab || !tab.messages[msgIdx]) return;
             tab.messages[msgIdx].collapsed = !tab.messages[msgIdx].collapsed;
             this.chatTick++;
+            // Cat: react to fold/unfold (rare, only on long messages)
+            if (window.CatModule && CatModule.isActive() && Math.random() < 0.15) {
+                const folded = tab.messages[msgIdx].collapsed;
+                CatModule.setExpression(folded ? 'sleepy' : 'surprised');
+                CatModule.setSpeechText(folded ? '*зажмурился* Свернул_ Так уютнее_' : '*раскрыл глаза* Показал!', 2000);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2000);
+            }
         },
 
         // ========== CHAT: PIN MESSAGES ==========
@@ -2745,6 +2802,12 @@ window.AppChat = (function() {
             if (existingIdx >= 0) {
                 this.pinnedMessages.splice(existingIdx, 1);
                 this.showToast('UNPINNED');
+                // Cat: react to unpin
+                if (window.CatModule && CatModule.isActive() && Math.random() < 0.4) {
+                    const tips = ['Открепили_ *разочарованно*', 'Не важно больше? *опустил уши*', 'Убрал пин... Мяу_'];
+                    CatModule.setExpression('neutral');
+                    CatModule.setSpeechText(tips[Math.floor(Math.random() * tips.length)], 2000);
+                }
             } else {
                 // Limit to 20 pins total
                 if (this.pinnedMessages.length >= 20) {
@@ -2761,6 +2824,14 @@ window.AppChat = (function() {
                     ts: msg.ts || Date.now(),
                 });
                 this.showToast('PINNED');
+                // Cat: react to pin
+                if (window.CatModule && CatModule.isActive()) {
+                    const tips = ['Зафиксировал! *удовлетворённо мурчит*', 'Важно! *приклеил взгляд*', 'Запомним это_ *кивает* Мяу!'];
+                    CatModule.setExpression('happy');
+                    if (CatModule.triggerPawWave) CatModule.triggerPawWave();
+                    CatModule.setSpeechText(tips[Math.floor(Math.random() * tips.length)], 2500);
+                    setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2500);
+                }
             }
             this.chatTick++;
             this._scheduleChatSave();
@@ -2812,6 +2883,12 @@ window.AppChat = (function() {
             this.pinnedMessages = [];
             this.chatTick++;
             this.showToast('ALL PINS CLEARED');
+            // Cat: react to clearing all pins
+            if (window.CatModule && CatModule.isActive()) {
+                CatModule.setExpression('surprised');
+                CatModule.setSpeechText('*шокирован* Всё открепил?! Ну и ладно... Мяу!', 3000);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 3000);
+            }
         },
         getActiveTabPins() {
             const tabId = this.activeChatTab;
@@ -2827,6 +2904,12 @@ window.AppChat = (function() {
             if (!msg.regenerated || !msg._regenOriginal) return;
             msg._showRegenDiff = !msg._showRegenDiff;
             this.chatTick++;
+            // Cat: react to diff view
+            if (window.CatModule && CatModule.isActive() && Math.random() < 0.4) {
+                CatModule.setExpression('thinking');
+                CatModule.setSpeechText('*прищурился* Сравниваем версии... Мяу!', 2500);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2500);
+            }
         },
         _renderRegenDiffHtml(msg) {
             const oldContent = msg._regenOriginal || '';
@@ -2895,12 +2978,24 @@ window.AppChat = (function() {
                 }
             }
             this.chatTick++;
+            // Cat: react to collapse all
+            if (window.CatModule && CatModule.isActive() && Math.random() < 0.3) {
+                CatModule.setExpression('sleepy');
+                CatModule.setSpeechText('*зажмурился* Так чище... Мяу_ Zzz', 2500);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2500);
+            }
         },
         expandAllMessages() {
             const tab = this.activeTab;
             if (!tab) return;
             for (const msg of tab.messages) { msg.collapsed = false; }
             this.chatTick++;
+            // Cat: react to expand all
+            if (window.CatModule && CatModule.isActive() && Math.random() < 0.3) {
+                CatModule.setExpression('surprised');
+                CatModule.setSpeechText('*раскрыл глаза* Много текста! *интригующе*', 2500);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2500);
+            }
         },
 
         // ========== CHAT: TURN COLLAPSE ==========
@@ -2928,18 +3023,42 @@ window.AppChat = (function() {
                 tab._collapsedTurns.add(t);
             }
             this.chatTick++;
+            // Cat: react to collapse prev turns
+            if (window.CatModule && CatModule.isActive() && Math.random() < 0.3) {
+                const tips = ['Старое не нужно_ *свернулся*', 'Скрыл историю! *умно кивает*', '*потянулся* Так компактнее_ Мяу!'];
+                CatModule.setExpression('neutral');
+                CatModule.setSpeechText(tips[Math.floor(Math.random() * tips.length)], 2500);
+            }
         },
         expandAllTurns() {
             const tab = this.activeTab;
             if (!tab) return;
             tab._collapsedTurns = new Set();
             this.chatTick++;
+            // Cat: react to expand all turns
+            if (window.CatModule && CatModule.isActive() && Math.random() < 0.3) {
+                CatModule.setExpression('happy');
+                CatModule.setSpeechText('*радостно* Показали всё! Много_много!', 2500);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2500);
+            }
         },
 
         // ========== CHAT: MESSAGE TYPE FILTERS ==========
         toggleChatFilter(type) {
             this.chatFilters[type] = !this.chatFilters[type];
             this.chatTick++;
+            // Cat: react to filter toggle (only on first interaction, not spam)
+            if (window.CatModule && CatModule.isActive() && Math.random() < 0.2) {
+                const filterNames = { user: 'USER', assistant: 'ASSISTANT', tool: 'TOOLS', thinking: 'THINKING' };
+                const name = filterNames[type] || type;
+                const on = this.chatFilters[type];
+                const tips = on
+                    ? ['Показываю ' + name + '! *внимательно*', name + ' видны_ *кивает* Мяу!']
+                    : ['Скрыл ' + name + '_ *прищурился*', name + ' спрятались_ Мяу!'];
+                CatModule.setExpression(on ? 'thinking' : 'neutral');
+                CatModule.setSpeechText(tips[Math.floor(Math.random() * tips.length)], 2000);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2000);
+            }
         },
         getChatFilterCount(tab) {
             if (!tab) return 0;
@@ -2955,8 +3074,21 @@ window.AppChat = (function() {
 
         // ========== CHAT: BOTTOM PANEL ==========
         toggleBottomPanel(panel) {
+            const opening = this.chatBottomPanel !== panel;
             this.chatBottomPanel = this.chatBottomPanel === panel ? 'closed' : panel;
             this.chatTick++;
+            // Cat: react to bottom panel toggle
+            if (window.CatModule && CatModule.isActive() && opening && Math.random() < 0.3) {
+                const panelTips = {
+                    rawlog: ['Логи! *интересно смотрит*', 'Журнал событий_ Мяу!'],
+                    summary: ['Статистика! *умылся*', 'Итоги сессии_ *кивает*'],
+                    filepreview: ['Просмотр файла! *прищурился*', 'Читаем код_ Мяу!'],
+                };
+                const tips = panelTips[panel] || ['Панель! *обернулся*'];
+                CatModule.setExpression('thinking');
+                CatModule.setSpeechText(tips[Math.floor(Math.random() * tips.length)], 2000);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 2000);
+            }
         },
         getBottomPanelLog() {
             const tab = this.activeTab;
@@ -3473,6 +3605,13 @@ window.AppChat = (function() {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             this.showToast('Экспорт: ' + filename + ' (' + msgs.length + ' msg)');
+            // Cat: react to export
+            if (window.CatModule && CatModule.isActive()) {
+                const tips = ['Сохранено! *гордо* Для истории_ Мяу!', 'Экспорт готов! *потёрся об экран*', '*довольно мурчит* Файл скачан!'];
+                CatModule.setExpression('happy');
+                CatModule.setSpeechText(tips[Math.floor(Math.random() * tips.length)], 3000);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 3000);
+            }
         },
 
         // ========== CHAT: PROJECT FILE SEARCH ==========

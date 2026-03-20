@@ -1950,13 +1950,33 @@
                     const msgs = c.messageCount || 0;
                     const streaming = c.isStreaming;
                     const cost = c.totalCost;
+                    const editMode = c.isEditMode;
+                    const pinned = c.pinnedCount || 0;
+                    const budget = c.budgetPct;
+                    if (editMode) {
+                        return pickRandom([
+                            '*прищурился* Редактируем...',
+                            'Осторожно_ Изменяем сообщение!',
+                        ]);
+                    }
                     if (streaming) {
-                        return 'Агент работает... ' + msgs + ' сообщ.';
+                        return pickRandom([
+                            'Агент работает... ' + msgs + ' сообщ.',
+                            'Пишет... *наблюдает*',
+                        ]);
+                    }
+                    if (budget && budget >= 0.8) {
+                        return '*тревожно* Бюджет ' + Math.round(budget * 100) + '%!';
                     }
                     let line = sessions + ' сессия' + (sessions === 1 ? '' : sessions < 5 ? 'и' : 'й');
                     if (msgs > 0) line += ' · ' + msgs + ' сообщ.';
+                    if (pinned > 0) line += ' · ' + pinned + ' pin';
                     if (cost > 0) line += ' · $' + cost.toFixed(2);
                     if (sessions === 0) return 'Нет сессий... Начни чат!';
+                    if (msgs === 0 && sessions > 0) return pickRandom([
+                        'Сессия открыта_ Ждём сообщение!',
+                        '*виляет хвостом* Пиши что-нибудь!',
+                    ]);
                     return line;
                 }
                 case 'settings': {
