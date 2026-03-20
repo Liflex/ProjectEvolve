@@ -1,26 +1,34 @@
 # Last Experiment Summary
 
-**Experiment #146** — Enhanced markdown rendering — task lists, tables, blockquotes, details
-**Date:** 2026-03-20 17:00:55
+**Experiment #147** — Project documentation search with TF-IDF ranking (Ctrl+Shift+D)
+**Date:** 2026-03-20
 
 ## What Was Done
 
-N/A
+1. **`utils/docsearch.py`** — DocSearchEngine: индексирует .md файлы проекта, разбивает на секции по заголовкам, TF-IDF ранжирование, стоп-слова (EN+RU), snippet extraction.
+2. **`GET /api/docs/search`** — endpoint с кешированием (5 мин TTL), параметрами q, project, max_results.
+3. **Docs Search overlay** — Ctrl+Shift+D открывает панель с поиском по документации проекта. Показывает: файл, секцию, score, snippet, matched terms.
+4. **Command Palette entry** — "Search: Project Documentation" в категории SEARCH.
+5. **Keyboard shortcuts reference** — новая категория SEARCH с Ctrl+F, Ctrl+Shift+F, Ctrl+Shift+D, Ctrl+Alt+F, Ctrl+G.
+6. **insertDocRef()** — клик по результату вставляет `@file:line` в чат input.
 
 ## Files Modified
 
-- `ui/static/js/modules/renderer.js` — DOMPurify config, task list progress post-processing, table wrap post-processing
-- `ui/static/css/main.css` — enhanced styles for tables, blockquotes, task lists, details/summary, progress bar
+- `utils/docsearch.py` — NEW: DocSearchEngine with TF-IDF ranking
+- `ui/server.py` — `/api/docs/search` endpoint with cache
+- `ui/static/index.html` — docs search overlay HTML
+- `ui/static/js/app.js` — state, methods, shortcuts, command palette entry
+- `ui/static/css/main.css` — `.docs-search-*` styles
 
 ## Key Results
 
-Results
-
-**What was done:**
-1. **DOMPurify fix** — добавлены `ADD_TAGS: ['input', 'details', 'summary', 'progress']` и атрибуты `type, checked, disabled, open`. Теперь markdown task lists (`- [x]`, `- [ ]`) рендерятся корректно с чекбоксами (раньше DOMPurify их удалял).
-2. **Task list progress bar** — автоматический progress indicator для списков с 3+ чекбоксами: "3/5 done" + progress bar + percentage.
-3. **Task list styling** — checked items получают strikethrough + reduced opacity. Кастомный р
+- 352 секции проиндексировано из текущего проекта
+- TF-IDF scoring: title matches weighted 3x, file title bonus 1.5x, exact phrase bonus 2x
+- Debounced search (300ms), кеш индекса 5 минут
+- Работает без внешних зависимостей (no Ollama/embeddings needed)
 
 ## For Next Iteration
 
-N/A
+- Добавить embedding-based semantic search поверх TF-IDF (когда Ollama доступен)
+- Автокомплит в чате через Ctrl+Shift+D
+- Индексация .py и других исходных файлов (опционально)
