@@ -500,6 +500,130 @@
         ],
     };
 
+    // Real-time tool call reactions — per tool type with contextual messages
+    const TOOL_CALL_REACTIONS = {
+        read: {
+            // 25% trigger chance — reads are frequent
+            chance: 0.25,
+            expressions: ['thinking', 'neutral'],
+            generic: [
+                'Читаю файл... *прищурился*',
+                '*смотрит через плечо* Что там?',
+                '*внимательно* Интересно...',
+                'Чтение... Мяу~',
+            ],
+            // {file} placeholder replaced with filename
+            contextual: [
+                'Читаю {file}... *прищурился*',
+                '{file}... *изучает*',
+                '*заглядывает в* {file}...',
+            ],
+        },
+        edit: {
+            // 45% trigger chance — edits are important
+            chance: 0.45,
+            expressions: ['surprised', 'thinking'],
+            generic: [
+                'Правка! *ушами шевелит*',
+                'О, редактирование! =^.^=',
+                '*заинтересованно* Что меняем?',
+                'Код меняется! Мурр!',
+            ],
+            contextual: [
+                'Правим {file}! =^.^=',
+                'Редактирую {file}... *хвостиком виляет*',
+                '{file} изменён! Мяу!',
+            ],
+        },
+        write: {
+            // 55% trigger chance — new files are notable
+            chance: 0.55,
+            expressions: ['happy', 'surprised'],
+            generic: [
+                'Новый файл! Мурр!',
+                'Создаём файл! *радостно*',
+                '*хвостиком виляет* Пишем!',
+                'Создание... =^_^=',
+            ],
+            contextual: [
+                'Новый файл: {file}! Мяу!',
+                'Создаю {file}... *вдохновлённо*',
+                '{file} появился! =^_^=',
+            ],
+        },
+        bash: {
+            // 40% trigger chance — commands are action
+            chance: 0.40,
+            expressions: ['thinking', 'surprised'],
+            generic: [
+                'Команда! *напряжённо слушает*',
+                '*уши навострил* Запуск!',
+                'Баш! *готовится*',
+                'Выполняю... Мяу!',
+            ],
+            contextual: [
+                'Запускаю: {detail}... *напряжённо*',
+                'Команда: {detail}...',
+                '*уши навострил* {detail}',
+            ],
+        },
+        search: {
+            // 20% trigger chance — searches are routine
+            chance: 0.20,
+            expressions: ['neutral', 'thinking'],
+            generic: [
+                'Поиск... *внимательно*',
+                'Ищем... Мяу~',
+                '*принюхался* Где-то тут...',
+            ],
+            contextual: [
+                'Ищу: {detail}...',
+                'Поиск "{detail}"... Мяу~',
+            ],
+        },
+        other: {
+            // 15% trigger chance — unknown tools
+            chance: 0.15,
+            expressions: ['thinking'],
+            generic: [
+                '*наклонил голову* Что это?',
+                'Инструмент... Мяу?',
+                '*любопытно*...',
+            ],
+            contextual: [
+                '{detail}... *наклонил голову*',
+            ],
+        },
+    };
+
+    // Consecutive tool call pattern reactions
+    const TOOL_PATTERN_REACTIONS = {
+        many_edits: [
+            'Много правок! *волнуется*',
+            'Серия правок... *интенсивно следит*',
+            'Так-так-так, что тут творится...',
+        ],
+        many_reads: [
+            '*сонно* Много файлов... Зачем?',
+            'Чтение марафон... *зевает*',
+        ],
+        many_bash: [
+            '*тревожно* Много команд!',
+            'Запускаем всё подряд?! Мяу?!',
+        ],
+        edit_after_write: [
+            'Только создали и уже правим? =^.^=',
+            'Файл создан — сразу к доработке!',
+        ],
+        bash_after_edit: [
+            'Запускаем после правок? =^_^=',
+            'Тестируем изменения? Мурр!',
+        ],
+        search_then_read: [
+            'Нашли — теперь читаем! Логично.',
+        ],
+    };
+
     // Agent response content type tips
     const AGENT_RESPONSE_TIPS = {
         code_block: [
@@ -631,6 +755,8 @@
     let _idleLevel = 0;                   // 0=active, 1=restless, 2=sleepy, 3=deep-sleep
     let _hoverReactionCooldown = 0;        // prevent hover reaction spam
     let _speechAction = null;              // { type: 'insert', value: '/commit ' } — actionable speech
+    let _toolHistory = [];                 // recent tool calls [{type, ts}] for pattern detection
+    let _toolReactCooldown = 0;            // cooldown to prevent tool reaction spam (ticks)
     let _particles = [];                   // floating particles (Zzz, hearts, sparkles)
     let _whiskerWobble = 0;                // whisker wobble phase
     let _mouseX = 0, _mouseY = 0;         // global cursor position for eye tracking
@@ -926,6 +1052,9 @@
 
     function tick() {
         _tickCount++;
+
+        // Tool reaction cooldown decrement
+        if (_toolReactCooldown > 0) _toolReactCooldown--;
 
         // Tail: variable speed based on mood/expression
         _tailAccum++;
@@ -1396,6 +1525,97 @@
                 setTimeout(() => { if (animating) setExpression('neutral'); }, 4000);
                 return;
             }
+        },
+
+        /**
+         * React to a tool call from the agent in real-time.
+         * @param {string} toolType - 'read'|'edit'|'write'|'bash'|'search'|'other'
+         * @param {string} detail - tool detail (filename, command, pattern, etc.)
+         * @returns {boolean} true if reaction was triggered
+         */
+        reactToToolCall(toolType, detail) {
+            if (!animating || !toolType) return false;
+            if (_toolReactCooldown > 0) return false;
+            _lastInteractionTime = Date.now();
+
+            const now = Date.now();
+            _toolHistory.push({ type: toolType, ts: now });
+            // Keep last 20 tool calls
+            if (_toolHistory.length > 20) _toolHistory.shift();
+
+            // Pattern detection (needs 3+ history)
+            if (_toolHistory.length >= 3) {
+                const recent = _toolHistory.slice(-5);
+                const last3 = recent.slice(-3);
+                const allSame = last3.every(t => t.type === toolType);
+
+                if (allSame && last3.length >= 3) {
+                    const patternKey = 'many_' + (toolType === 'read' ? 'reads' : toolType === 'edit' ? 'edits' : toolType === 'bash' ? 'bash' : null);
+                    if (patternKey && TOOL_PATTERN_REACTIONS[patternKey]) {
+                        setSpeechText(pickRandom(TOOL_PATTERN_REACTIONS[patternKey]), 4000);
+                        if (toolType === 'bash') { setExpression('surprised'); triggerEarTwitch(); }
+                        else if (toolType === 'edit') { setExpression('thinking'); }
+                        else { setExpression('sleepy'); }
+                        _toolReactCooldown = 15; // 15 ticks (~1.8s) cooldown after pattern
+                        return true;
+                    }
+                }
+
+                // Cross-tool patterns: edit after write, bash after edit, search then read
+                if (recent.length >= 2) {
+                    const prev = recent[recent.length - 2];
+                    const prev2 = recent.length >= 3 ? recent[recent.length - 3] : null;
+                    if (prev.type === 'write' && toolType === 'edit' && Math.random() < 0.4) {
+                        setSpeechText(pickRandom(TOOL_PATTERN_REACTIONS.edit_after_write), 4000);
+                        setExpression('surprised');
+                        _toolReactCooldown = 10;
+                        return true;
+                    }
+                    if (prev.type === 'edit' && toolType === 'bash' && Math.random() < 0.5) {
+                        setSpeechText(pickRandom(TOOL_PATTERN_REACTIONS.bash_after_edit), 4000);
+                        setExpression('happy');
+                        _toolReactCooldown = 10;
+                        return true;
+                    }
+                    if (prev.type === 'search' && toolType === 'read' && Math.random() < 0.3) {
+                        setSpeechText(pickRandom(TOOL_PATTERN_REACTIONS.search_then_read), 4000);
+                        setExpression('thinking');
+                        _toolReactCooldown = 8;
+                        return true;
+                    }
+                }
+            }
+
+            // Standard per-tool reaction (rate-limited by chance)
+            const cfg = TOOL_CALL_REACTIONS[toolType] || TOOL_CALL_REACTIONS.other;
+            if (Math.random() > cfg.chance) return false;
+
+            // Build contextual message if detail available
+            let message;
+            const hasContext = detail && detail.length > 0 && detail.length < 80;
+            if (hasContext && cfg.contextual && Math.random() < 0.6) {
+                // Use contextual template with detail
+                const tpl = pickRandom(cfg.contextual);
+                const shortDetail = detail.length > 40 ? detail.slice(0, 37) + '...' : detail;
+                message = tpl.replace('{file}', shortDetail).replace('{detail}', shortDetail);
+            } else {
+                message = pickRandom(cfg.generic);
+            }
+
+            setExpression(pickRandom(cfg.expressions));
+            setSpeechText(message, 3500);
+            _toolReactCooldown = 6; // ~0.7s cooldown
+
+            // Occasional ear twitch for edits and bash
+            if ((toolType === 'edit' || toolType === 'bash') && Math.random() < 0.4) {
+                triggerEarTwitch();
+            }
+            // Paw wave for writes (new files are exciting!)
+            if (toolType === 'write' && Math.random() < 0.3) {
+                triggerPawWave();
+            }
+
+            return true;
         },
 
         /**

@@ -346,6 +346,10 @@ window.AppChat = (function() {
                             }
                             tab.messages.push({ role: 'tool', content: name, toolType, toolDetail, toolPath, toolEditOld: _toolEditOld || '', toolEditNew: _toolEditNew || '', toolWriteContent: _toolWriteContent || '' });
                             _app.chatTick++;
+                            // Cat: react to tool call in real-time
+                            if (window.CatModule && CatModule.isActive() && CatModule.reactToToolCall) {
+                                CatModule.reactToToolCall(toolType, toolDetail || '');
+                            }
                         } else if (etype === 'result') {
                             const usage = data.usage || {};
                             if (usage.input_tokens) tab.tokens.input = usage.input_tokens;
