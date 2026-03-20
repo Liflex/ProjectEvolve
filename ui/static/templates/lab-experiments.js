@@ -148,6 +148,30 @@
                                         <div class="bg-[var(--bg)] p-2 pixel-border"><div class="text-[0.5rem] text-[var(--v3)] tracking-widest">SCORE</div><div class="text-sm mt-1" :class="scoreCls(selectedExpData?.score)" style="font-family:'Press Start 2P',monospace" x-text="selectedExpData?.score"></div></div>
                                         <div class="bg-[var(--bg)] p-2 pixel-border"><div class="text-[0.5rem] text-[var(--v3)] tracking-widest">DECISION</div><div class="text-xs mt-1" :class="decisionCls(selectedExpData?.decision)" x-text="selectedExpData?.decision"></div></div>
                                     </div>
+                                    <!-- Judge Verdict -->
+                                    <div class="mb-3">
+                                        <div class="flex items-center justify-between mb-1.5">
+                                            <div class="text-[0.5625rem] text-[var(--v3)] tracking-widest">JUDGE_VERDICT_</div>
+                                            <button x-show="!judgeVerdict" @click="judgeExperiment(selectedExp)" class="text-[0.5625rem] px-2 py-0.5 tracking-wider border border-[var(--v-dim)] text-[var(--v3)] hover:border-[var(--v)] hover:text-[var(--v)] transition-all">[RUN JUDGE]</button>
+                                            <button x-show="judgeVerdict" @click="judgeVerdict=null" class="text-[0.5625rem] text-[var(--v3)] hover:text-[var(--red)] tracking-wider">[CLEAR]</button>
+                                        </div>
+                                        <div x-show="judgeVerdict" class="bg-[var(--bg)] p-3 pixel-border">
+                                            <div class="flex items-center gap-3 mb-2">
+                                                <span class="text-sm" :class="judgeVerdict.recommendation === 'KEEP' ? 'text-[var(--ng)]' : judgeVerdict.recommendation === 'DISCARD' ? 'text-[var(--red)]' : 'text-[var(--amber)]'" style="font-family:'Press Start 2P',monospace" x-text="judgeVerdict.recommendation"></span>
+                                                <span class="text-[0.625rem] text-[var(--v3)]">SCORE</span>
+                                                <span class="text-sm text-[var(--v)]" style="font-family:'Press Start 2P',monospace" x-text="judgeVerdict.score"></span>
+                                                <span class="text-[0.5625rem] text-[var(--v3)] ml-auto" x-text="judgeVerdict.summary"></span>
+                                            </div>
+                                            <template x-for="(chk, ci) in (judgeVerdict.checks || [])" :key="ci">
+                                                <div class="flex items-center gap-2 py-0.5 text-[0.5625rem]">
+                                                    <span x-text="chk.status === 'pass' ? '&#x2705;' : chk.status === 'fail' ? '&#x274C;' : '&#x26A0;'" class="shrink-0 text-xs"></span>
+                                                    <span class="text-[var(--v3)] tracking-wider w-28 shrink-0" x-text="chk.name"></span>
+                                                    <span class="text-[var(--ng3)]" x-text="chk.message"></span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                        <div x-show="!judgeVerdict" class="text-[0.5625rem] text-[var(--v3)] tracking-wider">Click RUN JUDGE to evaluate this experiment_</div>
+                                    </div>
                                     <div x-show="selectedExpData?.files_modified?.length" class="mb-3">
                                         <div class="text-[0.5625rem] text-[var(--v3)] tracking-widest mb-1">FILES_MODIFIED_</div>
                                         <div class="flex flex-wrap gap-1">

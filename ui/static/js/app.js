@@ -246,6 +246,7 @@ function _buildAppData() {
         compareExps: [],
         compareData: {},
         compareLoading: false,
+        judgeVerdict: null,
         config: { name: '', description: '', goals: [], constraints: [], tech_stack: [], focus_areas: [] },
         prompt: '',
         changesLog: '',

@@ -2918,3 +2918,23 @@ N/A
 N/A
 
 
+## Experiment 140 — Chat — collapsible markdown sections (heading fold/unfold like IDE code folding)
+
+**Time:** 2026-03-20 05:10:07
+
+**Files:** `ui/static/js/modules/chat.js`, `ui/static/css/main.css`
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **`_addSectionFolding()`** — заменяет `_addHeadingIds`. Для сообщений с 3+ заголовками (##, ###, ####) оборачивает каждый заголовок и его контент в сворачиваемый `<div class="md-section">`. Клик по заголовку переключает видимость секции. Для коротких сообщений — просто добавляет ID (обратная совместимость).
+2. **Стрелка фолдинга** — каждый заголовок получает ▼ стрелку, которая поворачивается на 90° при сворачивании.
+3. **TOC: FOLD ALL / OPEN ALL** — кнопки в панели
+
+

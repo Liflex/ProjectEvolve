@@ -1,30 +1,29 @@
 # Last Experiment Summary
 
-**Experiment #140** — Chat — collapsible markdown sections (heading fold/unfold)
-
+**Experiment #141** — Post-experiment auto-judge — basic sanity checker
 **Date:** 2026-03-20
 
 ## What Was Done
 
-1. **`_addSectionFolding(html, prefix)`** — replaces `_addHeadingIds`. For messages with 3+ headings, wraps each heading + its content in a collapsible `<div class="md-section">`. Clicking a heading toggles `.md-section-collapsed` class. Falls back to simple ID injection for messages with fewer headings.
-2. **Fold arrow** — each heading gets a fold arrow (▼) that rotates 90° when collapsed.
-3. **TOC collapse/expand all** — "FOLD" and "OPEN" buttons in the OUTLINE panel header.
-4. **CSS** — new styles for sections, fold arrows, collapsed state.
+1. **`utils/judge.py`** — ExperimentJudge module with 4 checks: commit_exists, file_consistency, syntax_check, diff_size. Produces verdict with score (0-1), recommendation (KEEP/DISCARD/REVIEW), and per-check details.
+2. **Server integration** — judge auto-runs after each experiment save in `_save_experiment_artifacts()`. Verdict stored in experiment data.
+3. **API endpoint** — `GET /api/judge/{n}` for manual judge trigger on any experiment.
+4. **UI** — "RUN JUDGE" button in experiment summary tab. Shows verdict with recommendation badge, score, and check results.
 
 ## Files Modified
 
-- `ui/static/js/modules/chat.js` — _addSectionFolding(), _toggleAllSections(), TOC fold/open buttons
-- `ui/static/css/main.css` — .md-section, .md-heading, .md-fold-arrow, .md-section-collapsed, .md-section-body, .msg-toc-collapse-btn
+- `utils/judge.py` (new)
+- `ui/server.py`
+- `ui/static/js/app.js`
+- `ui/static/js/modules/lab.js`
+- `ui/static/templates/lab-experiments.js`
 
 ## Key Results
 
-- Messages with 3+ headings now have clickable fold/unfold on each heading
-- OUTLINE panel has FOLD ALL / OPEN ALL buttons
-- Arrow indicator rotates on collapse
-- Backward compatible: messages with <3 headings use simple ID injection
+First step towards judgement system goal. Judge validates agent's work independently by checking git state. Score 0.88 on current project (KEEP recommendation with minor warnings).
 
 ## For Next Iteration
 
-- Could add persistence for collapsed sections state
-- Could add double-click to collapse all except clicked section
-- Could add keyboard shortcut for section folding
+- Add more checks (test runner, import validation)
+- Show judge verdict badge in experiments list (not just detail)
+- Auto-judge on experiment end with live log event

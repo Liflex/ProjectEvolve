@@ -528,6 +528,26 @@ async def get_experiment(n: int):
     }
 
 
+@app.get("/api/judge/{n}")
+async def judge_experiment(n: int):
+    """Run post-experiment judge on experiment N."""
+    from utils.judge import ExperimentJudge
+    project = get_project_dir()
+    try:
+        experiments = parse_experiments()
+        exp = next((e for e in experiments if e["number"] == n), None)
+        if not exp:
+            raise HTTPException(status_code=404, detail=f"Experiment {n} not found")
+        judge = ExperimentJudge(project)
+        verdict = judge.evaluate(
+            claimed_files=exp.get("files_modified", []),
+            agent_decision=exp.get("decision", ""),
+        )
+        return verdict
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/changes-log")
 async def get_changes_log():
     log_file = get_exp_dir() / "changes_log.md"
@@ -933,6 +953,23 @@ async def start_run(data: RunRequest):
         if result.get("status") in ("success", "incomplete") and output:
             try:
                 exp_data = ar.parse_experiment_report(output, exp_num)
+
+                # Run post-experiment judge
+                try:
+                    from utils.judge import ExperimentJudge
+                    judge = ExperimentJudge(project_dir)
+                    verdict = judge.evaluate(
+                        claimed_files=exp_data.get("files_modified", []),
+                        agent_decision=exp_data.get("agent_decision", ""),
+                    )
+                    exp_data["judge_verdict"] = verdict
+                    _log_append(
+                        f"[JUDGE] Exp #{exp_num}: score={verdict['score']}, "
+                        f"rec={verdict['recommendation']}, {verdict['summary']}"
+                    )
+                except Exception as je:
+                    logger.warning("Judge failed for exp %d: %s", exp_num, je)
+
                 ar.save_last_experiment_summary(project_dir, exp_data)
                 ar.save_accumulation_context(project_dir, exp_data)
                 ar.save_changes_log(project_dir, exp_data)

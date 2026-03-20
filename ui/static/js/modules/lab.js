@@ -300,11 +300,11 @@ window.AppLab = (function() {
 
         // --- Experiment detail ---
         toggleExperiment(n) {
-            if (this.selectedExp === n) { this.selectedExp = null; this.selectedExpData = null; this.fileDiffData = null; return; }
+            if (this.selectedExp === n) { this.selectedExp = null; this.selectedExpData = null; this.fileDiffData = null; this.judgeVerdict = null; return; }
             this.loadExperiment(n);
         },
         async loadExperiment(n) {
-            this.selectedExp = n; this.expLoading = true; this.expDetailTab = 'output'; this.fileDiffData = null;
+            this.selectedExp = n; this.expLoading = true; this.expDetailTab = 'output'; this.fileDiffData = null; this.judgeVerdict = null;
             try {
                 const data = await this.api('/api/experiments/' + n);
                 this.selectedExpData = data;
@@ -352,6 +352,17 @@ window.AppLab = (function() {
             const idx = this.compareExps.indexOf(n);
             if (idx >= 0) { this.compareExps.splice(idx, 1); }
             else if (this.compareExps.length < 2) { this.compareExps.push(n); }
+        },
+
+        // --- Judge ---
+        async judgeExperiment(n) {
+            this.judgeVerdict = null;
+            try {
+                this.judgeVerdict = await this.api('/api/judge/' + n);
+            } catch (e) {
+                console.error('[judgeExperiment] FAILED:', e);
+                this.showToast('JUDGE FAILED', 'error');
+            }
         },
         async runCompare() {
             if (this.compareExps.length !== 2) return;
