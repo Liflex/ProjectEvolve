@@ -171,6 +171,7 @@ class ParallelAgentRunner:
             max_turns=task.max_turns,
             permission_mode=task.permission_mode,
             env=clean_env,
+            disallowed_tools=["Bash", "Write", "Edit", "WebFetch", "WebSearch"],
         )
 
         if task.model:
@@ -191,14 +192,17 @@ class ParallelAgentRunner:
                 msg_type = type(message).__name__
 
                 # Stream to listeners with agent context
-                await self._emit(_make_event(
-                    EVENT_PARALLEL_AGENT_EVENT,
-                    run_id=self._run_id,
-                    agent_id=task.agent_id,
-                    agent_label=task.label,
-                    message_type=msg_type,
-                    data=event_dict,
-                ))
+                # Skip verbose per-message events for judge agents — only log start/end
+                is_judge = task.label.startswith("judge-")
+                if not is_judge:
+                    await self._emit(_make_event(
+                        EVENT_PARALLEL_AGENT_EVENT,
+                        run_id=self._run_id,
+                        agent_id=task.agent_id,
+                        agent_label=task.label,
+                        message_type=msg_type,
+                        data=event_dict,
+                    ))
 
                 # Collect text output
                 if msg_type == "AssistantMessage":
@@ -918,6 +922,7 @@ async def _run_chief_judge(
             permission_mode="bypassPermissions",
             env=clean_env,
             append_system_prompt=system_prompt,
+            disallowed_tools=["Bash", "Write", "Edit", "WebFetch", "WebSearch"],
         )
 
         output_parts: list[str] = []
@@ -1025,7 +1030,7 @@ async def run_parallel_judges(
             append_system_prompt=system,
         ))
 
-    runner = ParallelAgentRunner(max_concurrency=len(profiles))
+    runner = ParallelAgentRunner(max_concurrency=1)
     results = await runner.run(tasks)
 
     # Parse verdicts from agent outputs

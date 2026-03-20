@@ -1779,6 +1779,14 @@
         speechTimer = setTimeout(() => { currentSpeech = ''; _speechAction = null; }, 6000);
     }
 
+    function setSpeechText(text, duration) {
+        duration = duration || 5000;
+        currentSpeech = text;
+        _speechAction = null;
+        if (speechTimer) clearTimeout(speechTimer);
+        speechTimer = setTimeout(() => { currentSpeech = ''; _speechAction = null; }, duration);
+    }
+
     function startTips() {
         if (tipTimer) clearInterval(tipTimer);
         const showTip = () => {

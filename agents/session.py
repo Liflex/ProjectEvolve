@@ -20,6 +20,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, AsyncIterator, Optional
 
+from claude_code_sdk.types import AssistantMessage, ResultMessage, ToolUseBlock
+
 logger = logging.getLogger(__name__)
 
 
@@ -158,15 +160,44 @@ class ClaudeSession:
                     self.session_id, self.message_count,
                 )
 
-            # Stream response until ResultMessage (receive_response handles this)
+            # Stream response until ResultMessage (receive_response handles this).
+            # Decompose SDK messages into events matching the client's expected
+            # format: "assistant" (text+thinking), "tool" (tool calls), "result".
             async for message in self._client.receive_response():
-                try:
+                if isinstance(message, AssistantMessage):
+                    # Yield full assistant event — client extracts text + thinking
                     event = asdict(message)
-                except Exception:
-                    event = {"type": str(type(message).__name__), "data": str(message)}
-                event.setdefault("type", type(message).__name__.removesuffix("Message").lower())
-                self._output_lines.append(json.dumps(event, default=str))
-                yield event
+                    event["type"] = "assistant"
+                    self._output_lines.append(json.dumps(event, default=str))
+                    yield event
+
+                    # Yield separate tool events for each ToolUseBlock
+                    for block in message.content:
+                        if isinstance(block, ToolUseBlock):
+                            tool_evt = {
+                                "type": "tool",
+                                "name": block.name,
+                                "input": block.input,
+                                "tool_use_id": block.id,
+                            }
+                            self._output_lines.append(json.dumps(tool_evt, default=str))
+                            yield tool_evt
+
+                elif isinstance(message, ResultMessage):
+                    event = asdict(message)
+                    event["type"] = "result"
+                    self._output_lines.append(json.dumps(event, default=str))
+                    yield event
+
+                else:
+                    # SystemMessage, UserMessage, StreamEvent, etc.
+                    try:
+                        event = asdict(message)
+                    except Exception:
+                        event = {"type": str(type(message).__name__), "data": str(message)}
+                    event.setdefault("type", type(message).__name__.removesuffix("Message").lower())
+                    self._output_lines.append(json.dumps(event, default=str))
+                    yield event
 
             self.status = SessionStatus.COMPLETED
             logger.info("Session %s: turn %d completed", self.session_id, self.message_count)

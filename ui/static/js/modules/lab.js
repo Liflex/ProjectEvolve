@@ -464,8 +464,8 @@ window.AppLab = (function() {
             this.researchWs.onmessage = (e) => {
                 try {
                     const event = JSON.parse(e.data);
-                    // DEBUG: log every received event
-                    if (!event.type || event.type !== 'tokens_update') {
+                    // DEBUG: log received events (skip verbose agent streaming)
+                    if (!event.type || (event.type !== 'tokens_update' && event.type !== 'parallel_agent_event')) {
                         console.log('[lab] WS event:', event.type, JSON.stringify(event).slice(0, 300));
                     }
                     // Live log — use window._app (Alpine proxy) for reactivity

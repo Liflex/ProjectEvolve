@@ -453,6 +453,19 @@ window.AppChat = (function() {
                             if (window.CatModule && CatModule.isActive() && CatModule.reactToToolCall) {
                                 CatModule.reactToToolCall(toolType, toolDetail || '');
                             }
+                        } else if (etype === 'error') {
+                            // SDK error mid-stream — show as assistant error message
+                            tab.messages.push({ role: 'assistant', content: '[ERROR] ' + (data.message || 'Unknown SDK error'), ts: Date.now() });
+                            _app._trackNewMsg(tab);
+                            tab.is_streaming = false;
+                            _app.stopTurnTimer(tab);
+                            if (window.CatModule && CatModule.isActive()) {
+                                CatModule.setExpression('surprised');
+                                if (CatModule.triggerEarTwitch) CatModule.triggerEarTwitch();
+                                CatModule.setSpeechText('Мяу?! Ошибка!', 3000);
+                                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 3000);
+                            }
+                            _app.chatTick++;
                         } else if (etype === 'result') {
                             tab._agentActivity = { type: 'idle', text: '', icon: '', color: '' };
                             tab._turnToolCount = 0;

@@ -4067,3 +4067,64 @@ N/A
 **Per-task Results:**
 
 
+## Experiment 187 — Session grace period on WebSocket disconnect
+
+**Time:** 2026-03-20 21:27:36
+
+**Files:** `agents/manager.py` — переписан: grace period с asyncio timers, `ui/server.py` — +7 строк: reactivation на WS connect + logger, `tests/test_session_grace_period.py` — +109 строк (новый файл)
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**Tests:** 21/21 pass (8 новых + 13 существующих)
+**Build:** success
+
+
+## Experiment 188 — Untitled
+
+**Time:** 2026-03-20 21:30:28
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $2.1281
+**Conflicts:** None
+
+**Per-task Results:**
+
+
+## Experiment 190 — Migrate ClaudeSession to ClaudeSDKClient for proper multi-turn
+
+**Time:** 2026-03-20 22:04:53
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. Обнаружен root cause: SDK документация прямо говорит что `query()` — **stateless** ("Each query is independent, no conversation state"). Предыдущий код использовал неправильный API для multi-turn.
+2. Мигрировал `ClaudeSession` с `query()` на `ClaudeSDKClient` — persistent bidirectional connection:
+   - Первое сообщение: `connect(prompt)` — создаёт клиент и подключается
+   - Последующие: `query(prompt)` — переиспользует существующее соединение
+   - `interrupt()` — т
+
+
