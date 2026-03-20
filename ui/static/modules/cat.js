@@ -563,6 +563,13 @@
             '*расправляется* Ну вот_',
             '*встряхнулся* Проснулся!',
         ],
+        sneeze: [
+            'Апчхи! =O_O=',
+            '*Апчхи!* Мяу?!',
+            'А-апчхи!... *трёт нос*',
+            '*чихает* Мяу! Прости_',
+            'Апчхи! *вздрагивает*',
+        ],
     };
 
     // Chat context-aware skill tips (keyword → tips)
@@ -1030,6 +1037,8 @@
     let _headTiltTicks = 0;                // ticks remaining for forced tilt hold
     let _bounceTicks = 0;                  // remaining ticks for body bounce
     let _bounceOffset = 0;                 // current bounce Y offset (pixels)
+    let _sneezeTicks = 0;                  // remaining ticks for sneeze animation
+    let _sneezePhase = 0;                  // 0=none, 1=pre, 2=jerks, 3=recover
 
     // Mouse move handler for eye tracking
     function _onMouseMove(e) {
@@ -1224,6 +1233,13 @@
             }
         }
 
+        // Breathing: subtle continuous body oscillation (sitting only)
+        if (!isLying) {
+            const breathPeriod = expression === 'sleepy' || _idleLevel >= 2 ? 40 : 25;
+            const breathAmp = expression === 'sleepy' || _idleLevel >= 2 ? 0.4 : 0.3;
+            bodyOffY += Math.sin(_tickCount / breathPeriod * Math.PI * 2) * breathAmp;
+        }
+
         // Purr vibration: subtle body shake
         if (_purrrTicks > 0) {
             bodyOffX += Math.random() < 0.5 ? -1 : 1;
@@ -1278,8 +1294,21 @@
         }
 
         // === Head tilt: canvas rotation around neck pivot ===
-        const headDrawX = headBase.x + _headOffX;
-        const headDrawY = headBase.y + _headOffY + headExtraY + _bounceOffset;
+        // Sneeze head jerk
+        let sneezeOffX = 0, sneezeOffY = 0;
+        if (_sneezePhase === 1) {
+            // Pre-sneeze: head pulls back slightly
+            sneezeOffY = 1;
+        } else if (_sneezePhase === 2) {
+            // Sneeze jerk: head snaps forward
+            sneezeOffX = 2;
+            sneezeOffY = -1;
+        } else if (_sneezePhase === 3) {
+            // Recovery: subtle residual shake
+            sneezeOffX = Math.random() < 0.5 ? 0.5 : -0.5;
+        }
+        const headDrawX = headBase.x + _headOffX + sneezeOffX;
+        const headDrawY = headBase.y + _headOffY + headExtraY + _bounceOffset + sneezeOffY;
         const tiltRad = _headTiltAngle * Math.PI / 180;
         const pivotX = (headDrawX + HEAD.w / 2) * ps;
         const pivotY = (headDrawY + HEAD.h - 2) * ps;
@@ -1422,6 +1451,27 @@
         } else {
             _bounceOffset *= 0.8;
             if (Math.abs(_bounceOffset) < 0.1) _bounceOffset = 0;
+        }
+
+        // Sneeze: rare random animation
+        if (_sneezeTicks > 0) {
+            _sneezeTicks--;
+            if (_sneezeTicks === 0) {
+                _sneezePhase = 0;
+                // Return to neutral after sneeze
+                if (expression === 'surprised' && _idleLevel === 0) {
+                    setTimeout(() => { if (animating) setExpression('neutral'); }, 1500);
+                }
+            } else if (_sneezeTicks < 3) {
+                _sneezePhase = 3; // recovery shake
+            } else if (_sneezeTicks < 5) {
+                _sneezePhase = 2; // sneeze jerk
+            } else {
+                _sneezePhase = 1; // pre-sneeze pull back
+            }
+        } else if (expression === 'neutral' && _idleLevel < 2 && _stretchTicks === 0 && _pawWaveTicks === 0 && Math.random() < 0.001) {
+            // ~0.1% per tick ≈ every ~2 min at 120ms interval
+            triggerSneeze();
         }
 
         // Paw wave: random animation during idle
@@ -1653,6 +1703,34 @@
     }
 
     // ================================================================
+    //  SNEEZE ANIMATION
+    // ================================================================
+
+    function triggerSneeze() {
+        if (_sneezeTicks > 0 || !animating) return;
+        _sneezeTicks = 8;
+        _sneezePhase = 1;
+        setExpression('surprised');
+        setSpeechText(pickRandom(SPEECH.sneeze), 3000);
+        triggerEarTwitch();
+        // Small particle burst from nose area
+        for (let s = 0; s < 4; s++) {
+            spawnParticle({
+                x: HEAD_POS.x + 11 + Math.random() * 4,
+                y: HEAD_POS.y + 14 + Math.random() * 2,
+                vx: (Math.random() - 0.5) * 0.3,
+                vy: 0.1 + Math.random() * 0.15,
+                life: 12 + Math.floor(Math.random() * 8),
+                char: Math.random() < 0.5 ? '·' : '°',
+                color: '#d98fff',
+                fontSize: 5 + Math.floor(Math.random() * 3),
+                wobble: 0.08,
+                wobbleSpeed: 0.12,
+            });
+        }
+    }
+
+    // ================================================================
     //  PUBLIC API
     // ================================================================
 
@@ -1790,6 +1868,11 @@
         /** Trigger a body bounce animation (celebration/excitement). */
         triggerBounce(ticks) {
             _bounceTicks = ticks || 15;
+        },
+
+        /** Trigger a sneeze animation (rare random, or call manually). */
+        triggerSneeze() {
+            triggerSneeze();
         },
 
         /**
