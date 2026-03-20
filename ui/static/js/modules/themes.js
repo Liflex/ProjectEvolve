@@ -153,9 +153,14 @@ window.AppThemes = (function() {
                     document.body.style.color = val;
                 } else if (prop === 'body-font') {
                     document.body.style.fontFamily = val;
-                } else if (prop === 'font-size' || prop === 'code-font') {
-                    // font-size handled by zoom in applySettings(), code-font as CSS var
-                    if (prop === 'code-font') root.style.setProperty('--code-font', val);
+                } else if (prop === 'code-font') {
+                    root.style.setProperty('--code-font', val);
+                } else if (prop === 'font-size') {
+                    // Only apply theme font-size if user hasn't set a custom one
+                    const userFontSize = document.documentElement.style.getPropertyValue('--user-font-size');
+                    if (!userFontSize) {
+                        document.documentElement.style.fontSize = val;
+                    }
                 } else {
                     root.style.setProperty(prop, val);
                 }

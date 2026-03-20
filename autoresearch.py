@@ -574,6 +574,27 @@ def build_agent_prompt(config: ProjectConfig, iteration: int, total: int, strate
         project_memory += "## Последний эксперимент\n\n"
         project_memory += last_experiment + "\n\n"
 
+    # Добавляем REWORK remarks от судей (если предыдущий эксперимент получил REWORK)
+    if exp_dir.exists():
+        last_judge = None
+        # Find the latest judge file
+        judge_files = sorted(exp_dir.glob("judge_*_all.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if judge_files:
+            try:
+                import json as _json_for_rework
+                judge_data = _json_for_rework.loads(judge_files[0].read_text(encoding="utf-8"))
+                if judge_data.get("consensus") == "REWORK" and judge_data.get("rework_remarks"):
+                    last_judge = judge_data
+            except Exception:
+                pass
+        if last_judge:
+            project_memory += "## Замечания судей (REWORK)\n\n"
+            project_memory += "Предыдущий эксперимент получил вердикт REWORK. "
+            project_memory += "Судьи указали следующие проблемы, которые нужно исправить:\n"
+            for remark in last_judge["rework_remarks"]:
+                project_memory += f"- {remark}\n"
+            project_memory += "\n**Важно:** Учитывай эти замечания при выборе и выполнении текущего эксперимента.\n\n"
+
     # Добавляем текущее состояние проекта (git status)
     try:
         result = subprocess.run(

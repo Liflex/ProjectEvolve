@@ -742,6 +742,211 @@ class ResultAggregator:
 
 
 # ---------------------------------------------------------------------------
+# Judge JSON parser — robust extraction from LLM output
+# ---------------------------------------------------------------------------
+
+def _try_parse_judge_json(output: str) -> Optional[Dict[str, Any]]:
+    """Extract and validate a judge verdict JSON from LLM output.
+
+    Tries multiple strategies:
+    1. Direct JSON parse of full output
+    2. Last JSON object in text (LLM often puts answer at the end)
+    3. Extract from markdown code fences (```json ... ```)
+    4. Regex for JSON-like pattern with verdict/score fields
+    """
+    import json as _json
+    import re
+
+    if not output:
+        return None
+
+    # Strategy 1: Direct parse
+    try:
+        parsed = _json.loads(output)
+        if _validate_judge_parsed(parsed):
+            return parsed
+    except (_json.JSONDecodeError, ValueError):
+        pass
+
+    # Strategy 2: Extract from markdown code fences
+    fence_match = re.findall(r'```(?:json)?\s*\n?(.*?)\n?\s*```', output, re.DOTALL)
+    for block in reversed(fence_match):
+        try:
+            parsed = _json.loads(block.strip())
+            if _validate_judge_parsed(parsed):
+                return parsed
+        except (_json.JSONDecodeError, ValueError):
+            continue
+
+    # Strategy 3: Find last JSON object (brace-balanced)
+    # Scan from the end — LLM typically puts the answer last
+    last_brace = output.rfind("}")
+    if last_brace > 0:
+        # Walk backwards to find matching {
+        depth = 0
+        for i in range(last_brace, -1, -1):
+            if output[i] == '}':
+                depth += 1
+            elif output[i] == '{':
+                depth -= 1
+                if depth == 0:
+                    candidate = output[i:last_brace + 1]
+                    try:
+                        parsed = _json.loads(candidate)
+                        if _validate_judge_parsed(parsed):
+                            return parsed
+                    except (_json.JSONDecodeError, ValueError):
+                        break
+
+    # Strategy 4: Regex — find verdict and score anywhere in text
+    verdict_match = re.search(r'"verdict"\s*:\s*"(KEEP|DISCARD|REWORK)"', output, re.IGNORECASE)
+    score_match = re.search(r'"score"\s*:\s*([\d.]+)', output)
+
+    if verdict_match:
+        verdict = verdict_match.group(1).upper()
+        score = float(score_match.group(1)) if score_match else 0.5
+        score = max(0.0, min(1.0, score))
+        # Try to extract reason from JSON-like format
+        reason_match = re.search(r'"reason"\s*:\s*"([^"]{1,500})"', output)
+        reason = reason_match.group(1) if reason_match else "Extracted from text"
+        return {
+            "verdict": verdict,
+            "score": score,
+            "reason": reason,
+            "risks": [],
+            "_parsed_via": "regex",
+        }
+
+    # Strategy 5: Bare verdict/score without JSON quotes (e.g. "verdict: KEEP, score: 0.7")
+    bare_verdict = re.search(r'\bverdict\s*[:=]\s*(KEEP|DISCARD|REWORK)\b', output, re.IGNORECASE)
+    bare_score = re.search(r'\bscore\s*[:=]\s*([\d.]+)\b', output, re.IGNORECASE)
+    if bare_verdict:
+        verdict = bare_verdict.group(1).upper()
+        score = float(bare_score.group(1)) if bare_score else 0.5
+        score = max(0.0, min(1.0, score))
+        return {
+            "verdict": verdict,
+            "score": score,
+            "reason": "Extracted from bare text",
+            "risks": [],
+            "_parsed_via": "bare_regex",
+        }
+
+    return None
+
+
+def _validate_judge_parsed(parsed: Dict[str, Any]) -> bool:
+    """Check that parsed dict has required judge fields and normalize."""
+    if not isinstance(parsed, dict):
+        return False
+    verdict = parsed.get("verdict", "")
+    if verdict.upper() not in ("KEEP", "DISCARD", "REWORK"):
+        return False
+    # Normalize verdict to uppercase
+    parsed["verdict"] = verdict.upper()
+    # Ensure score is a number in range, clamp if needed
+    try:
+        score = float(parsed.get("score", 0.5))
+        parsed["score"] = max(0.0, min(1.0, score))
+    except (TypeError, ValueError):
+        parsed["score"] = 0.5
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Chief judge — tiebreaker for split verdicts
+# ---------------------------------------------------------------------------
+
+async def _run_chief_judge(
+    project_dir: Path,
+    report_text: str,
+    verdicts: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """Invoke a 4th 'chief' judge to break a split verdict.
+
+    The chief judge receives all 3 profiles' decisions and arguments,
+    reviews the experiment report, and makes the final call.
+    Used when judges disagree (e.g., 2 DISCARD + 1 KEEP).
+
+    Returns dict with verdict/score/reason, or None on failure.
+    """
+    # Build summary of all profiles' decisions
+    profiles_summary = []
+    for label, v in verdicts.items():
+        profiles_summary.append(
+            f"- {label}: {v.get('verdict', '?')} (score={v.get('score', 0)}) "
+            f"— {v.get('reason', 'no reason')}"
+        )
+
+    summary = "\n".join(profiles_summary)
+
+    prompt = (
+        "You are the CHIEF JUDGE — the final decision maker.\n"
+        "Three independent judges reviewed this experiment and DISAGREED.\n"
+        "Your job is to make the FINAL decision after reviewing all arguments.\n\n"
+        f"Experiment report:\n```\n{report_text[:6000]}\n```\n\n"
+        f"Judges' decisions:\n{summary}\n\n"
+        "Analyze the disagreement fairly. Which side has stronger arguments?\n"
+        "Consider: Does the value delivered outweigh the concerns?\n"
+        "Is the feature useful enough to keep even with imperfections?\n\n"
+        "IMPORTANT: Your response MUST be ONLY a single JSON object on the last line.\n"
+        'Format: {"verdict": "KEEP|REWORK|DISCARD", "score": 0.0-1.0, "reason": "your final reasoning"}\n'
+        "verdict: KEEP (good enough), REWORK (useful but needs fixes), DISCARD (remove)\n"
+        "score: confidence in your decision (0.0-1.0)\n"
+        "reason: 1-3 sentences explaining why, acknowledging both sides"
+    )
+
+    system_prompt = (
+        "You are the chief judge making the FINAL decision on a disputed experiment.\n"
+        "Be fair and objective. Weigh all arguments carefully.\n"
+        "KEEP: the experiment provides enough value to keep despite concerns.\n"
+        "REWORK: the feature is useful but has specific issues that should be addressed.\n"
+        "DISCARD: the concerns are fundamental and the experiment should be removed.\n"
+    )
+
+    try:
+        from claude_code_sdk import ClaudeCodeOptions, query
+
+        clean_env = {}
+        for var in ("CLAUDECODE", "CLAUDE_SESSION_ID"):
+            if var in os.environ:
+                clean_env[var] = ""
+
+        options = ClaudeCodeOptions(
+            cwd=str(project_dir),
+            max_turns=1,
+            permission_mode="bypassPermissions",
+            env=clean_env,
+            append_system_prompt=system_prompt,
+        )
+
+        output_parts: list[str] = []
+        async for message in query(prompt=[{"type": "user", "message": {"role": "user", "content": prompt}}], options=options):
+            event_dict = asdict(message)
+            msg_type = type(message).__name__
+            if msg_type == "AssistantMessage":
+                for block in event_dict.get("content", []):
+                    if isinstance(block, dict) and block.get("text"):
+                        output_parts.append(block["text"])
+
+        output = "\n".join(output_parts).strip()
+        if not output:
+            return None
+
+        parsed = _try_parse_judge_json(output)
+        if parsed:
+            logger.info("Chief judge decided: %s (score=%.2f)", parsed["verdict"], parsed.get("score", 0))
+            return parsed
+        else:
+            logger.warning("Chief judge output could not be parsed: %s", output[:200])
+            return None
+
+    except Exception as e:
+        logger.error("Chief judge error: %s", e)
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Convenience: parallel judge evaluation
 # ---------------------------------------------------------------------------
 
@@ -764,37 +969,60 @@ async def run_parallel_judges(
     Returns:
         Dict with per-profile verdicts and consensus.
     """
-    try:
-        from utils.judge import ExperimentJudge
-    except ImportError:
-        logger.warning("Judge module not available for parallel evaluation")
-        return {"error": "judge module not available"}
-
     if profiles is None:
         profiles = ["strict", "balanced", "lenient"]
 
-    judge = ExperimentJudge(project_dir)
-
     # Build individual prompts per profile
+    profile_prompts = {
+        "strict": (
+            "You are a THOROUGH code review judge. You pay close attention to details.\n"
+            "Your role is to catch real problems, not to be harsh for the sake of it.\n"
+            "Be objective: acknowledge what works well before pointing out issues.\n"
+            "Score fairly — a working feature with minor issues still deserves a decent score.\n"
+        ),
+        "balanced": (
+            "You are a FAIR code review judge. You weigh value vs. concerns objectively.\n"
+            "Consider: Does the experiment achieve its goal? Are the issues fixable?\n"
+            "A feature that works but needs polish is better than a perfect feature that doesn't exist.\n"
+            "Score based on net value delivered, not on perfection.\n"
+        ),
+        "lenient": (
+            "You are a SUPPORTIVE code review judge. You focus on what was accomplished.\n"
+            "Celebrate progress. Only flag issues that are genuinely problematic.\n"
+            "Remember: experiments are iterative by nature — perfection is not the goal.\n"
+            "Give credit for effort and direction, not just for flawless execution.\n"
+        ),
+    }
+
     tasks = []
     for profile in profiles:
+        system = profile_prompts.get(profile, profile_prompts["balanced"])
         prompt = (
-            f"You are a {profile} code review judge evaluating an experiment.\n"
             f"Project: {project_dir}\n\n"
             f"Experiment report:\n```\n{report_text[:8000]}\n```\n\n"
             f"Evaluate as a {profile} judge. Consider:\n"
-            f"- Code quality and correctness\n"
-            f"- Goal alignment\n"
-            f"- Risk of regression\n"
-            f"- Complexity impact\n\n"
-            f"Respond in JSON: {{\"verdict\": \"KEEP|DISCARD\", \"score\": 0.0-1.0, "
-            f"\"reason\": \"...\", \"risks\": [...]}}"
+            f"- Does the experiment achieve its stated goal?\n"
+            f"- Code quality, correctness, and readability\n"
+            f"- Risk of regression or side effects\n"
+            f"- Complexity vs. value trade-off\n\n"
+            f"Verdict options:\n"
+            f"- KEEP: The experiment is good enough. Minor imperfections are acceptable.\n"
+            f"- REWORK: The feature is useful and worth keeping, BUT has specific issues that should be fixed in a follow-up experiment. List the issues in \"risks\".\n"
+            f"- DISCARD: The experiment is fundamentally flawed, broken, or harmful. Only use if the problems are severe.\n\n"
+            f"IMPORTANT: Your response MUST be ONLY a single JSON object on the last line. "
+            f"No markdown, no code fences, no explanation before or after. Just:\n"
+            f'{{"verdict": "KEEP", "score": 0.75, "reason": "brief reason", "risks": []}}\n'
+            f"verdict: KEEP, REWORK, or DISCARD\n"
+            f"score: float 0.0 to 1.0 (REWORK should typically be 0.5-0.8)\n"
+            f"reason: one sentence explaining your verdict\n"
+            f"risks: list of strings — specific issues to fix (for REWORK) or concerns (for all)"
         )
         tasks.append(AgentTask(
             label=f"judge-{profile}",
             prompt=prompt,
             cwd=str(project_dir),
-            max_turns=3,
+            max_turns=1,
+            append_system_prompt=system,
         ))
 
     runner = ParallelAgentRunner(max_concurrency=len(profiles))
@@ -802,53 +1030,88 @@ async def run_parallel_judges(
 
     # Parse verdicts from agent outputs
     import json as _json
+    import re
     verdicts = {}
+    parsed_count = 0
     for task in results:
         if task.status != "completed":
-            continue
-        try:
-            # Try to extract JSON from output
-            output = task.output.strip()
-            # Find JSON block in output
-            json_start = output.find("{")
-            json_end = output.rfind("}") + 1
-            if json_start >= 0 and json_end > json_start:
-                parsed = _json.loads(output[json_start:json_end])
-                verdicts[task.label] = parsed
-            else:
-                verdicts[task.label] = {
-                    "verdict": "DISCARD",
-                    "score": 0.0,
-                    "reason": f"Could not parse judge output",
-                    "raw_output": output[:500],
-                }
-        except Exception as e:
             verdicts[task.label] = {
                 "verdict": "DISCARD",
                 "score": 0.0,
-                "reason": f"Parse error: {e}",
-                "raw_output": task.output[:500],
+                "reason": f"Agent failed: {task.status}",
+            }
+            continue
+
+        output = task.output.strip()
+        parsed = _try_parse_judge_json(output)
+        if parsed:
+            verdicts[task.label] = parsed
+            parsed_count += 1
+        else:
+            verdicts[task.label] = {
+                "verdict": "DISCARD",
+                "score": 0.0,
+                "reason": "Could not parse judge output",
+                "raw_output": output[:500],
             }
 
     # Compute consensus
+    chief_verdict = None
     if verdicts:
         scores = [v.get("score", 0) for v in verdicts.values()]
         avg_score = sum(scores) / len(scores) if scores else 0
         keep_count = sum(1 for v in verdicts.values() if v.get("verdict") == "KEEP")
+        rework_count = sum(1 for v in verdicts.values() if v.get("verdict") == "REWORK")
         discard_count = sum(1 for v in verdicts.values() if v.get("verdict") == "DISCARD")
 
         if keep_count > len(verdicts) / 2:
+            # Majority KEEP — no chief needed
             consensus = "KEEP"
-        elif discard_count > len(verdicts) / 2:
+        elif discard_count > len(verdicts) / 2 and rework_count == 0:
+            # Clear majority DISCARD with no REWORK — reject
             consensus = "DISCARD"
-        else:
-            # Split — use score tiebreaker
-            if avg_score >= 0.65:
-                consensus = "KEEP"
-            elif avg_score <= 0.35:
+        elif rework_count > 0 or keep_count > 0:
+            # Any REWORK or any KEEP among DISCARDs → likely needs review
+            # Chief decides: is it worth keeping with fixes, or should it go?
+            if discard_count >= 2 and rework_count == 0 and keep_count == 0:
                 consensus = "DISCARD"
+            elif keep_count >= 1 or rework_count >= 2:
+                # Feature has support — chief decides between KEEP/REWORK
+                chief_verdict = await _run_chief_judge(
+                    project_dir=project_dir,
+                    report_text=report_text,
+                    verdicts=verdicts,
+                )
+                if chief_verdict:
+                    consensus = chief_verdict.get("verdict", "REWORK")
+                    avg_score = chief_verdict.get("score", avg_score)
+                    verdicts["chief"] = {
+                        "verdict": chief_verdict["verdict"],
+                        "score": chief_verdict["score"],
+                        "reason": chief_verdict.get("reason", ""),
+                        "source": "chief_judge",
+                    }
+                else:
+                    # Chief failed — default to REWORK (safer than DISCARD)
+                    consensus = "REWORK"
             else:
-                consensus = "REVIEW"
+                # Genuine split — invoke chief
+                chief_verdict = await _run_chief_judge(
+                    project_dir=project_dir,
+                    report_text=report_text,
+                    verdicts=verdicts,
+                )
+                if chief_verdict:
+                    consensus = chief_verdict.get("verdict", "REWORK")
+                    avg_score = chief_verdict.get("score", avg_score)
+                    verdicts["chief"] = {
+                        "verdict": chief_verdict["verdict"],
+                        "score": chief_verdict["score"],
+                        "reason": chief_verdict.get("reason", ""),
+                        "source": "chief_judge",
+                    }
+                else:
+                    consensus = "REWORK"
     else:
         avg_score = 0
         consensus = "DISCARD"
@@ -859,4 +1122,6 @@ async def run_parallel_judges(
         "consensus_score": round(avg_score, 3),
         "total_agents": len(results),
         "completed": sum(1 for r in results if r.status == "completed"),
+        "parsed": parsed_count,
+        "chief_called": chief_verdict is not None,
     }

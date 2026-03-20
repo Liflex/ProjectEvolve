@@ -142,7 +142,7 @@ window._copyCode = function(btn, preId) {
             Object.keys(selections).forEach(clearSelection);
         }
     });
-})()
+})();
 // === Code block wrap and fold toggles ===
 window._toggleCodeWrap = function(btn, preId) {
     var block = btn.closest('.code-block');

@@ -276,18 +276,10 @@ class ResearchRunner:
                     }
 
                 if profiles:
-                    recs = [v["recommendation"] for v in profiles.values()]
-                    keep_count = recs.count("KEEP")
-                    discard_count = recs.count("DISCARD")
-
-                    if keep_count >= 2:
-                        consensus = "KEEP"
-                    elif discard_count >= 2:
-                        consensus = "DISCARD"
-                    else:
-                        consensus = "REVIEW"
-
-                    avg_score = sum(v["score"] for v in profiles.values()) / len(profiles)
+                    # Use consensus from run_parallel_judges directly
+                    consensus = result.get("consensus", "REVIEW")
+                    avg_score = result.get("consensus_score", 0.0)
+                    parsed_count = result.get("parsed", 0)
 
                     verdict = {
                         "profiles": profiles,
@@ -299,13 +291,16 @@ class ResearchRunner:
                         "parallel_mode": True,
                         "total_agents": result.get("total_agents", 0),
                         "completed_agents": result.get("completed", 0),
+                        "parsed_agents": parsed_count,
                     }
 
+                    chief_called = result.get("chief_called", False)
+                    chief_info = " + chief" if chief_called else ""
                     await self._emit(_make_event(
                         EVENT_LOG,
                         message=f"Parallel judges done: {consensus} "
                                 f"(score={avg_score:.2f}, "
-                                f"{result.get('completed', 0)}/{result.get('total_agents', 0)} completed)",
+                                f"{parsed_count}/{result.get('completed', 0)} parsed{chief_info})",
                     ))
             else:
                 # --- Sequential mode: local ExperimentJudge ---
@@ -331,11 +326,43 @@ class ResearchRunner:
             consensus = verdict.get("consensus", "REVIEW")
             score = verdict.get("consensus_score", 0.5)
 
-            # Auto-revert on strong DISCARD consensus (all agree or score very low)
+            # Collect rework remarks from judges to pass to next experiment
+            rework_remarks = []
+            if consensus == "REWORK":
+                for pname, pdata in verdict.get("profiles", {}).items():
+                    risks = pdata.get("risks", [])
+                    reason = pdata.get("reason", "")
+                    if risks:
+                        rework_remarks.extend(risks)
+                    if reason and pdata.get("recommendation") == "REWORK":
+                        rework_remarks.append(f"[{pname}] {reason}")
+                # Also check chief
+                chief = verdict.get("profiles", {}).get("chief", {})
+                if chief.get("risks"):
+                    rework_remarks.extend(chief["risks"])
+                if rework_remarks:
+                    rework_remarks = list(dict.fromkeys(rework_remarks))  # dedupe preserving order
+                    await self._emit(_make_event(
+                        EVENT_LOG,
+                        message=f"REWORK remarks for next experiment: "
+                                + "; ".join(rework_remarks[:5]),
+                    ))
+
+            # Auto-revert only on DISCARD (REWORK and KEEP are kept)
             auto_reverted = False
-            if consensus == "DISCARD" and score < 0.4:
+            if consensus == "DISCARD" and score < 0.85:
                 auto_reverted = await self._auto_revert_discard(
                     experiment_number, consensus, score, verdict,
+                )
+
+            # Update verdict with auto_reverted and rework_remarks, re-save to disk
+            verdict["auto_reverted"] = auto_reverted
+            if rework_remarks:
+                verdict["rework_remarks"] = rework_remarks
+            if exp_dir.exists():
+                judge_file = exp_dir / f"judge_{experiment_number}_all.json"
+                judge_file.write_text(
+                    _json.dumps(verdict, indent=2), encoding="utf-8"
                 )
 
             # Log conflict resolution details if present
@@ -361,7 +388,6 @@ class ResearchRunner:
             except Exception as adj_err:
                 logger.debug("Judge weight auto-adjust skipped: %s", adj_err)
 
-            verdict["auto_reverted"] = auto_reverted
             return verdict
         except Exception as e:
             logger.warning("Judge evaluation failed for exp %d: %s", experiment_number, e)
@@ -772,6 +798,15 @@ class ResearchRunner:
                             i, judge_verdict.get("consensus"),
                             judge_verdict.get("consensus_score", 0),
                         )
+
+                        # Emit REWORK remarks so agent sees them in next experiment
+                        remarks = judge_verdict.get("rework_remarks", [])
+                        if remarks and judge_verdict.get("consensus") == "REWORK":
+                            await self._emit(_make_event(
+                                EVENT_LOG,
+                                message="[REWORK] Issues to address in next experiment: "
+                                        + "; ".join(remarks[:8]),
+                            ))
 
                 # Pause between experiments
                 if i < max_number and timeout_min > 0 and not self._cancelled:
