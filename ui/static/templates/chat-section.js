@@ -660,10 +660,17 @@
                                           :disabled="tab.is_streaming"></textarea>
                                 <div class="flex items-center justify-between px-1 mt-0.5">
                                     <span class="chat-input-hint text-[0.5rem] text-[var(--v3)] tracking-wider"
-                                          x-text="tab._editMode ? 'ENTER — send edited | ESC — cancel'
+                                          x-text="tab._editMode ? (settings.chatSendMode === 'ctrlenter' ? 'CTRL+ENTER — send edited | ESC — cancel' : 'ENTER — send edited | ESC — cancel')
                                                : tab._msgHistoryIdx >= 0 ? 'HISTORY ' + (tab._msgHistoryIdx + 1) + '/' + tab._msgHistory.length + ' — UP/DOWN navigate | ESC — exit | ENTER — send'
+                                               : settings.chatSendMode === 'ctrlenter' ? 'CTRL+ENTER — send | ENTER — newline | UP/DOWN — history | ALT+UP/DOWN — turns | CTRL+SHIFT+B/I/K/C — format'
                                                : 'ENTER — send | SHIFT+ENTER — newline | UP/DOWN — history | ALT+UP/DOWN — turns | CTRL+SHIFT+B/I/K/C — format'"></span>
-                                    <span class="text-[0.5rem] text-[var(--v3)] tabular-nums" x-show="(tab.input_text || '').length > 0" x-text="(tab.input_text || '').length + 'ch · ' + (tab.input_text || '').trim().split(/\s+/).filter(Boolean).length + 'w'"></span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[0.5rem] text-[var(--v3)] tabular-nums" x-show="(tab.input_text || '').length > 0" x-text="(tab.input_text || '').length + 'ch · ' + (tab.input_text || '').trim().split(/\s+/).filter(Boolean).length + 'w'"></span>
+                                        <button class="send-mode-toggle" @click.stop="toggleSendMode()" :title="settings.chatSendMode === 'ctrlenter' ? 'Switch to Enter to send' : 'Switch to Ctrl+Enter to send'"
+                                                :class="settings.chatSendMode === 'ctrlenter' && 'send-mode-ctrlenter'">
+                                            <span x-text="settings.chatSendMode === 'ctrlenter' ? 'CTRL+ENT' : 'ENT'"></span>
+                                        </button>
+                                    </div>
                                 </div>
                                 <!-- Slash command menu -->
                                 <div x-show="slashMenu.show && slashMenu._tabId === tab.tab_id"
@@ -749,7 +756,8 @@
                         <div class="chat-shortcut-row"><kbd>/</kbd><span>Skill autocomplete</span></div>
                         <div class="chat-shortcut-row"><kbd>Up/Down</kbd><span>Message history</span></div>
                         <div class="chat-shortcut-row"><kbd>Alt+Up/Down</kbd><span>Jump between turns</span></div>
-                        <div class="chat-shortcut-row"><kbd>Shift+Enter</kbd><span>New line</span></div>
+                        <div class="chat-shortcut-row"><kbd x-text="settings.chatSendMode === 'ctrlenter' ? 'Ctrl+Enter' : 'Enter'"></kbd><span x-text="settings.chatSendMode === 'ctrlenter' ? 'Send message' : 'Send message'"></span></div>
+                        <div class="chat-shortcut-row"><kbd x-text="settings.chatSendMode === 'ctrlenter' ? 'Enter' : 'Shift+Enter'"></kbd><span>New line</span></div>
                         <div class="chat-shortcut-row"><kbd>ESC</kbd><span>Cancel edit / exit history</span></div>
                     </div>
                 </div>

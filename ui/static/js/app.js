@@ -268,7 +268,7 @@ function _buildAppData() {
         organismSVG: '',
         organismStage: 'DORMANT',
         runElapsed: '',
-        settings: JSON.parse(localStorage.getItem('ar-settings') || '{"matrixRain":true,"crtEffect":true,"catCompanion":true,"theme":"synthwave","fontSize":16,"chatDensity":"comfortable","compactSidebar":false,"showThinking":false,"costBudget":5.00}'),
+        settings: JSON.parse(localStorage.getItem('ar-settings') || '{"matrixRain":true,"crtEffect":true,"catCompanion":true,"theme":"synthwave","fontSize":16,"chatDensity":"comfortable","compactSidebar":false,"showThinking":false,"costBudget":5.00,"chatSendMode":"enter"}'),
         _matrixRainStopped: false,
         _catHovering: false,
         // Docs search state

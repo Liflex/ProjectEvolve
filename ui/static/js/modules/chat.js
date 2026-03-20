@@ -726,6 +726,12 @@ window.AppChat = (function() {
                 ta.style.overflowY = ta.scrollHeight > 200 ? 'auto' : 'hidden';
             });
         },
+        toggleSendMode() {
+            this.settings.chatSendMode = (this.settings.chatSendMode || 'enter') === 'enter' ? 'ctrlenter' : 'enter';
+            localStorage.setItem('ar-settings', JSON.stringify(this.settings));
+            this.showToast('SEND: ' + (this.settings.chatSendMode === 'ctrlenter' ? 'CTRL+ENTER' : 'ENTER'), 'success');
+        },
+        },
 
         // ========== CHAT: MARKDOWN FORMAT TOOLBAR ==========
         insertMarkdown(tab, before, after) {
@@ -985,9 +991,21 @@ window.AppChat = (function() {
                     return;
                 }
             }
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                this.sendChatMessage(tab);
+            // Send on Enter (or Ctrl+Enter depending on mode)
+            const sendMode = this.settings.chatSendMode || 'enter';
+            if (sendMode === 'ctrlenter') {
+                // Ctrl+Enter to send, Enter for newline, Shift+Enter for newline
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+                    e.preventDefault();
+                    this.sendChatMessage(tab);
+                }
+                // Enter without Ctrl = newline (do nothing, let textarea handle it)
+            } else {
+                // Default: Enter to send, Shift+Enter for newline
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.sendChatMessage(tab);
+                }
             }
         },
 

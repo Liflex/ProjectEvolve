@@ -2428,6 +2428,30 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .chat-input-area:focus ~ .flex .chat-input-hint,
 .chat-input-area:not(:placeholder-shown) ~ .flex .chat-input-hint { opacity: 0.6; }
 
+/* === CHAT SEND MODE TOGGLE === */
+.send-mode-toggle {
+    font-size: 0.4375rem;
+    letter-spacing: 0.1em;
+    padding: 1px 5px;
+    border: 1px solid var(--v-dim);
+    color: var(--v3);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    font-family: inherit;
+    line-height: 1.4;
+}
+.send-mode-toggle:hover {
+    border-color: var(--v2);
+    color: var(--v);
+}
+.send-mode-ctrlenter {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    background: rgba(0, 229, 255, 0.06);
+}
+
 /* === CHAT QUICK ACTION CHIPS === */
 .prompt-templates-bar {
     padding: 4px 4px 2px;
