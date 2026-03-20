@@ -114,6 +114,7 @@ window.AppChat = (function() {
 
         activateChatTab(tabId) {
             this.activeChatTab = tabId;
+            this._budgetDetailOpen = false;
             const tab = this.chatTabs.find(t => t.tab_id === tabId);
             if (tab) {
                 this.page = '';
@@ -3348,6 +3349,21 @@ window.AppChat = (function() {
         },
 
         // ========== CHAT: DURATION FORMATTER ==========
+        budgetBarColor(tab) {
+            if (!tab || !tab.tokens) return 'var(--v3)';
+            const budget = this.settings.costBudget || 5.00;
+            const cost = tab.tokens.cost || 0;
+            const pct = cost / budget;
+            if (pct >= 1.0) return 'var(--red)';
+            if (pct >= 0.8) return '#ff9800';
+            if (pct >= 0.5) return 'var(--amber)';
+            return 'var(--ng)';
+        },
+        formatTokenCount(n) {
+            if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+            if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+            return String(n);
+        },
         fmtDuration(ms) {
             if (!ms || ms < 0) return '';
             if (ms < 1000) return ms + 'ms';

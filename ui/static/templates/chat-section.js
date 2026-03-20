@@ -200,6 +200,51 @@
                   class="w-1.5 h-1.5 rounded-full bg-[var(--cyan)] animate-pulse ml-1"></span>
             <span class="text-[0.5rem] text-[var(--v)] tracking-wider blink" x-show="_chatNavIdx >= 0" x-text="'NAV #' + (_chatNavIdx + 1) + ' [c q e f p d t n m g]'"></span>
             <div class="flex-1"></div>
+            <!-- Token Budget Bar -->
+            <template x-if="activeTab && settings.costBudget > 0">
+                <div @click.outside="_budgetDetailOpen = false">
+                <div class="budget-bar-wrap" @click.stop="_budgetDetailOpen = !_budgetDetailOpen">
+                    <div class="budget-bar-track">
+                        <div class="budget-bar-fill"
+                             :style="'width:' + Math.min(100, ((activeTab.tokens?.cost || 0) / settings.costBudget) * 100) + '%;background:' + budgetBarColor(activeTab)"></div>
+                    </div>
+                    <span class="budget-bar-label"
+                          :style="'color:' + budgetBarColor(activeTab)"
+                          x-text="'$' + (activeTab.tokens?.cost || 0).toFixed(2)"></span>
+                    <!-- Budget detail popup -->
+                    <div x-show="_budgetDetailOpen" x-cloak x-transition.duration.150ms
+                         @click.stop
+                         class="budget-detail-popup">
+                        <div class="budget-detail-header">
+                            <span>&#x1f4b0; SESSION_BUDGET</span>
+                            <span x-text="'$' + (activeTab.tokens?.cost || 0).toFixed(2) + ' / $' + settings.costBudget.toFixed(2)"></span>
+                        </div>
+                        <div class="budget-detail-row">
+                            <span class="budget-detail-label">Input tokens</span>
+                            <span class="budget-detail-value" x-text="formatTokenCount(activeTab.tokens?.input || 0)"></span>
+                        </div>
+                        <div class="budget-detail-row">
+                            <span class="budget-detail-label">Output tokens</span>
+                            <span class="budget-detail-value" x-text="formatTokenCount(activeTab.tokens?.output || 0)"></span>
+                        </div>
+                        <div class="budget-detail-row">
+                            <span class="budget-detail-label">Budget used</span>
+                            <span class="budget-detail-value" :style="'color:' + budgetBarColor(activeTab)"
+                                  x-text="((activeTab.tokens?.cost || 0) / settings.costBudget * 100).toFixed(1) + '%'"></span>
+                        </div>
+                        <div class="budget-detail-row">
+                            <span class="budget-detail-label">Context window</span>
+                            <span class="budget-detail-value"
+                                  :style="'color:' + (((activeTab.tokens?.input || 0) / (activeTab.tokens?.threshold || 180000)) > 0.8 ? 'var(--red)' : 'var(--ng3)')"
+                                  x-text="((activeTab.tokens?.input || 0) / (activeTab.tokens?.threshold || 180000) * 100).toFixed(1) + '%'"></span>
+                        </div>
+                        <div class="budget-detail-footer">
+                            <span class="budget-detail-hint">Set budget in Settings (ALT+9)</span>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </template>
             <div class="relative">
                 <button class="chat-toolbar-btn" :class="showExportMenu && 'active'" @click.stop="showExportMenu = !showExportMenu" title="Export session to Markdown">&#x1f4e4; EXPORT</button>
                 <div x-show="showExportMenu" x-cloak x-transition.duration.150ms

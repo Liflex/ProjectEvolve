@@ -3217,3 +3217,30 @@ Results
    - **conclusion** — последний нетривиальный параграф (заклю
 
 
+## Experiment 152 — Chat send mode toggle (Enter/Ctrl+Enter to send)
+
+**Time:** 2026-03-20 17:34:13
+
+**Files:** `ui/static/js/modules/chat.js`, `ui/static/templates/chat-section.js`, `ui/static/css/main.css`, `ui/static/js/app.js`
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+Добавлена возможность переключения режима отправки сообщений в чате:
+- **Enter mode** (default) — Enter отправляет, Shift+Enter — новая строка
+- **Ctrl+Enter mode** — Ctrl+Enter отправляет, Enter — новая строка
+- Маленькая кнопка-тоггл (ENT / CTRL+ENT) рядом со счётчиком символов
+- Подсказка под инпутом динамически обновляется
+- Шорткаты на welcome screen адаптируются к текущему режиму
+- Настройка сохраняется в localStorage
+
+**Working:** yes
+**Tests:** skipped (UI cha
+
+

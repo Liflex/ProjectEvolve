@@ -1,26 +1,29 @@
 # Last Experiment Summary
 
-**Experiment #152** — Chat send mode toggle (Enter/Ctrl+Enter to send)
+**Experiment #153** — Chat token budget bar with real-time cost tracking
 **Date:** 2026-03-20
 
 ## What Was Done
 
-1. **`chatSendMode` setting** — добавлена настройка в `settings` (default: 'enter'). Два режима: 'enter' (Enter отправляет, Shift+Enter — newline) и 'ctrlenter' (Ctrl+Enter отправляет, Enter — newline). Сохраняется в localStorage.
-2. **`handleChatKeydown` update** — логика отправки теперь проверяет `settings.chatSendMode` и решает, какая комбинация клавиш отправляет сообщение.
-3. **Toggle button** — маленькая кнопка в правом нижнем углу инпута (рядом со счётчиком символов). Показывает текущий режим (ENT / CTRL+ENT), клик переключает. Активный режим 'ctrlenter' подсвечивается cyan.
-4. **Hint text** — подсказка под инпутом обновляется динамически в зависимости от режима. Также обновлены шорткаты в пустом состоянии (welcome screen).
-5. **`toggleSendMode()`** — метод в chat.js, переключает режим и сохраняет в localStorage с toast-уведомлением.
+Добавлен визуальный индикатор расхода токенов/стоимости сессии в toolbar чата:
+- **Compact progress bar** — показывает % использования бюджета цветом (зелёный → жёлтый → оранжевый → красный)
+- **Cost label** — текущая стоимость сессии ($X.XX)
+- **Detail popup** — при клике показывает: input/output tokens, budget %, context window %
+- **Auto-close** — popup закрывается при клике вне, при переключении вкладок
+- **Hover effect** — progress bar утолщается при наведении
+- Функции `budgetBarColor()` и `formatTokenCount()` в chat.js
 
 ## Files Modified
 
-- `ui/static/js/modules/chat.js` — send mode logic, toggleSendMode()
-- `ui/static/templates/chat-section.js` — toggle button UI, dynamic hints
-- `ui/static/css/main.css` — .send-mode-toggle styles
-- `ui/static/js/app.js` — chatSendMode default in settings
+- `ui/static/templates/chat-section.js` — budget bar HTML в toolbar
+- `ui/static/js/modules/chat.js` — budgetBarColor(), formatTokenCount(), close on tab switch
+- `ui/static/js/app.js` — _budgetDetailOpen state
+- `ui/static/css/main.css` — budget bar стили (.budget-bar-*, .budget-detail-*)
 
 ## Key Results
 
-Working. Users who prefer multi-line editing can switch to Ctrl+Enter mode. Default remains Enter-to-send for backward compatibility.
+**Working:** yes
+**Tests:** skipped (UI change, smoke syntax checks passed)
 
 ## For Next Iteration
 

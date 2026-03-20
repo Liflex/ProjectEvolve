@@ -342,6 +342,7 @@ function _buildAppData() {
         _tbPanelOpen: false,
         _tbMsgOpen: false,
         _tbFilterOpen: false,
+        _budgetDetailOpen: false,
 
         // Message type filters
         chatFilters: { user: true, assistant: true, tool: true, thinking: true },

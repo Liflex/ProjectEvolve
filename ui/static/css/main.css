@@ -1316,6 +1316,95 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .chat-toolbar-btn.active { color: var(--v); border-color: var(--v-dim); background: rgba(180,74,255,0.06); }
 .chat-toolbar-sep { width: 1px; height: 0.875rem; background: var(--v-dim); margin: 0 4px; flex-shrink: 0; }
 
+/* === TOKEN BUDGET BAR === */
+.budget-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 6px;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+}
+.budget-bar-track {
+    width: 60px;
+    height: 4px;
+    background: var(--v-dim);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.budget-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease, background 0.3s ease;
+    min-width: 0;
+}
+.budget-bar-label {
+    font-size: 0.5rem;
+    letter-spacing: 0.05em;
+    font-weight: bold;
+    white-space: nowrap;
+    transition: color 0.3s ease;
+}
+.budget-bar-wrap:hover .budget-bar-track {
+    height: 6px;
+}
+.budget-detail-popup {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    min-width: 220px;
+    background: var(--bg2);
+    border: 1px solid var(--v-dim);
+    z-index: 50;
+    padding: 8px 0;
+}
+.budget-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 12px 8px;
+    border-bottom: 1px solid var(--v-dim);
+    margin-bottom: 4px;
+    font-size: 0.5625rem;
+    letter-spacing: 0.1em;
+    color: var(--v3);
+}
+.budget-detail-header span:last-child {
+    color: var(--ng2);
+    font-weight: bold;
+}
+.budget-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 12px;
+}
+.budget-detail-label {
+    font-size: 0.5rem;
+    color: var(--v3);
+    letter-spacing: 0.05em;
+}
+.budget-detail-value {
+    font-size: 0.5rem;
+    color: var(--ng3);
+    letter-spacing: 0.05em;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+}
+.budget-detail-footer {
+    padding: 6px 12px 2px;
+    border-top: 1px solid var(--v-dim);
+    margin-top: 4px;
+}
+.budget-detail-hint {
+    font-size: 0.4375rem;
+    color: var(--v3);
+    opacity: 0.6;
+    letter-spacing: 0.05em;
+}
+
 /* === TOOLBAR GROUP DROPDOWNS === */
 .tb-dropdown-menu {
     position: absolute;
