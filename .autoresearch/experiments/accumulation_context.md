@@ -1,4 +1,24 @@
 
+## Experiment 163 — Chat toolbar cleanup — compact primary toolbar with MORE dropdown
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **Compact primary toolbar** - removed 10+ buttons from primary row. Only THINK toggle, Search, FILTER, MSGS count, streaming stats, budget bar, and MORE remain.
+2. **MORE dropdown** - CLEAR, PANELS, MSG folding, PINS, EXPORT, STATS, FILE SEARCH, GLOBAL SEARCH, CMD PALETTE, KEYBOARD SHORTCUTS consolidated into single dropdown.
+3. **Detached global search** - moved out of toolbar flow.
+4. **CSS updates** - styles for MORE dropdown, submenu positioning.
+
+### Files Modified
+
+- ui/static/templates/chat-section.js - toolbar rewritten
+- ui/static/js/app.js - _tbMoreOpen state
+- ui/static/css/main.css - new styles
+
+---
+
+
 
 ## Experiment 159 — Chat streaming thinking preview — live-updating thinking content display
 
@@ -6407,6 +6427,37 @@ Results
 2. **Collapsible toggle** — Пользователь может свернуть/развернуть live preview (respecting `settings.showThinking`).
 3. **Character count** — Показывает количество символов в буфере мышления.
 4. **CSS анимации** — Blinking cursor в конце текста и в hea
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 162 — Live turn elapsed timer and typing duration display
+
+**Date:** 2026-03-20 19:14:28
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- Target:** chat.js, chat-section.js, main.css
+- `ui/static/js/modules/chat.js` — методы `startTurnTimer`, `stopTurnTimer`, `getTurnElapsedText`; свойства `_turnElapsed`, `_turnTimerInterval`, `_typingStart`; typing duration tracking
+- `ui/static/templates/chat-section.js` — live elapsed timer в input area footer
+- `ui/static/css/main.css` — стили `.turn-elapsed-timer` с pulse animation, `.msg-typing-duration` badge
+
+### Results
+
+Results
+
+**What was done:**
+1. **Live elapsed timer** — пока агент работает над ответом, в правом нижнем углу зоны ввода показывается ⏱ с секундами (пульсирующая анимация amber цвета). Обновляется каждую секунду.
+2. **Typing duration badge** — на user-сообщениях, если пользователь печатал >2 секунд, показывается ⌨ Xs badge.
+3. **Timer lifecycle** — автозапуск при отправке, автоостановка при stream_end/error/cancel/WS close/tab close.
+4. **Persistence** — typing duration сохраняется в localStorag
 
 ### Notes for Next
 

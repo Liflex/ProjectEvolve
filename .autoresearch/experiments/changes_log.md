@@ -3453,3 +3453,24 @@ Results
 4. **CSS анимации** — Blinking cursor в конце текста и в hea
 
 
+## Experiment 162 — Live turn elapsed timer and typing duration display
+
+**Time:** 2026-03-20 19:14:28
+
+**Files:** Target:** chat.js, chat-section.js, main.css, `ui/static/js/modules/chat.js` — методы `startTurnTimer`, `stopTurnTimer`, `getTurnElapsedText`; свойства `_turnElapsed`, `_turnTimerInterval`, `_typingStart`; typing duration tracking, `ui/static/templates/chat-section.js` — live elapsed timer в input area footer, `ui/static/css/main.css` — стили `.turn-elapsed-timer` с pulse animation, `.msg-typing-duration` badge
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **Live elapsed timer** — пока агент работает над ответом, в правом нижнем углу зоны ввода показывается ⏱ с секундами (пульсирующая анимация amber цвета). Обновляется каждую секунду.
+2. **Typing duration badge** — на user-сообщениях, если пользователь печатал >2 секунд, показывается ⌨ Xs badge.
+3. **Timer lifecycle** — автозапуск при отправке, автоостановка при stream_end/error/cancel/WS close/tab close.
+4. **Persistence** — typing duration сохраняется в localStorag
+
+

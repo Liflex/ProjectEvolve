@@ -1,26 +1,26 @@
 # Last Experiment Summary
 
-**Experiment #162** — Live turn elapsed timer and typing duration display
-**Date:** 2026-03-20 16:14:03
+**Experiment #163** — Chat toolbar cleanup — compact primary toolbar with MORE dropdown
+**Date:** 2026-03-20
 
 ## What Was Done
 
-1. **Live elapsed timer** — В зоне ввода чата, пока агент работает над ответом, показывается live-таймер (обновляется каждую секунду) с иконкой ⏱ и пульсирующей CSS-анимацией.
-2. **Typing duration badge** — На user-сообщениях, если пользователь печатал более 2 секунд, показывается badge с длительностью набора (⌨ Xs).
-3. **Timer lifecycle** — Таймер автоматически запускается при отправке сообщения и останавливается при stream_end, error, cancel, WS close, tab close.
-4. **Persistence** — `_typingDuration` сохраняется в localStorage при сохранении состояния чата.
+1. **Compact primary toolbar** — убраны 10+ кнопок из primary row. Остались только: THINK toggle, Search (Ctrl+F), FILTER dropdown, MSGS count, streaming stats, budget bar, и кнопка MORE.
+2. **MORE dropdown** — все продвинутые функции (CLEAR, PANELS, MSG folding, PINS, EXPORT, STATS, FILE SEARCH, GLOBAL SEARCH, CMD PALETTE, KEYBOARD SHORTCUTS) объединены в единый dropdown "MORE".
+3. **Sub-dropdowns** — PANEL, MSG folding, PINS, EXPORT открываются как sub-dropdowns от MORE.
+4. **Detached global search** — глобальный поиск вынесен из toolbar flow в абсолютно позиционированную панель.
+5. **CSS updates** — новые стили для MORE dropdown, submenu positioning, detached panels.
 
 ## Files Modified
 
-- `ui/static/js/modules/chat.js` — Added `startTurnTimer`, `stopTurnTimer`, `getTurnElapsedText` methods; `_turnElapsed`, `_turnTimerInterval`, `_typingStart` properties on tab; typing duration tracking in `handleChatInput` and `sendChatMessage`
-- `ui/static/templates/chat-section.js` — Live elapsed timer display in input area footer
-- `ui/static/css/main.css` — `.turn-elapsed-timer` with pulse animation, `.msg-typing-duration` badge styles
+- `ui/static/templates/chat-section.js` — переписан toolbar: compact primary + MORE dropdown + detached global search
+- `ui/static/js/app.js` — добавлено `_tbMoreOpen: false` state
+- `ui/static/css/main.css` — стили `.tb-dropdown-more`, `.tb-dropdown-badge`, `.tb-dropdown-hint`, `.tb-submenu-right`, `.global-search-panel-detached`
 
 ## Key Results
 
-**Working:** yes
-**Tests:** skipped (UI change, no complex logic)
+Toolbar чата уменьшен с 16+ видимых кнопок до 3-4 primary + MORE. Все функции сохранены и доступны. Keyboard shortcuts не затронуты.
 
 ## For Next Iteration
 
-N/A
+Оценить какие bottom panels (RAW LOG, TOOLS SUMMARY, FILE PREVIEW) можно убрать или упростить.

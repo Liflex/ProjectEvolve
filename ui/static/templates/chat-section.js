@@ -70,59 +70,14 @@
             </div>
         </div>
 
-        <!-- Chat Toolbar (shared across tabs) -->
+        <!-- Chat Toolbar (compact — primary row + MORE dropdown) -->
         <div x-show="activeTab" class="chat-toolbar">
-            <button class="chat-toolbar-btn" @click="clearActiveChat()" title="Clear chat messages">CLEAR</button>
+            <!-- Primary: only essential chat controls -->
             <button class="chat-toolbar-btn" :class="settings.showThinking && 'active'" @click="toggleSetting('showThinking')" title="Toggle thinking blocks visibility">
                 <span :style="'color:' + (settings.showThinking ? 'var(--amber)' : 'inherit')">&#x1f4ad;</span> THINK
             </button>
-            <div class="chat-toolbar-sep"></div>
-            <!-- PANEL group dropdown -->
-            <div class="relative">
-                <button class="chat-toolbar-btn" :class="chatBottomPanel !== 'closed' && 'active'" @click.stop="_tbPanelOpen = !_tbPanelOpen" title="Bottom panels">
-                    <span :style="'color:' + (chatBottomPanel !== 'closed' ? 'var(--v)' : 'inherit')">&#x25BC;</span> PANEL
-                </button>
-                <div x-show="_tbPanelOpen" x-cloak x-transition.duration.150ms
-                     @click.outside="_tbPanelOpen = false"
-                     class="tb-dropdown-menu">
-                    <button class="tb-dropdown-item" :class="chatBottomPanel === 'rawlog' && 'active'" @click.stop="_tbPanelOpen = false; toggleBottomPanel('rawlog')">
-                        <span :style="'color:' + (chatBottomPanel === 'rawlog' ? 'var(--v)' : 'var(--v3)')">&#x2328;</span> RAW LOG
-                    </button>
-                    <button class="tb-dropdown-item" :class="chatBottomPanel === 'summary' && 'active'" @click.stop="_tbPanelOpen = false; toggleBottomPanel('summary')">
-                        <span :style="'color:' + (chatBottomPanel === 'summary' ? 'var(--cyan)' : 'var(--v3)')">&#x2699;</span> TOOLS
-                    </button>
-                    <button class="tb-dropdown-item" :class="chatBottomPanel === 'filepreview' && 'active'" @click.stop="_tbPanelOpen = false; chatBottomPanel === 'filepreview' ? chatBottomPanel = 'closed' : (filePreview.path ? chatBottomPanel = 'filepreview' : null)">
-                        <span :style="'color:' + (chatBottomPanel === 'filepreview' ? 'var(--ng)' : 'var(--v3)')">&#x1f4c4;</span> FILE PREVIEW
-                    </button>
-                    <button class="tb-dropdown-item" x-show="chatBottomPanel !== 'closed'" @click.stop="_tbPanelOpen = false; chatBottomPanel = 'closed'" style="color:var(--red)">
-                        [X] CLOSE
-                    </button>
-                </div>
-            </div>
-            <!-- MSG group dropdown -->
-            <div class="relative">
-                <button class="chat-toolbar-btn" @click.stop="_tbMsgOpen = !_tbMsgOpen" title="Message folding & turns">
-                    &#x25A0; MSG
-                </button>
-                <div x-show="_tbMsgOpen" x-cloak x-transition.duration.150ms
-                     @click.outside="_tbMsgOpen = false"
-                     class="tb-dropdown-menu">
-                    <button class="tb-dropdown-item" @click.stop="_tbMsgOpen = false; collapseAllMessages()">
-                        <span style="color:var(--amber)">&#x25B2;</span> FOLD ALL
-                    </button>
-                    <button class="tb-dropdown-item" @click.stop="_tbMsgOpen = false; expandAllMessages()">
-                        <span style="color:var(--cyan)">&#x25BC;</span> UNFOLD ALL
-                    </button>
-                    <div class="tb-dropdown-sep"></div>
-                    <button class="tb-dropdown-item" @click.stop="_tbMsgOpen = false; collapsePrevTurns()">
-                        &#x25B2; COLLAPSE TURNS
-                    </button>
-                    <button class="tb-dropdown-item" @click.stop="_tbMsgOpen = false; expandAllTurns()">
-                        &#x25BC; EXPAND TURNS
-                    </button>
-                </div>
-            </div>
-            <!-- FILTER group dropdown -->
+            <button class="chat-toolbar-btn" @click="openChatSearch()" title="Search in chat (Ctrl+F)">&#x1f50d;</button>
+            <!-- FILTER compact button -->
             <div class="relative">
                 <button class="chat-toolbar-btn" :class="(!chatFilters.user || !chatFilters.assistant || !chatFilters.tool || !chatFilters.thinking) && 'active'" @click.stop="_tbFilterOpen = !_tbFilterOpen" title="Message type filters">
                     <span :style="'color:' + ((!chatFilters.user || !chatFilters.assistant || !chatFilters.tool || !chatFilters.thinking) ? 'var(--v)' : 'inherit')">&#x25BC;</span> FILTER
@@ -154,45 +109,8 @@
                     </button>
                 </div>
             </div>
-            <div class="chat-toolbar-sep"></div>
-            <!-- PINS -->
-            <div class="relative">
-                <button class="chat-toolbar-btn" :class="showPinsPanel && 'active'" @click="showPinsPanel = !showPinsPanel" title="Pinned messages">
-                    &#x1F4CC; PINS
-                    <span x-show="pinnedMessages.length > 0" x-cloak class="pins-count-badge" x-text="pinnedMessages.length"></span>
-                </button>
-                <!-- Pins panel dropdown -->
-                <div x-show="showPinsPanel" x-cloak x-transition.duration.150ms
-                     @click.outside="showPinsPanel = false"
-                     class="pins-panel">
-                    <div class="pins-panel-header">
-                        <span>&#x1F4CC; PINNED_MESSAGES</span>
-                        <div class="flex items-center gap-1">
-                            <span x-show="pinnedMessages.length > 0" class="text-[0.5rem] text-[var(--v3)]" x-text="pinnedMessages.length + '/' + 20"></span>
-                            <button x-show="pinnedMessages.length > 0" @click.stop="clearAllPins()" class="text-[0.5rem] text-[var(--red)] hover:text-[var(--ng2)] tracking-wider px-1">CLEAR ALL</button>
-                        </div>
-                    </div>
-                    <div class="pins-panel-list">
-                        <template x-for="(pin, idx) in pinnedMessages" :key="idx">
-                            <div class="pin-item" @click="scrollToPin(pin)">
-                                <div class="pin-item-header">
-                                    <span class="pin-item-tab" x-text="pin.tabLabel"></span>
-                                    <span class="pin-item-time" x-text="fmtTime(pin.ts)"></span>
-                                    <button @click.stop="unpinMessage(idx)" class="pin-item-unpin" title="Unpin">&#x2715;</button>
-                                </div>
-                                <div class="pin-item-preview" x-text="pin.preview"></div>
-                            </div>
-                        </template>
-                        <div x-show="pinnedMessages.length === 0" class="pins-panel-empty">
-                            No pinned messages yet_
-                            <div class="text-[0.5rem] text-[var(--v3)] mt-1">Hover assistant message → PIN</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="chat-toolbar-sep"></div>
+            <!-- Contextual info (always visible when relevant) -->
             <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider" x-show="activeTab" x-text="getChatFilterCount(activeTab) + '/' + (activeTab?.messages?.length || 0) + ' MSGS'"></span>
-            <!-- Streaming elapsed timer + word count + speed -->
             <span x-show="activeTab && activeTab.is_streaming && activeTab._msgStartTime"
                   class="text-[0.5625rem] text-[var(--cyan)] tracking-wider tabular-nums"
                   x-text="(_clockTick, 'ELAPSED ' + getStreamingElapsed(activeTab) + ' · ' + (getStreamingWordCount(activeTab) || 0) + 'w' + (getStreamingSpeed(activeTab) ? ' · ' + getStreamingSpeed(activeTab) + ' w/s' : ''))"></span>
@@ -200,7 +118,7 @@
                   class="w-1.5 h-1.5 rounded-full bg-[var(--cyan)] animate-pulse ml-1"></span>
             <span class="text-[0.5rem] text-[var(--v)] tracking-wider blink" x-show="_chatNavIdx >= 0" x-text="'NAV #' + (_chatNavIdx + 1) + ' [c q e f p d t n m g]'"></span>
             <div class="flex-1"></div>
-            <!-- Token Budget Bar -->
+            <!-- Budget bar (shown when configured) -->
             <template x-if="activeTab && settings.costBudget > 0">
                 <div @click.outside="_budgetDetailOpen = false">
                 <div class="budget-bar-wrap" @click.stop="_budgetDetailOpen = !_budgetDetailOpen">
@@ -211,7 +129,6 @@
                     <span class="budget-bar-label"
                           :style="'color:' + budgetBarColor(activeTab)"
                           x-text="'$' + (activeTab.tokens?.cost || 0).toFixed(2)"></span>
-                    <!-- Budget detail popup -->
                     <div x-show="_budgetDetailOpen" x-cloak x-transition.duration.150ms
                          @click.stop
                          class="budget-detail-popup">
@@ -245,11 +162,130 @@
                 </div>
                 </div>
             </template>
+            <!-- MORE dropdown — all advanced/IDE features consolidated -->
             <div class="relative">
-                <button class="chat-toolbar-btn" :class="showExportMenu && 'active'" @click.stop="showExportMenu = !showExportMenu" title="Export session to Markdown">&#x1f4e4; EXPORT</button>
+                <button class="chat-toolbar-btn" :class="(_tbMoreOpen || showPinsPanel || showStatsPanel || _tbPanelOpen || _tbMsgOpen || showExportMenu || _globalSearch.show || _fileSearch.show) && 'active'" @click.stop="_tbMoreOpen = !_tbMoreOpen" title="More tools & options">
+                    &#x22EF; MORE
+                </button>
+                <div x-show="_tbMoreOpen" x-cloak x-transition.duration.150ms
+                     @click.outside="_tbMoreOpen = false"
+                     class="tb-dropdown-menu tb-dropdown-more">
+                    <div class="tb-dropdown-header">TOOLS_&_OPTIONS</div>
+                    <button class="tb-dropdown-item" @click.stop="_tbMoreOpen = false; clearActiveChat()">
+                        <span style="color:var(--v3)">&#x1f5d1;</span> CLEAR CHAT
+                    </button>
+                    <div class="tb-dropdown-sep"></div>
+                    <!-- PANEL sub-section -->
+                    <button class="tb-dropdown-item" :class="chatBottomPanel !== 'closed' && 'active'" @click.stop="_tbMoreOpen = false; _tbPanelOpen = !_tbPanelOpen">
+                        <span :style="'color:' + (chatBottomPanel !== 'closed' ? 'var(--v)' : 'var(--v3)')">&#x25BC;</span> PANELS
+                    </button>
+                    <button class="tb-dropdown-item" @click.stop="_tbMoreOpen = false; _tbMsgOpen = !_tbMsgOpen">
+                        <span style="color:var(--v3)">&#x25A0;</span> MSG FOLDING
+                    </button>
+                    <button class="tb-dropdown-item" :class="showPinsPanel && 'active'" @click.stop="_tbMoreOpen = false; showPinsPanel = !showPinsPanel">
+                        <span style="color:var(--v3)">&#x1F4CC;</span> PINS
+                        <span x-show="pinnedMessages.length > 0" class="tb-dropdown-badge" x-text="pinnedMessages.length"></span>
+                    </button>
+                    <div class="tb-dropdown-sep"></div>
+                    <button class="tb-dropdown-item" @click.stop="_tbMoreOpen = false; showExportMenu = !showExportMenu">
+                        <span style="color:var(--v3)">&#x1f4e4;</span> EXPORT
+                    </button>
+                    <button class="tb-dropdown-item" :class="showStatsPanel && 'active'" @click.stop="_tbMoreOpen = false; showStatsPanel = !showStatsPanel">
+                        <span style="color:var(--v3)">&#x1f4ca;</span> STATS
+                    </button>
+                    <div class="tb-dropdown-sep"></div>
+                    <button class="tb-dropdown-item" :class="_fileSearch.show && 'active'" @click.stop="_tbMoreOpen = false; toggleFileSearch()">
+                        <span style="color:var(--v3)">&#x1f4c2;</span> FILE SEARCH
+                        <span class="tb-dropdown-hint">Ctrl+Shift+F</span>
+                    </button>
+                    <button class="tb-dropdown-item" :class="_globalSearch.show && 'active'" @click.stop="_tbMoreOpen = false; toggleGlobalSearch()">
+                        <span style="color:var(--v3)">&#x1f50e;</span> GLOBAL SEARCH
+                        <span class="tb-dropdown-hint">Ctrl+Alt+F</span>
+                    </button>
+                    <div class="tb-dropdown-sep"></div>
+                    <button class="tb-dropdown-item" @click.stop="_tbMoreOpen = false; openCmdPalette()">
+                        <span style="color:var(--v3)">&#x2328;</span> COMMAND PALETTE
+                        <span class="tb-dropdown-hint">Ctrl+K</span>
+                    </button>
+                    <button class="tb-dropdown-item" @click.stop="_tbMoreOpen = false; openShortcuts()">
+                        <span style="color:var(--v3)">?</span> KEYBOARD SHORTCUTS
+                    </button>
+                </div>
+            </div>
+            <!-- Hidden sub-dropdowns opened from MORE (PANEL) -->
+            <div class="relative">
+                <div x-show="_tbPanelOpen" x-cloak x-transition.duration.150ms
+                     @click.outside="_tbPanelOpen = false"
+                     class="tb-dropdown-menu tb-submenu-right">
+                    <button class="tb-dropdown-item" :class="chatBottomPanel === 'rawlog' && 'active'" @click.stop="_tbPanelOpen = false; toggleBottomPanel('rawlog')">
+                        <span :style="'color:' + (chatBottomPanel === 'rawlog' ? 'var(--v)' : 'var(--v3)')">&#x2328;</span> RAW LOG
+                    </button>
+                    <button class="tb-dropdown-item" :class="chatBottomPanel === 'summary' && 'active'" @click.stop="_tbPanelOpen = false; toggleBottomPanel('summary')">
+                        <span :style="'color:' + (chatBottomPanel === 'summary' ? 'var(--cyan)' : 'var(--v3)')">&#x2699;</span> TOOLS
+                    </button>
+                    <button class="tb-dropdown-item" :class="chatBottomPanel === 'filepreview' && 'active'" @click.stop="_tbPanelOpen = false; chatBottomPanel === 'filepreview' ? chatBottomPanel = 'closed' : (filePreview.path ? chatBottomPanel = 'filepreview' : null)">
+                        <span :style="'color:' + (chatBottomPanel === 'filepreview' ? 'var(--ng)' : 'var(--v3)')">&#x1f4c4;</span> FILE PREVIEW
+                    </button>
+                    <button class="tb-dropdown-item" x-show="chatBottomPanel !== 'closed'" @click.stop="_tbPanelOpen = false; chatBottomPanel = 'closed'" style="color:var(--red)">
+                        [X] CLOSE
+                    </button>
+                </div>
+            </div>
+            <!-- MSG folding sub-dropdown opened from MORE -->
+            <div class="relative">
+                <div x-show="_tbMsgOpen" x-cloak x-transition.duration.150ms
+                     @click.outside="_tbMsgOpen = false"
+                     class="tb-dropdown-menu tb-submenu-right">
+                    <button class="tb-dropdown-item" @click.stop="_tbMsgOpen = false; collapseAllMessages()">
+                        <span style="color:var(--amber)">&#x25B2;</span> FOLD ALL
+                    </button>
+                    <button class="tb-dropdown-item" @click.stop="_tbMsgOpen = false; expandAllMessages()">
+                        <span style="color:var(--cyan)">&#x25BC;</span> UNFOLD ALL
+                    </button>
+                    <div class="tb-dropdown-sep"></div>
+                    <button class="tb-dropdown-item" @click.stop="_tbMsgOpen = false; collapsePrevTurns()">
+                        &#x25B2; COLLAPSE TURNS
+                    </button>
+                    <button class="tb-dropdown-item" @click.stop="_tbMsgOpen = false; expandAllTurns()">
+                        &#x25BC; EXPAND TURNS
+                    </button>
+                </div>
+            </div>
+            <!-- PINS sub-panel opened from MORE -->
+            <div class="relative">
+                <div x-show="showPinsPanel" x-cloak x-transition.duration.150ms
+                     @click.outside="showPinsPanel = false"
+                     class="pins-panel tb-submenu-right">
+                    <div class="pins-panel-header">
+                        <span>&#x1F4CC; PINNED_MESSAGES</span>
+                        <div class="flex items-center gap-1">
+                            <span x-show="pinnedMessages.length > 0" class="text-[0.5rem] text-[var(--v3)]" x-text="pinnedMessages.length + '/' + 20"></span>
+                            <button x-show="pinnedMessages.length > 0" @click.stop="clearAllPins()" class="text-[0.5rem] text-[var(--red)] hover:text-[var(--ng2)] tracking-wider px-1">CLEAR ALL</button>
+                        </div>
+                    </div>
+                    <div class="pins-panel-list">
+                        <template x-for="(pin, idx) in pinnedMessages" :key="idx">
+                            <div class="pin-item" @click="scrollToPin(pin)">
+                                <div class="pin-item-header">
+                                    <span class="pin-item-tab" x-text="pin.tabLabel"></span>
+                                    <span class="pin-item-time" x-text="fmtTime(pin.ts)"></span>
+                                    <button @click.stop="unpinMessage(idx)" class="pin-item-unpin" title="Unpin">&#x2715;</button>
+                                </div>
+                                <div class="pin-item-preview" x-text="pin.preview"></div>
+                            </div>
+                        </template>
+                        <div x-show="pinnedMessages.length === 0" class="pins-panel-empty">
+                            No pinned messages yet_
+                            <div class="text-[0.5rem] text-[var(--v3)] mt-1">Hover assistant message → PIN</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- EXPORT sub-menu opened from MORE -->
+            <div class="relative">
                 <div x-show="showExportMenu" x-cloak x-transition.duration.150ms
                      @click.outside="showExportMenu = false"
-                     class="export-menu">
+                     class="export-menu tb-submenu-right">
                     <div class="export-menu-header"><span>&#x1f4e4; EXPORT_SESSION</span></div>
                     <button class="export-menu-item" @click.stop="showExportMenu = false; exportChatSession('full')">
                         <span class="export-menu-icon">&#x1f4c4;</span> Full Session
@@ -264,56 +300,48 @@
                     </button>
                 </div>
             </div>
-            <button class="chat-toolbar-btn" :class="showStatsPanel && 'active'" @click="showStatsPanel = !showStatsPanel" title="Session statistics">&#x1f4ca; STATS</button>
-            <button class="chat-toolbar-btn" :class="_fileSearch.show && 'active'" @click="toggleFileSearch()" title="Search project files">&#x1f4c2; FILES</button>
-            <button class="chat-toolbar-btn" @click="openChatSearch()" title="Search in chat (Ctrl+F)">&#x1f50d;</button>
-            <div class="relative">
-                <button class="chat-toolbar-btn" :class="_globalSearch.show && 'active'" @click="toggleGlobalSearch()" title="Search all sessions (Ctrl+Alt+F)">&#x1f50e; ALL</button>
-                <!-- Global search panel -->
-                <div x-show="_globalSearch.show" x-cloak x-transition.duration.150ms
-                     @click.outside="closeGlobalSearch()"
-                     class="global-search-panel">
-                    <div class="global-search-header">
-                        <span>&#x1f50e; GLOBAL_SEARCH</span>
-                        <span class="text-[0.5rem] text-[var(--v3)]" x-text="_globalSearch.results.length + ' results'"></span>
-                    </div>
-                    <div class="global-search-input-wrap">
-                        <input id="global-search-input"
-                               x-model="_globalSearch.query"
-                               @input="executeGlobalSearch()"
-                               @keydown="globalSearchKeyDown($event)"
-                               placeholder="Search all sessions..."
-                               class="global-search-input"
-                               autocomplete="off" spellcheck="false">
-                        <span x-show="_globalSearch.query.length < 2" class="global-search-hint">min 2 chars</span>
-                    </div>
-                    <div class="global-search-results">
-                        <template x-for="(result, idx) in _globalSearch.results" :key="idx">
-                            <div class="global-search-item"
-                                 :class="idx === _globalSearch.selectedIdx && 'selected'"
-                                 @click="goToGlobalResult(result)"
-                                 @mouseenter="_globalSearch.selectedIdx = idx">
-                                <div class="global-search-item-header">
-                                    <span class="global-search-item-tab" x-text="result.tabLabel"></span>
-                                    <span class="global-search-item-role"
-                                          :class="'role-' + result.role"
-                                          x-text="result.role === 'user' ? 'USER' : result.role === 'assistant' ? 'CLAUDE' : 'SYSTEM'"></span>
-                                    <span class="global-search-item-time" x-text="relativeTime(result.ts)"></span>
-                                </div>
-                                <div class="global-search-item-snippet" x-text="result.snippet"></div>
-                            </div>
-                        </template>
-                        <div x-show="_globalSearch.query.length >= 2 && _globalSearch.results.length === 0" class="global-search-empty">
-                            No matches found_
+        </div>
+        <!-- Global search panel (detached from toolbar, positioned absolutely) -->
+        <div x-show="_globalSearch.show && activeTab" x-cloak x-transition.duration.150ms
+             @click.outside="closeGlobalSearch()"
+             class="global-search-panel-detached">
+            <div class="global-search-header">
+                <span>&#x1f50e; GLOBAL_SEARCH</span>
+                <span class="text-[0.5rem] text-[var(--v3)]" x-text="_globalSearch.results.length + ' results'"></span>
+            </div>
+            <div class="global-search-input-wrap">
+                <input id="global-search-input"
+                       x-model="_globalSearch.query"
+                       @input="executeGlobalSearch()"
+                       @keydown="globalSearchKeyDown($event)"
+                       placeholder="Search all sessions..."
+                       class="global-search-input"
+                       autocomplete="off" spellcheck="false">
+                <span x-show="_globalSearch.query.length < 2" class="global-search-hint">min 2 chars</span>
+            </div>
+            <div class="global-search-results">
+                <template x-for="(result, idx) in _globalSearch.results" :key="idx">
+                    <div class="global-search-item"
+                         :class="idx === _globalSearch.selectedIdx && 'selected'"
+                         @click="goToGlobalResult(result)"
+                         @mouseenter="_globalSearch.selectedIdx = idx">
+                        <div class="global-search-item-header">
+                            <span class="global-search-item-tab" x-text="result.tabLabel"></span>
+                            <span class="global-search-item-role"
+                                  :class="'role-' + result.role"
+                                  x-text="result.role === 'user' ? 'USER' : result.role === 'assistant' ? 'CLAUDE' : 'SYSTEM'"></span>
+                            <span class="global-search-item-time" x-text="relativeTime(result.ts)"></span>
                         </div>
-                        <div x-show="_globalSearch.query.length < 2 && _globalSearch.results.length === 0" class="global-search-empty">
-                            Type to search across all sessions_ <span class="text-[var(--v3)]">Ctrl+Alt+F</span>
-                        </div>
+                        <div class="global-search-item-snippet" x-text="result.snippet"></div>
                     </div>
+                </template>
+                <div x-show="_globalSearch.query.length >= 2 && _globalSearch.results.length === 0" class="global-search-empty">
+                    No matches found_
+                </div>
+                <div x-show="_globalSearch.query.length < 2 && _globalSearch.results.length === 0" class="global-search-empty">
+                    Type to search across all sessions_ <span class="text-[var(--v3)]">Ctrl+Alt+F</span>
                 </div>
             </div>
-            <button class="chat-toolbar-btn" @click="openCmdPalette()" title="Command Palette (Ctrl+K)" style="font-size:0.5rem;letter-spacing:0.1em">CTRL+K</button>
-            <button class="chat-toolbar-btn" @click="openShortcuts()" title="Keyboard Shortcuts (?)">? KEYS</button>
         </div>
 
         <!-- Chat Search Bar (Ctrl+F) -->

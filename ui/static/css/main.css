@@ -1414,6 +1414,7 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     border-bottom: 1px solid var(--v-dim);
     background: rgba(0,0,0,0.1);
     flex-shrink: 0;
+    position: relative;
 }
 .chat-toolbar-btn {
     padding: 3px 8px;
@@ -1572,6 +1573,54 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     padding: 0 3px;
     margin-left: 2px;
     line-height: 1.2;
+}
+
+/* MORE dropdown — wider for grouped items */
+.tb-dropdown-more {
+    min-width: 220px;
+    right: 0;
+    left: auto;
+}
+.tb-dropdown-badge {
+    font-size: 0.4375rem;
+    color: var(--bg);
+    background: var(--v);
+    padding: 0 4px;
+    margin-left: auto;
+    line-height: 1.2;
+    border-radius: 2px;
+}
+.tb-dropdown-hint {
+    margin-left: auto;
+    font-size: 0.4375rem;
+    color: var(--v3);
+    opacity: 0.5;
+    letter-spacing: 0.05em;
+    font-family: monospace;
+}
+
+/* Sub-dropdowns opened from MORE — positioned to the left */
+.tb-submenu-right {
+    right: 0;
+    left: auto;
+}
+
+/* Detached global search panel (positioned in toolbar flow) */
+.global-search-panel-detached {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 420px;
+    max-height: 400px;
+    background: var(--bg2);
+    border: 1px solid var(--v-dim);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 2px;
 }
 
 /* === CHAT SIDEBAR CONTENT === */

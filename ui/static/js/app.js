@@ -341,6 +341,7 @@ function _buildAppData() {
         showExportMenu: false,
 
         // Toolbar group dropdowns
+        _tbMoreOpen: false,
         _tbPanelOpen: false,
         _tbMsgOpen: false,
         _tbFilterOpen: false,
