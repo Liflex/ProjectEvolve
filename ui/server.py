@@ -894,6 +894,7 @@ class RunRequest(BaseModel):
 
 try:
     from agents.research import ResearchRunner
+    from agents.parallel import ParallelAgentRunner, AgentTask
     _sdk_available = True
 except ImportError:
     _sdk_available = False
@@ -901,6 +902,10 @@ except ImportError:
 # Active runner instance (replaces run_state["process"])
 _active_runner: Optional["ResearchRunner"] = None
 _run_task: Optional[asyncio.Task] = None
+# Active parallel runner
+_active_parallel: Optional["ParallelAgentRunner"] = None
+_parallel_task: Optional[asyncio.Task] = None
+_parallel_results: List[Dict[str, Any]] = []
 # WebSocket subscribers for real-time research events
 _research_ws_clients: list = []
 # Keep last tokens snapshot so the bar persists after run ends
@@ -1193,6 +1198,136 @@ async def stop_run():
 
     run_state["running"] = False
     _log_append("[STOP] Runner stopped.")
+    return {"status": "stopped"}
+
+
+# ---------------------------------------------------------------------------
+# Parallel Agent API
+# ---------------------------------------------------------------------------
+
+@app.post("/api/parallel/run")
+async def start_parallel_run(data: dict):
+    """Run multiple agents in parallel.
+
+    Body:
+        tasks: [
+            {"label": "...", "prompt": "...", "cwd": "...", "model": "...", "max_turns": 10}
+        ]
+        concurrency: int (default 3)
+    """
+    global _active_parallel, _parallel_task, _parallel_results
+
+    if not _sdk_available:
+        raise HTTPException(status_code=503, detail="claude-code-sdk not available")
+
+    if _active_parallel and _active_parallel.is_running:
+        raise HTTPException(status_code=409, detail="Parallel run already in progress")
+
+    tasks_data = data.get("tasks", [])
+    if not tasks_data:
+        raise HTTPException(status_code=400, detail="No tasks provided")
+
+    # Validate tasks
+    agent_tasks = []
+    for td in tasks_data:
+        if not td.get("prompt") or not td.get("cwd"):
+            raise HTTPException(status_code=400, detail="Each task needs 'prompt' and 'cwd'")
+        cwd = Path(td["cwd"]).resolve()
+        if not cwd.exists():
+            raise HTTPException(status_code=404, detail=f"Path not found: {td['cwd']}")
+        agent_tasks.append(AgentTask(
+            label=td.get("label", f"agent-{len(agent_tasks)}"),
+            prompt=td["prompt"],
+            cwd=str(cwd),
+            model=td.get("model"),
+            max_turns=td.get("max_turns", 10),
+            permission_mode=td.get("permission_mode", "bypassPermissions"),
+            append_system_prompt=td.get("append_system_prompt"),
+        ))
+
+    concurrency = min(data.get("concurrency", 3), len(agent_tasks))
+
+    runner = ParallelAgentRunner(max_concurrency=concurrency)
+    runner.add_listener(_parallel_event_handler)
+    _active_parallel = runner
+    _parallel_results = []
+
+    _log_append(f"[PARALLEL] Starting {len(agent_tasks)} agents (concurrency={concurrency})")
+    for t in agent_tasks:
+        _log_append(f"[PARALLEL]   Agent '{t.label}': cwd={t.cwd}, model={t.model or 'default'}")
+
+    async def _run_wrapper():
+        global _parallel_results
+        try:
+            results = await runner.run(agent_tasks, concurrency=concurrency)
+            _parallel_results = [t.to_dict() for t in results]
+            completed = sum(1 for r in results if r.status == "completed")
+            errors = sum(1 for r in results if r.status == "error")
+            _log_append(f"[PARALLEL] Done: {completed} completed, {errors} errors")
+        except Exception as e:
+            _log_append(f"[PARALLEL] Fatal error: {e}")
+
+    _parallel_task = asyncio.create_task(_run_wrapper())
+    return {
+        "status": "started",
+        "run_id": runner._run_id,
+        "total_tasks": len(agent_tasks),
+        "concurrency": concurrency,
+    }
+
+
+def _parallel_event_handler(event: dict) -> None:
+    """Forward parallel runner events to WebSocket subscribers and logs."""
+    # Log key events
+    etype = event.get("type", "")
+    if etype == "parallel_agent_start":
+        _log_append(f"[PARALLEL] Agent '{event.get('agent_label')}' started")
+    elif etype == "parallel_agent_end":
+        _log_append(f"[PARALLEL] Agent '{event.get('agent_label')}' {event.get('status')}")
+    elif etype == "parallel_end":
+        _log_append(f"[PARALLEL] Run {event.get('run_id')} complete: "
+                     f"{event.get('completed')}/{event.get('total_tasks')} completed, "
+                     f"cost=${event.get('total_cost_usd', 0)}")
+    elif etype == "parallel_error":
+        _log_append(f"[PARALLEL] Error: {event.get('message')}")
+
+    # Forward to WebSocket subscribers
+    for client in list(_research_ws_clients):
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(_ws_send(client, event))
+        except Exception:
+            pass
+
+
+@app.get("/api/parallel/status")
+async def get_parallel_status():
+    if not _active_parallel:
+        return {"running": False, "results": _parallel_results}
+    return {
+        **_active_parallel.get_status(),
+        "results": _parallel_results,
+    }
+
+
+@app.post("/api/parallel/stop")
+async def stop_parallel_run():
+    global _active_parallel, _parallel_task
+
+    if not _active_parallel or not _active_parallel.is_running:
+        raise HTTPException(status_code=409, detail="Not running")
+
+    _active_parallel.cancel()
+    _log_append("[PARALLEL] Stop requested")
+
+    if _parallel_task and not _parallel_task.done():
+        try:
+            await asyncio.wait_for(asyncio.shield(_parallel_task), timeout=5)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            _parallel_task.cancel()
+
     return {"status": "stopped"}
 
 

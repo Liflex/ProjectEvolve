@@ -1,0 +1,44 @@
+{
+  "name": "autoresearch",
+  "description": "CLI-инструмент для автономного AI-исследования и улучшения любых проектов через итеративные эксперименты с Claude Code. Запускает цикл: анализ → предложение → реализация → оценка → решение.",
+  "goals": [
+    "Интегрировать семантический поиск и помощник по скиллам клауда — autocomplete в чате реализован (exp64), docs search с TF-IDF (exp147), session config panel (exp148)",
+    "Научить кота давать советы по скиллам или давать комментарии по текущему контексту чата сообщения (exp65: keyword-based skill tips, agent response reactions, chat idle tips, slash menu reactions)",
+    "Cat companion (ui/static/modules/cat.js): улучшение спрайтов кота — выражения лица (neutral, happy, sleepy, surprised, angry, thinking, love, sad), анимации (ear twitch, stretch, paw wave), реакция на события (KEEP/DISCARD/ERROR/milestone), диалоговые подсказки-тултипы contextual, улучшение хвоста и поз, love при глубоком поглаживании (7+ кликов), sad при DISCARD, lying down pose при глубоком сне (exp167). Осталось: больше анимаций. ВАЖНО: все диалоги и speech-сообщения кота только на русском языке",
+    "Regen/Edit/Thinking — resume_id фикс (exp55), thinking render фикс. Осталось: проверить что SDK continue_conversation работает стабильно при multi-turn",
+    "В Research lab - RUN experiment выбор проекта/папки (exp58: file browser + preflight check). Интерактивное анкетирование реализовано в exp117 (setup wizard: name, goals, stack, focus, constraints)",
+    "Нужна система judgement судей, которые оценивают и решают делать DIVERSITY или KEEP изменения. — реализовано: ExperimentJudge с 3 профилями, 6 проверок, auto-judge в research loop (exp164), JudgeHistory аналитика (exp165), weight auto-adjustment с persistence (exp168), parallel judge evaluation via run_parallel_judges (exp170). Осталось: интеграция parallel judges в research loop",
+    "Самосовершенствование системы judgement, критериев приемки и оценки. Запуск Параллельных агентов для независимой оценки. Влияние на score — частично реализовано: JudgeHistory аналитика (exp165), weight auto-adjustment с persistence и blend factor (exp168), parallel judge evaluation (exp170). Осталось: интеграция в research loop, result comparison",
+    "Мультиагентность для исследования — этап 1: ParallelAgentRunner (exp170: asyncio.gather, bounded concurrency, API endpoints /api/parallel/*), run_parallel_judges helper. Осталось: этап 2 — task decomposition, этап 3 — result aggregation & merge, этап 4 — integration into ResearchRunner loop",
+    "✦ TEMPLATES В чате при раскрытии подсказки лучше пускай будут по скиллам /speckit типа — реализовано в exp96 (skill-based quick action chips с slash command insertion)",
+    "РЕАКЦИИ (thumbs up/down) — реализовано в exp94 (кнопки) и exp97 (фидбек агенту). Badge-индикатор на кнопке SEND показывает количество ожидающих реакций.",
+    "Добавить чату дашборд — реализовано в exp90 (activity heatmap) и exp104 (cross-session aggregate stats & activity feed)",
+    "Добавь всяких прикольных фраз коту из Warcraft 3 — реализовано в exp107 (Warcraft 3, Starcraft и gaming фразы во всех SPEECH категориях)",
+    "Judge - судья. Означает надо задействовать разностороннюю независимую оценку качества сделанному. — частично реализовано: ExperimentJudge с 3 профилями (strict/balanced/lenient), 6 проверок, auto-judge в research loop (exp164), UI отображение вердиктов, JudgeHistory аналитика (exp165), weight auto-adjustment (exp168), parallel judge evaluation (exp170). Осталось: интеграция parallel judges в research loop"
+  ],
+  "constraints": [
+    "В первую очередь chat это - chat. Не нужно перегружать его лишними функциями что не нужны чату. Это не ide для программирования кода, а наша сессия общения с агентом, и она должна быть удобная и покрывать возможности claude sdk для тщательной настройки. Удобный чат - залог успеха."
+  ],
+  "tech_stack": [
+    "Python 3.10+",
+    "Claude CLI",
+    "Git",
+    "FastAPI",
+    "Alpine.js"
+  ],
+  "completed_goals": [
+    "Ctrl+F в чате — реализовано в exp 39 (IDE-style incremental search с highlight и навигацией)",
+    "Live-логирование экспериментов через WebSocket — реализовано в exp 40 (фильтры, пауза, авто-скролл)",
+    "FONT_SIZE слайд бар — rem scaling (exp56), все текстовые элементы используют rem единицы, масштабируется корректно",
+    "Разбить JS на модули — HTML templates exp46, JS: app.js + 5 modules (utils, themes, renderer, lab, chat)",
+    "Добавление раздела настроек — темы с превью, тогглы (matrix, CRT, cat, thinking), font size slider, chat density, compact sidebar",
+    "Добавление выбора тем — 4 темы (synthwave, darcula, one-dark, dracula) с превью-карточками и визуальными свотчами в настройках",
+    "Стилизация вывода агента под шаблоны тем — theme-aware markdown rendering (exp63), CSS переменные --md-* для каждой темы",
+    "Шаблон темы Dark Dracula — добавлена тема dracula с палитрой Dracula IDE",
+    "Auto-scroll в чате и RUN — smart scroll с pause при скролле вверх, FAB для возврата, liveLogAutoScroll toggle",
+    "Skill autocomplete в чате — exp64: slash menu с локальными командами + Claude Code skills (/commit, /speckit.*, /simplify и др.)",
+    "Память сессий и чатов — exp101: localStorage persistence для sessions и tabs, auto-reconnect",
+    "Настройки ALT+9 глобальные — exp102: кнопка Settings перенесена в нижнюю часть sidebar, видна всегда",
+    "Почистить chat от лишних функций — toolbar cleanup (exp163), removed IDE features: File Search, Global Search, Command Palette, Stats Panel (exp169). MORE dropdown now contains only chat-relevant tools."
+  ]
+}
