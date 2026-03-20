@@ -136,6 +136,7 @@ EVENT_AGENT = "agent_event"          # wraps individual SDK messages
 EVENT_LOG = "log"
 EVENT_ERROR = "error"
 EVENT_TOKENS = "tokens_update"
+EVENT_JUDGE = "judge_verdict"        # post-experiment judge evaluation
 
 
 def _make_event(event_type: str, **data) -> dict:
@@ -228,6 +229,34 @@ class ResearchRunner:
             "type": "user",
             "message": {"role": "user", "content": text},
         }
+
+    def _run_judge(self, experiment_number: int, report_text: str) -> Optional[Dict[str, Any]]:
+        """Run all judge profiles on the last experiment commit.
+
+        Returns the multi-profile verdict dict, or None on error.
+        Judge failures are non-fatal — logged but don't break the loop.
+        """
+        try:
+            from utils.judge import ExperimentJudge
+            import json as _json
+
+            judge = ExperimentJudge(self.project_dir)
+            verdict = judge.evaluate_all(
+                report_text=report_text,
+            )
+
+            # Persist verdict to experiments directory
+            exp_dir = self.project_dir / ".autoresearch" / "experiments"
+            if exp_dir.exists():
+                judge_file = exp_dir / f"judge_{experiment_number}_all.json"
+                judge_file.write_text(
+                    _json.dumps(verdict, indent=2), encoding="utf-8"
+                )
+
+            return verdict
+        except Exception as e:
+            logger.warning("Judge evaluation failed for exp %d: %s", experiment_number, e)
+            return None
 
     async def run_experiment(
         self,
@@ -429,6 +458,24 @@ class ResearchRunner:
                     cost=result.get("cost"),
                     tokens=self.tokens.to_dict(),
                 ))
+
+                # --- Auto-judge: evaluate experiment after completion ---
+                if result.get("status") == "success":
+                    judge_verdict = self._run_judge(i, result.get("output", ""))
+                    if judge_verdict:
+                        result["judge"] = judge_verdict
+                        await self._emit(_make_event(
+                            EVENT_JUDGE,
+                            number=i,
+                            consensus=judge_verdict.get("consensus"),
+                            consensus_score=judge_verdict.get("consensus_score"),
+                            profiles=judge_verdict.get("profiles"),
+                        ))
+                        logger.info(
+                            "Judge verdict for exp %d: %s (score=%.2f)",
+                            i, judge_verdict.get("consensus"),
+                            judge_verdict.get("consensus_score", 0),
+                        )
 
                 # Pause between experiments
                 if i < max_number and timeout_min > 0 and not self._cancelled:

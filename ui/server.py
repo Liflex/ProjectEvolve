@@ -895,6 +895,16 @@ async def _research_event_handler(event: dict) -> None:
         _log_append(f"[INFO] {event.get('message', '')}")
     elif etype == "error":
         _log_append(f"[ERROR] {event.get('message', '')}")
+    elif etype == "judge_verdict":
+        n = event.get("number", 0)
+        consensus = event.get("consensus", "?")
+        score = event.get("consensus_score", 0)
+        profiles = event.get("profiles", {})
+        detail_parts = []
+        for pname, pverdict in profiles.items():
+            detail_parts.append(f"{pname.upper()}={pverdict.get('recommendation', '?')}")
+        details = " | ".join(detail_parts)
+        _log_append(f"[JUDGE] Эксперимент {n}: {consensus} (score={score}) — {details}")
     elif etype == "run_end":
         ok = event.get("successful", 0)
         total = event.get("total_run", 0)

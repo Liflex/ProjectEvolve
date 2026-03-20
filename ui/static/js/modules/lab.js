@@ -483,6 +483,22 @@ window.AppLab = (function() {
                                 event.number || this.runStatus.current_exp || 0
                             );
                         }
+                    } else if (event.type === 'judge_verdict') {
+                        // Cat reacts to judge verdict
+                        if (window.CatModule && CatModule.isActive()) {
+                            const c = event.consensus || '?';
+                            if (c === 'KEEP') {
+                                CatModule.setExpression('happy');
+                                CatModule.setSpeechText('Судья сказал KEEP! *довольно мурлычет*', 3000);
+                            } else if (c === 'DISCARD') {
+                                CatModule.setExpression('angry');
+                                CatModule.setSpeechText('Судья отклонил! *возмущённо фыркает*', 3000);
+                            } else {
+                                CatModule.setExpression('thinking');
+                                CatModule.setSpeechText('Судья сомневается... Надо подумать!', 3000);
+                            }
+                            setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 4000);
+                        }
                     } else if (event.type === 'run_end') {
                         this.runStatus.running = false;
                         this.pollRunStatus();
@@ -579,6 +595,12 @@ window.AppLab = (function() {
                 return { ts, type: 'info', icon: '·', color: 'var(--v3)', text: event.message || '' };
             } else if (etype === 'error') {
                 return { ts, type: 'error', icon: '✕', color: 'var(--red)', text: event.message || 'Unknown error' };
+            } else if (etype === 'judge_verdict') {
+                const n = event.number || 0;
+                const consensus = event.consensus || '?';
+                const score = event.consensus_score || 0;
+                const c = consensus === 'KEEP' ? 'var(--ng)' : consensus === 'DISCARD' ? 'var(--red)' : 'var(--amber)';
+                return { ts, type: 'judge', icon: '⚖', color: c, text: `Judge exp ${n}: ${consensus} (${score})` };
             }
             return null;
         },
