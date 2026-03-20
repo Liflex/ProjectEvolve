@@ -255,7 +255,7 @@ function _buildAppData() {
         changesLog: '',
         promptSaving: false,
         configSaving: false,
-        runConfig: { iterations: 10, timeout: 5, max_time: 600, project: '.', strategy: 'default', token_threshold: 100000 },
+        runConfig: { iterations: 10, timeout: 5, max_time: 600, project: '.', strategy: 'default', token_threshold: 100000, parallel_judges: false },
         runStatus: { running: false, current_exp: 0, total_exps: 0, started_at: null, recent_logs: [], error: null, tokens: null, session_id: null },
         researchWs: null,
         toast: { show: false, message: '', type: 'success' },

@@ -886,6 +886,7 @@ class RunRequest(BaseModel):
     project: str = "."
     strategy: str = Field(default="default", pattern=r"^(default|execution|quality)$")
     token_threshold: int = Field(default=100_000, ge=20_000, le=200_000)
+    parallel_judges: bool = Field(default=False)
 
 
 # ---------------------------------------------------------------------------
@@ -1026,6 +1027,7 @@ async def start_run(data: RunRequest):
         max_turns=100,
         token_threshold=data.token_threshold,
         token_soft_threshold=int(data.token_threshold * 0.8),
+        parallel_judges=data.parallel_judges,
     )
     runner.add_listener(_research_event_handler)
     _active_runner = runner
@@ -1204,6 +1206,28 @@ async def stop_run():
 # ---------------------------------------------------------------------------
 # Parallel Agent API
 # ---------------------------------------------------------------------------
+
+
+
+@app.get("/api/run/judge-mode")
+async def get_judge_mode():
+    """Get current parallel judges setting."""
+    if _active_runner:
+        return {"parallel_judges": _active_runner.parallel_judges}
+    return {"parallel_judges": False}
+
+
+@app.post("/api/run/judge-mode")
+async def set_judge_mode(data: dict):
+    """Toggle parallel judges mode for the next run."""
+    enabled = data.get("parallel_judges", False)
+    if _active_runner and _active_runner.is_running:
+        raise HTTPException(status_code=409, detail="Cannot change judge mode while running")
+    if _active_runner:
+        _active_runner.parallel_judges = bool(enabled)
+    _log_append(f"[CONFIG] Parallel judges: {'ON' if enabled else 'OFF'}")
+    return {"parallel_judges": bool(enabled)}
+
 
 @app.post("/api/parallel/run")
 async def start_parallel_run(data: dict):

@@ -164,10 +164,12 @@ class ResearchRunner:
         max_turns: int = 100,
         token_threshold: int = 100_000,
         token_soft_threshold: int = 80_000,
+        parallel_judges: bool = False,
     ):
         self.project_dir = project_dir.resolve()
         self.strategy = strategy
         self.max_turns = max_turns
+        self.parallel_judges = parallel_judges
 
         self.tokens = TokenBudget(
             threshold=token_threshold,
@@ -229,21 +231,91 @@ class ResearchRunner:
             "type": "user",
             "message": {"role": "user", "content": text},
         }
-
-    def _run_judge(self, experiment_number: int, report_text: str) -> Optional[Dict[str, Any]]:
+    async def _run_judge(self, experiment_number: int, report_text: str) -> Optional[Dict[str, Any]]:
         """Run all judge profiles on the last experiment commit.
 
-        Returns the multi-profile verdict dict, or None on error.
-        Judge failures are non-fatal — logged but don't break the loop.
-        """
-        try:
-            from utils.judge import ExperimentJudge, JudgeHistory
-            import json as _json
+        When ``self.parallel_judges`` is True, uses ParallelAgentRunner to
+        run each judge profile as a separate independent agent concurrently.
+        Otherwise falls back to sequential ExperimentJudge.evaluate_all().
 
-            judge = ExperimentJudge(self.project_dir)
-            verdict = judge.evaluate_all(
-                report_text=report_text,
-            )
+        Returns the multi-profile verdict dict, or None on error.
+        Judge failures are non-fatal -- logged but don't break the loop.
+        """
+        import json as _json
+
+        try:
+            verdict = None
+
+            if self.parallel_judges:
+                # --- Parallel mode: independent agents per profile ---
+                from agents.parallel import run_parallel_judges
+
+                await self._emit(_make_event(
+                    EVENT_LOG,
+                    message=f"Running parallel judges for exp {experiment_number}...",
+                ))
+
+                result = await run_parallel_judges(
+                    project_dir=self.project_dir,
+                    report_text=report_text,
+                )
+
+                # Normalize format to match evaluate_all() output
+                profiles: Dict[str, Dict[str, Any]] = {}
+                for label, v in result.get("verdicts", {}).items():
+                    # label is "judge-strict", "judge-balanced", etc.
+                    profile_name = label.replace("judge-", "")
+                    profiles[profile_name] = {
+                        "recommendation": v.get("verdict", "DISCARD"),
+                        "score": v.get("score", 0.0),
+                        "reason": v.get("reason", ""),
+                        "risks": v.get("risks", []),
+                        "source": "parallel_agent",
+                    }
+
+                if profiles:
+                    recs = [v["recommendation"] for v in profiles.values()]
+                    keep_count = recs.count("KEEP")
+                    discard_count = recs.count("DISCARD")
+
+                    if keep_count >= 2:
+                        consensus = "KEEP"
+                    elif discard_count >= 2:
+                        consensus = "DISCARD"
+                    else:
+                        consensus = "REVIEW"
+
+                    avg_score = sum(v["score"] for v in profiles.values()) / len(profiles)
+
+                    verdict = {
+                        "profiles": profiles,
+                        "consensus": consensus,
+                        "consensus_score": round(avg_score, 2),
+                        "agent_decision": "",
+                        "agent_score": None,
+                        "available_profiles": list(profiles.keys()),
+                        "parallel_mode": True,
+                        "total_agents": result.get("total_agents", 0),
+                        "completed_agents": result.get("completed", 0),
+                    }
+
+                    await self._emit(_make_event(
+                        EVENT_LOG,
+                        message=f"Parallel judges done: {consensus} "
+                                f"(score={avg_score:.2f}, "
+                                f"{result.get('completed', 0)}/{result.get('total_agents', 0)} completed)",
+                    ))
+            else:
+                # --- Sequential mode: local ExperimentJudge ---
+                from utils.judge import ExperimentJudge
+
+                judge = ExperimentJudge(self.project_dir)
+                verdict = judge.evaluate_all(
+                    report_text=report_text,
+                )
+
+            if verdict is None:
+                return None
 
             # Persist verdict to experiments directory
             exp_dir = self.project_dir / ".autoresearch" / "experiments"
@@ -255,12 +327,13 @@ class ResearchRunner:
 
             # Auto-adjust weights based on accumulated history
             try:
+                from utils.judge import JudgeHistory
                 history = JudgeHistory(self.project_dir)
-                result = history.auto_adjust(min_verdicts=5)
-                if result and result.get("applied"):
+                adj_result = history.auto_adjust(min_verdicts=5)
+                if adj_result and adj_result.get("applied"):
                     logger.info(
                         "Judge weights auto-adjusted after exp %d: %s",
-                        experiment_number, result.get("reason", ""),
+                        experiment_number, adj_result.get("reason", ""),
                     )
             except Exception as adj_err:
                 logger.debug("Judge weight auto-adjust skipped: %s", adj_err)
@@ -473,7 +546,7 @@ class ResearchRunner:
 
                 # --- Auto-judge: evaluate experiment after completion ---
                 if result.get("status") == "success":
-                    judge_verdict = self._run_judge(i, result.get("output", ""))
+                    judge_verdict = await self._run_judge(i, result.get("output", ""))
                     if judge_verdict:
                         result["judge"] = judge_verdict
                         await self._emit(_make_event(
@@ -529,4 +602,5 @@ class ResearchRunner:
             "error": self.error,
             "session_id": self._session_id,
             "tokens": self.tokens.to_dict(),
+            "parallel_judges": self.parallel_judges,
         }

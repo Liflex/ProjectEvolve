@@ -3626,3 +3626,49 @@ Results
 3. **ExperimentJudge загружает кастомные веса** — `_load_custom_weights()` в `__init__` применяет сохранённ
 
 
+## Experiment 169 — Remove IDE-like features from chat
+
+**Time:** 2026-03-20 20:00:09
+
+**Files:** Target:** `ui/static/templates/chat-section.js`, `ui/static/js/app.js`, Complexity Impact:** -368 строк в chat-section.js (-27%), Files Modified:** `ui/static/templates/chat-section.js`, `ui/static/js/app.js`
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+Удалены 4 IDE-фичи из чата, которые не относятся к чат-функциональности:
+- **File Search** (Ctrl+Shift+F) — поиск по файлам проекта, это IDE, не чат
+- **Global Search** (Ctrl+Alt+F) — поиск по всем сессиям, это аналитика
+- **Command Palette** (Ctrl+K) — IDE power-user паттерн
+- **Stats Panel** — дублировал данные из status bar (tokens, cost, context %)
+
+MORE dropdown теперь содержит только чат-релевантные инструменты: CLEAR CHAT, PANELS (Raw Log/Tools/File Preview), M
+
+
+## Experiment 170 — Parallel multi-agent runner
+
+**Time:** 2026-03-20 20:08:54
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+- Создан `agents/parallel.py` с `ParallelAgentRunner` — выполняет N агентов параллельно через `asyncio.gather` с `asyncio.Semaphore` для ограничения concurrency
+- `AgentTask` — дескриптор задачи с label, prompt, cwd, model, system prompt
+- Поддержка отмены всех агентов через `cancel()` — один падающий агент не отменяет остальные
+- Событийная модель: `parallel_start/end`, `parallel_agent_start/end/event`, `parallel_error`
+- `run_parallel_judges()` — convenience-функция
+
+

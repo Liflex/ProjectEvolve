@@ -1,30 +1,27 @@
 # Last Experiment Summary
 
-**Experiment #169** — Remove IDE-like features from chat
-**Date:** 2026-03-20
+**Experiment #170** — Parallel multi-agent runner
+**Date:** 2026-03-20 20:08:54
 
 ## What Was Done
 
-1. **Removed 4 IDE-like features from chat MORE dropdown:** File Search (Ctrl+Shift+F), Global Search (Ctrl+Alt+F), Command Palette (Ctrl+K), Stats Panel
-2. **Removed panel HTML:** Global search panel, File search panel, Stats panel (268 lines of template code)
-3. **Removed keyboard handlers:** Ctrl+Shift+F, Ctrl+Alt+F bindings and Escape handlers for removed panels
-4. **Removed from command palette:** File search and global search entries
-5. **Removed from shortcuts panel:** File search and global search entries
-6. **Updated UI references:** MORE button active state, textarea placeholder, empty state shortcuts
+N/A
 
 ## Files Modified
 
-- `ui/static/templates/chat-section.js` — removed 368 lines (1350→982)
-- `ui/static/js/app.js` — removed keyboard handlers and palette entries
+- None
 
 ## Key Results
 
-- chat-section.js reduced by 27% (402 lines net removed)
-- Chat is now focused on conversation: CLEAR, PANELS, MSG FOLDING, PINS, EXPORT, SHORTCUTS
-- Status bar already shows key metrics (tokens, cost, context %) — Stats panel was redundant
-- Dead JS functions left in chat.js (no UI references, harmless)
+Results
+
+**What was done:**
+- Создан `agents/parallel.py` с `ParallelAgentRunner` — выполняет N агентов параллельно через `asyncio.gather` с `asyncio.Semaphore` для ограничения concurrency
+- `AgentTask` — дескриптор задачи с label, prompt, cwd, model, system prompt
+- Поддержка отмены всех агентов через `cancel()` — один падающий агент не отменяет остальные
+- Событийная модель: `parallel_start/end`, `parallel_agent_start/end/event`, `parallel_error`
+- `run_parallel_judges()` — convenience-функция
 
 ## For Next Iteration
 
-- Next goal to tackle: multi-agent research or cat animations
-- Remaining chat cleanup: consider if bottom panels (RAW LOG, TOOLS SUMMARY) are needed
+N/A

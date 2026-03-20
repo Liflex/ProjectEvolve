@@ -51,6 +51,20 @@
                     </select>
                 </div>
 
+                <!-- Parallel Judges Toggle -->
+                <div class="mt-3 flex items-center gap-3">
+                    <label class="text-[0.5625rem] text-[var(--v3)] tracking-wider cursor-pointer select-none flex items-center gap-2"
+                           @click="runConfig.parallel_judges = !runConfig.parallel_judges">
+                        <span class="inline-block w-8 h-4 rounded-full transition-colors relative"
+                              :class="runConfig.parallel_judges ? 'bg-[var(--cyan)]' : 'bg-[var(--v-dim)]'">
+                            <span class="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform"
+                                  :class="runConfig.parallel_judges ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                        </span>
+                        PARALLEL_JUDGES
+                    </label>
+                    <span class="text-[0.5rem] text-[var(--v3)] opacity-60" x-show="runConfig.parallel_judges">3 independent agents</span>
+                </div>
+
                 <!-- File Browser Panel -->
                 <div x-show="_showBrowsePanel" x-transition class="mt-3 border border-[var(--v-dim)] bg-[var(--bg)]">
                     <!-- Browser header / breadcrumb -->
