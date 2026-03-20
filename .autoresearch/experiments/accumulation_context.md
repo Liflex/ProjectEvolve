@@ -1,4 +1,20 @@
 
+## Experiment 177 — Cat expression overlays + yawn mouth sprite
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **MOUTH_YAWN sprite** (7×5 px) — широко открытый рот для зевания. Показывается во время stretch фаз 1-2.
+2. **renderExpressionOverlays()** — визуальные overlay-эффекты: blush, sweat drop, tear, angry vein.
+3. Все overlays используют `ctx.globalAlpha` и `Math.sin(_tickCount)` для плавной анимации.
+
+### Files Modified
+
+- `ui/static/modules/cat.js` (+60 lines)
+
+---
+
 ## Experiment 169 — Remove IDE-like features from chat
 
 **Date:** 2026-03-20
@@ -6910,6 +6926,32 @@ Results
 
 **Working:** yes
 **Tests:** syntax
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 176 — Cat breathing + sneeze animations
+
+**Date:** 2026-03-20 20:33:05
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+Results
+
+**What was done:**
+1. **Breathing** — непрерывная осцилляция bodyOffY по синусоиде (±0.3px, период ~3с в normal, ±0.4px и ~4.8с при sleep). Кот "дышит" — всегда активно в sitting pose, выключается при lying. Делает кота живым даже в idle.
+2. **Sneeze** — редкое случайное событие (~0.1% за tick ≈ раз в 2 минуты idle). 3 фазы: pre-sneeze (голова тянутся назад) → jerk (голова резко вперёд) → recovery (микро-дрожь). Expression → surprised, 5 вариантов "Апчхи!" на русском, ear twitch, burst 
 
 ### Notes for Next
 

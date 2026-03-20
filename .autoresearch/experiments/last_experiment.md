@@ -1,19 +1,28 @@
 # Last Experiment Summary
 
-**Experiment #176** — Cat breathing + sneeze animations
+**Experiment #177** — Cat expression overlays + yawn mouth sprite
 **Date:** 2026-03-20
 
 ## What Was Done
 
-1. **Breathing animation** — continuous subtle body Y oscillation (±0.3px, sine wave). Always active in sitting pose. Slower amplitude and period when sleeping/idle (±0.4px, 40-tick period vs 25-tick). Makes cat feel alive even during idle.
-2. **Sneeze animation** — rare random event (~0.1% per tick, ≈every 2min idle). 3-phase: pre-sneeze pull-back → sneeze jerk (head snaps forward+down) → recovery shake. Expression → surprised, speech "Апчхи!" with 5 Russian variants, ear twitch, small particle burst from nose area.
-3. Public API: `triggerSneeze()` method.
+1. **Yawn mouth sprite** (MOUTH_YAWN) — широко открытый рот 7×5 пикселей для анимации зевания. Показывается вместо обычного рта во время stretch/yawn фаз (phase 1-2).
+2. **Expression overlays** — визуальные эффекты поверх головы для усиления эмоций:
+   - **Blush** — розовые пиксели на щеках при love/happy выражениях
+   - **Sweat drop** — анимированная капля при thinking (аниме-стиль, пульсирует)
+   - **Tear** — капля слезы при sad (капает вниз по циклу)
+   - **Angry vein** — крестик на лбу при angry (пульсирует)
+3. Все overlays используют `ctx.globalAlpha` для плавного мерцания и `Math.sin(_tickCount)` для анимации.
 
 ## Files Modified
 
-- `ui/static/modules/cat.js` — breathing in render(), sneeze state/logic/tick, SPEECH.sneeze, triggerSneeze(), public API
+- `ui/static/modules/cat.js` (+60 lines)
 
 ## Key Results
 
-**Working:** yes (syntax check + server import pass)
-**Tests:** syntax only (UI animation — no unit tests needed)
+- Кот стал более выразительным — каждая эмоция теперь имеет уникальный визуальный маркер
+- Yawn делает stretch анимацию реалистичнее — рот действительно открывается
+
+## For Next Iteration
+
+- Добавить больше overlay-эффектов (например, звёздочки в глазах при surprise)
+- Paw kneading animation для happy/love

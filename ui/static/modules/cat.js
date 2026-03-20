@@ -292,6 +292,8 @@
     const MOUTH_LOVE = decode([0x6C, 0x7C], 7, 2);
     // Sad: frown (7×2)
     const MOUTH_SAD = decode([0x7C, 0x38], 7, 2);
+    // Yawn: wide open mouth (7×5) — used during stretch animation
+    const MOUTH_YAWN = decode([0x1C, 0x22, 0x41, 0x22, 0x1C], 7, 5);
 
     // Mouth config: { sprite, x-offset from HEAD_POS, y-offset from HEAD_POS, color }
     const MOUTH_CFG = {
@@ -1168,7 +1170,66 @@
         ctx.restore();
     }
 
+    function renderExpressionOverlays(headX, headY) {
+        // Blush: pink pixels on cheeks during love/happy expressions
+        if (expression === 'love' || (expression === 'happy' && _mood === 'happy')) {
+            ctx.globalAlpha = expression === 'love' ? 0.7 : 0.4;
+            ctx.fillStyle = '#ff69b4';
+            // Left cheek
+            ctx.fillRect((headX + 3) * ps, (headY + 13) * ps, ps, ps);
+            ctx.fillRect((headX + 4) * ps, (headY + 13) * ps, ps, ps);
+            // Right cheek
+            ctx.fillRect((headX + 20) * ps, (headY + 13) * ps, ps, ps);
+            ctx.fillRect((headX + 21) * ps, (headY + 13) * ps, ps, ps);
+            ctx.globalAlpha = 1.0;
+        }
+
+        // Sweat drop: during thinking expression (anime-style)
+        if (expression === 'thinking') {
+            ctx.globalAlpha = 0.6 + Math.sin(_tickCount * 0.15) * 0.2;
+            ctx.fillStyle = '#88ccff';
+            const sweatX = headX + 22;
+            const sweatY = headY + 8 + Math.sin(_tickCount * 0.08) * 0.5;
+            ctx.fillRect(sweatX * ps, sweatY * ps, ps, ps);
+            ctx.fillRect(sweatX * ps, (sweatY + 1) * ps, ps, ps);
+            ctx.globalAlpha = 1.0;
+        }
+
+        // Tear: during sad expression (occasional drip)
+        if (expression === 'sad') {
+            ctx.globalAlpha = 0.5 + Math.sin(_tickCount * 0.1) * 0.2;
+            ctx.fillStyle = '#6699cc';
+            // Tear near left eye, dripping down
+            const tearOffset = Math.floor(_tickCount / 12) % 6;
+            const tearX = headX + 6;
+            const tearY = headY + 12 + tearOffset;
+            ctx.fillRect(tearX * ps, tearY * ps, ps, ps);
+            if (tearOffset > 0) ctx.fillRect(tearX * ps, (tearY - 1) * ps, ps, ps);
+            ctx.globalAlpha = 1.0;
+        }
+
+        // Angry vein: small cross mark during angry expression
+        if (expression === 'angry') {
+            ctx.globalAlpha = 0.6 + Math.sin(_tickCount * 0.2) * 0.2;
+            ctx.fillStyle = '#ff3355';
+            const vx = headX + 21;
+            const vy = headY + 7;
+            // Cross/vein mark
+            ctx.fillRect((vx - 1) * ps, vy * ps, ps, ps);
+            ctx.fillRect((vx + 1) * ps, vy * ps, ps, ps);
+            ctx.fillRect(vx * ps, (vy - 1) * ps, ps, ps);
+            ctx.fillRect(vx * ps, (vy + 1) * ps, ps, ps);
+            ctx.globalAlpha = 1.0;
+        }
+    }
+
     function renderMouth(headX, headY) {
+        // During stretch phase 1-2 (active stretch), show yawn mouth instead of expression mouth
+        if (_stretchTicks > 0 && (_stretchPhase === 1 || _stretchPhase === 2)) {
+            // Yawn mouth — slightly lower position to match wide-open look
+            drawGrid(MOUTH_YAWN, headX + 9, headY + 14, '#ff69b4');
+            return;
+        }
         const mCfg = MOUTH_CFG[expression] || MOUTH_CFG.neutral;
         drawGrid(mCfg.sprite, headX + mCfg.dx, headY + mCfg.dy, mCfg.color);
     }
@@ -1372,6 +1433,9 @@
 
         renderMouth(hx, hy);
         renderWhiskers(hx, hy);
+
+        // === Expression overlays: blush, tear, sweat ===
+        renderExpressionOverlays(hx, hy);
 
         // End head tilt transform
         if (Math.abs(tiltRad) > 0.001) {
