@@ -74,6 +74,11 @@ window.AppLab = (function() {
                 }
             } catch (e) { }
         },
+        async loadJudgeHistory() {
+            try {
+                this.judgeAnalytics = await this.api('/api/judge/history');
+            } catch (e) { this.judgeAnalytics = null; }
+        },
         async loadExperiments() {
             try {
                 const data = await this.api('/api/experiments');

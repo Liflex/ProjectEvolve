@@ -19,6 +19,7 @@ Produces a verdict dict with score, decision recommendation, and check details.
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import logging
@@ -505,3 +506,190 @@ class ExperimentJudge:
             "agent_score": agent_score,
             "available_profiles": list(JUDGE_PROFILES.keys()),
         }
+
+
+# ---------------------------------------------------------------------------
+# Judge History — analytics, trends, self-adjustment
+# ---------------------------------------------------------------------------
+
+class JudgeHistory:
+    """Aggregates judge verdicts across experiments for analytics.
+
+    Loads all ``judge_*_all.json`` files from the experiments directory,
+    computes per-profile accuracy, check reliability, score trends, and
+    provides weight self-adjustment suggestions.
+    """
+
+    def __init__(self, project_dir: Path):
+        self.project_dir = Path(project_dir).resolve()
+        self.exp_dir = self.project_dir / ".autoresearch" / "experiments"
+        self._verdicts: List[Dict[str, Any]] = []
+
+    def load(self) -> List[Dict[str, Any]]:
+        """Load all judge verdict files, sorted by experiment number."""
+        if not self.exp_dir.exists():
+            return []
+        self._verdicts = []
+        for f in sorted(self.exp_dir.glob("judge_*_all.json")):
+            try:
+                data = json.loads(f.read_text(encoding="utf-8"))
+                # Extract experiment number from filename: judge_42_all.json
+                m = re.search(r"judge_(\d+)_all", f.name)
+                if m:
+                    data["experiment"] = int(m.group(1))
+                self._verdicts.append(data)
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning("Failed to load judge file %s: %s", f.name, e)
+        return self._verdicts
+
+    def get_analytics(self) -> Dict[str, Any]:
+        """Compute full analytics from loaded verdicts.
+
+        Returns dict with:
+            - total_verdicts: number of judged experiments
+            - consensus_distribution: {KEEP: N, DISCARD: N, REVIEW: N, SPLIT: N}
+            - score_trend: [{experiment, consensus_score, consensus}]
+            - profile_accuracy: {profile_name: {agrees_with_consensus: N, total: N, rate: float}}
+            - check_reliability: {check_name: {pass_rate, warn_rate, fail_rate, discriminative_score}}
+            - weight_adjustments: suggested weight changes for self-improvement
+            - avg_consensus_score: overall average
+        """
+        if not self._verdicts:
+            self.load()
+
+        if not self._verdicts:
+            return {
+                "total_verdicts": 0,
+                "consensus_distribution": {},
+                "score_trend": [],
+                "profile_accuracy": {},
+                "check_reliability": {},
+                "weight_adjustments": {},
+                "avg_consensus_score": 0,
+            }
+
+        # --- Consensus distribution ---
+        consensus_dist: Dict[str, int] = {}
+        score_trend: List[Dict[str, Any]] = []
+        for v in self._verdicts:
+            c = v.get("consensus", "UNKNOWN")
+            consensus_dist[c] = consensus_dist.get(c, 0) + 1
+            score_trend.append({
+                "experiment": v.get("experiment", 0),
+                "consensus_score": v.get("consensus_score", 0),
+                "consensus": c,
+            })
+
+        # --- Profile accuracy ---
+        profile_accuracy: Dict[str, Dict[str, Any]] = {}
+        for profile_name in JUDGE_PROFILES:
+            agrees = 0
+            total = 0
+            for v in self._verdicts:
+                profiles = v.get("profiles", {})
+                if profile_name not in profiles:
+                    continue
+                total += 1
+                if profiles[profile_name]["recommendation"] == v.get("consensus"):
+                    agrees += 1
+            if total > 0:
+                profile_accuracy[profile_name] = {
+                    "agrees_with_consensus": agrees,
+                    "total": total,
+                    "rate": round(agrees / total, 2),
+                }
+
+        # --- Check reliability ---
+        check_reliability: Dict[str, Dict[str, Any]] = {}
+        # Collect all check results across all verdicts
+        check_data: Dict[str, List[str]] = {}  # check_name → [status, ...]
+        for v in self._verdicts:
+            for pname, pverdict in v.get("profiles", {}).items():
+                for check in pverdict.get("checks", []):
+                    cname = check.get("name", "unknown")
+                    if cname not in check_data:
+                        check_data[cname] = []
+                    check_data[cname].append(check.get("status", "warn"))
+
+        for cname, statuses in check_data.items():
+            n = len(statuses)
+            pass_r = round(statuses.count("pass") / n, 2) if n else 0
+            warn_r = round(statuses.count("warn") / n, 2) if n else 0
+            fail_r = round(statuses.count("fail") / n, 2) if n else 0
+            # Discriminative score: high variance = more discriminative
+            # Uses normalized entropy: 0 = always same, 1 = evenly split
+            import math
+            entropy = 0
+            for rate in (pass_r, warn_r, fail_r):
+                if rate > 0:
+                    entropy -= rate * math.log2(rate)
+            max_entropy = math.log2(3)  # ~1.585
+            discriminative = round(entropy / max_entropy, 2) if max_entropy > 0 else 0
+
+            check_reliability[cname] = {
+                "pass_rate": pass_r,
+                "warn_rate": warn_r,
+                "fail_rate": fail_r,
+                "discriminative_score": discriminative,
+                "total_evaluations": n,
+            }
+
+        # --- Weight adjustments (self-improvement) ---
+        weight_adjustments = self._compute_weight_adjustments(check_reliability)
+
+        # --- Average score ---
+        avg_score = sum(v.get("consensus_score", 0) for v in self._verdicts) / len(self._verdicts)
+
+        return {
+            "total_verdicts": len(self._verdicts),
+            "consensus_distribution": consensus_dist,
+            "score_trend": score_trend,
+            "profile_accuracy": profile_accuracy,
+            "check_reliability": check_reliability,
+            "weight_adjustments": weight_adjustments,
+            "avg_consensus_score": round(avg_score, 2),
+        }
+
+    def _compute_weight_adjustments(
+        self,
+        check_reliability: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, Dict[str, Any]]:
+        """Compute suggested weight adjustments based on check discriminative power.
+
+        Logic:
+        - High discriminative score (> 0.7) → increase weight (check is useful)
+        - Low discriminative score (< 0.3) → decrease weight (check always same result)
+        - High fail rate (> 0.5) → check may be too strict, suggest lowering threshold
+        - High pass rate (> 0.95) → check is trivially passing, reduce weight
+        """
+        adjustments: Dict[str, Dict[str, Any]] = {}
+        for cname, data in check_reliability.items():
+            adj: Dict[str, Any] = {}
+            disc = data.get("discriminative_score", 0)
+            pass_r = data.get("pass_rate", 0)
+            fail_r = data.get("fail_rate", 0)
+
+            if pass_r > 0.95:
+                adj["suggestion"] = "reduce_weight"
+                adj["reason"] = f"Pass rate {pass_r:.0%} — check is trivially passing, not discriminative"
+                adj["multiplier"] = 0.5
+            elif fail_r > 0.5:
+                adj["suggestion"] = "lower_threshold"
+                adj["reason"] = f"Fail rate {fail_r:.0%} — check may be too strict"
+                adj["multiplier"] = 0.8
+            elif disc > 0.7:
+                adj["suggestion"] = "increase_weight"
+                adj["reason"] = f"Discriminative score {disc:.2f} — check provides useful signal"
+                adj["multiplier"] = 1.3
+            elif disc < 0.3:
+                adj["suggestion"] = "reduce_weight"
+                adj["reason"] = f"Discriminative score {disc:.2f} — check rarely varies"
+                adj["multiplier"] = 0.7
+            else:
+                adj["suggestion"] = "keep"
+                adj["reason"] = "Check performance is within normal range"
+                adj["multiplier"] = 1.0
+
+            adjustments[cname] = adj
+
+        return adjustments

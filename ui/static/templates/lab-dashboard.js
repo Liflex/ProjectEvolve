@@ -304,6 +304,84 @@
             </div>
         </div>
 
+        <!-- Judge Analytics -->
+        <div x-show="judgeAnalytics && judgeAnalytics.total_verdicts > 0" class="mt-3 pixel-border bg-[var(--bg2)] p-4">
+            <div class="flex items-center justify-between mb-3">
+                <div class="text-[0.5625rem] tracking-widest text-[var(--v3)]">JUDGE_ANALYTICS_</div>
+                <div class="flex items-center gap-3">
+                    <span class="text-[0.5rem] text-[var(--v3)]" x-text="judgeAnalytics.total_verdicts + ' JUDGED'"></span>
+                    <span class="text-sm text-[var(--cyan)]" style="font-family:'Press Start 2P',monospace" x-text="'AVG ' + judgeAnalytics.avg_consensus_score"></span>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                <!-- Consensus Distribution -->
+                <div class="p-3 bg-[var(--bg)]" style="border:1px solid var(--v-dim)">
+                    <div class="text-[0.5rem] tracking-widest text-[var(--v3)] mb-2">CONSENSUS_DIST_</div>
+                    <div class="flex items-end gap-2" style="height:50px">
+                        <template x-for="[label, count] in Object.entries(judgeAnalytics.consensus_distribution || {}).sort((a,b) => b[1]-a[1])" :key="label">
+                            <div class="flex-1 flex flex-col items-center gap-1">
+                                <div class="text-[0.5rem] tabular-nums" :class="label === 'KEEP' ? 'text-[var(--ng)]' : label === 'DISCARD' ? 'text-[var(--red)]' : 'text-[var(--amber)]'" x-text="count"></div>
+                                <div class="w-full rounded-t-sm transition-all duration-500"
+                                     :class="label === 'KEEP' ? 'bg-[var(--ng)]' : label === 'DISCARD' ? 'bg-[var(--red)]' : 'bg-[var(--amber)]'"
+                                     :style="'height:' + Math.max(4, (count / Math.max(1, ...Object.values(judgeAnalytics.consensus_distribution || {}))) * 40) + 'px'">
+                                </div>
+                                <div class="text-[0.4375rem] tracking-wider" :class="label === 'KEEP' ? 'text-[var(--ng)]' : label === 'DISCARD' ? 'text-[var(--red)]' : 'text-[var(--amber)]'" x-text="label"></div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <!-- Profile Accuracy -->
+                <div class="p-3 bg-[var(--bg)]" style="border:1px solid var(--v-dim)">
+                    <div class="text-[0.5rem] tracking-widest text-[var(--v3)] mb-2">PROFILE_AGREEMENT_</div>
+                    <div class="space-y-2">
+                        <template x-for="[name, data] in Object.entries(judgeAnalytics.profile_accuracy || {}).sort((a,b) => (b[1].rate||0) - (a[1].rate||0))" :key="name">
+                            <div>
+                                <div class="flex items-center justify-between mb-0.5">
+                                    <span class="text-[0.5625rem] px-1 py-px tracking-wider" :class="name === 'strict' ? 'text-[var(--red)]' : name === 'lenient' ? 'text-[var(--ng)]' : 'text-[var(--cyan)]'" x-text="name.toUpperCase()"></span>
+                                    <span class="text-[0.625rem] tabular-nums" :class="(data.rate||0) >= 0.8 ? 'text-[var(--ng)]' : (data.rate||0) >= 0.5 ? 'text-[var(--amber)]' : 'text-[var(--red)]'" x-text="(data.rate * 100).toFixed(0) + '%'"></span>
+                                </div>
+                                <div class="h-1.5 bg-[var(--bg2)] overflow-hidden">
+                                    <div class="h-full transition-all duration-500" :class="(data.rate||0) >= 0.8 ? 'bg-[var(--ng)]' : (data.rate||0) >= 0.5 ? 'bg-[var(--amber)]' : 'bg-[var(--red)]'"
+                                         :style="'width:' + (data.rate * 100) + '%'"></div>
+                                </div>
+                                <div class="text-[0.4375rem] text-[var(--v3)] mt-0.5" x-text="data.agrees_with_consensus + '/' + data.total + ' agreed with consensus'"></div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <!-- Weight Adjustment Suggestions -->
+                <div class="p-3 bg-[var(--bg)]" style="border:1px solid var(--v-dim)">
+                    <div class="text-[0.5rem] tracking-widest text-[var(--v3)] mb-2">SELF_ADJUST_</div>
+                    <div class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                        <template x-for="[check, adj] in Object.entries(judgeAnalytics.weight_adjustments || {})" :key="check">
+                            <div class="flex items-start gap-1.5">
+                                <span class="text-[0.5625rem] mt-0.5 shrink-0" :class="adj.suggestion === 'increase_weight' ? 'text-[var(--ng)]' : adj.suggestion === 'reduce_weight' ? 'text-[var(--red)]' : adj.suggestion === 'lower_threshold' ? 'text-[var(--amber)]' : 'text-[var(--v3)]'"
+                                      x-text="adj.suggestion === 'increase_weight' ? '&#9650;' : adj.suggestion === 'reduce_weight' ? '&#9660;' : adj.suggestion === 'lower_threshold' ? '&#9654;' : '&#8226;'"></span>
+                                <div class="min-w-0">
+                                    <div class="text-[0.5625rem] text-[var(--v3)]" x-text="check"></div>
+                                    <div class="text-[0.4375rem] text-[var(--v-dim)] leading-snug" x-text="adj.reason"></div>
+                                    <div class="text-[0.4375rem] tabular-nums" :class="adj.multiplier >= 1 ? 'text-[var(--ng)]' : 'text-[var(--red)]'" x-text="'x' + adj.multiplier.toFixed(1)"></div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+            <!-- Judge Score Trend (mini) -->
+            <div class="mt-3" x-show="judgeAnalytics.score_trend && judgeAnalytics.score_trend.length > 1">
+                <div class="text-[0.5rem] tracking-widest text-[var(--v3)] mb-1">JUDGE_SCORE_TREND_</div>
+                <div class="flex items-end gap-0.5" style="height:30px">
+                    <template x-for="(pt, pi) in judgeAnalytics.score_trend" :key="pi">
+                        <div class="flex-1 rounded-t-sm transition-all duration-300"
+                             :class="pt.consensus === 'KEEP' ? 'bg-[var(--ng)]' : pt.consensus === 'DISCARD' ? 'bg-[var(--red)]' : 'bg-[var(--amber)]'"
+                             :style="'height:' + Math.max(2, (pt.consensus_score || 0) * 28) + 'px'"
+                             :title="'Exp #' + pt.experiment + ': ' + pt.consensus + ' (' + pt.consensus_score + ')'">
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
         <!-- Goal Progress Tracker -->
         <div class="mt-3 pixel-border bg-[var(--bg2)] p-4">
             <div class="flex items-center justify-between mb-3">

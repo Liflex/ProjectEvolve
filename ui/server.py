@@ -600,6 +600,19 @@ async def judge_experiment_all(n: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/judge/history")
+async def judge_history():
+    """Get aggregated judge analytics across all experiments."""
+    from utils.judge import JudgeHistory
+    project = get_project_dir()
+    try:
+        history = JudgeHistory(project)
+        analytics = history.get_analytics()
+        return analytics
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/changes-log")
 async def get_changes_log():
     log_file = get_exp_dir() / "changes_log.md"

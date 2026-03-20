@@ -249,6 +249,7 @@ function _buildAppData() {
         judgeVerdict: null,
         judgeAllVerdicts: null,
         judgeProfileView: null,
+        judgeAnalytics: null,
         config: { name: '', description: '', goals: [], constraints: [], tech_stack: [] },
         prompt: '',
         changesLog: '',
@@ -583,7 +584,7 @@ function _buildAppData() {
             // Restore chat sessions from localStorage
             this.restoreChatState();
             if (this.settings.matrixRain && window.MatrixRain) MatrixRain.init();
-            await Promise.all([this.loadStats(), this.loadExperiments()]);
+            await Promise.all([this.loadStats(), this.loadExperiments(), this.loadJudgeHistory()]);
             this._lastExpCount = this.stats.total_experiments || 0;
             this.$nextTick(() => {
                 setTimeout(() => {
@@ -812,7 +813,7 @@ function _buildAppData() {
             if (page === 'changes') this.loadChangesLog();
             if (page === 'prompt') this.loadPrompt();
             if (page === 'config') this.loadConfig();
-            if (page === 'dashboard') { this.loadStats(); this.loadExperiments(); this.loadConfig(); }
+            if (page === 'dashboard') { this.loadStats(); this.loadExperiments(); this.loadConfig(); this.loadJudgeHistory(); }
             if (page === 'run') { this.pollRunStatus(); if (this.runStatus.running) this.connectResearchWs(); }
             if (page !== 'run') this.disconnectResearchWs();
             if (window.CatModule && CatModule.isActive() && CatModule.setPage) { CatModule.setPage(page); }

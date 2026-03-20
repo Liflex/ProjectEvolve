@@ -1,4 +1,27 @@
 
+## Experiment 164 — Auto-judge integration in research loop
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **EVENT_JUDGE** — New event type `judge_verdict` added to research.py event constants.
+2. **_run_judge()** — Method on ResearchRunner that runs `ExperimentJudge.evaluate_all()` after each successful experiment. Non-fatal (catches exceptions, logs warning).
+3. **Auto-judge in run_loop()** — After `EVENT_EXP_END`, if status is "success", calls `_run_judge()` and emits `EVENT_JUDGE` with consensus, score, and per-profile verdicts.
+4. **Persistence** — Judge verdicts saved to `.autoresearch/experiments/judge_{n}_all.json`.
+5. **Server logging** — `judge_verdict` event handler in server.py logs consensus with per-profile breakdown.
+6. **Lab UI live log** — Judge verdicts appear in live log with color-coded icon (green=KEEP, red=DISCARD, amber=REVIEW).
+7. **Cat reactions** — Cat reacts to judge verdicts with expressions and Russian speech.
+
+### Files Modified
+
+- `agents/research.py` — EVENT_JUDGE, _run_judge(), auto-judge call in run_loop()
+- `ui/server.py` — judge_verdict event handler
+- `ui/static/js/modules/lab.js` — live log formatting, cat reaction
+
+---
+
+
 ## Experiment 163 — Chat toolbar cleanup — compact primary toolbar with MORE dropdown
 
 **Date:** 2026-03-20
@@ -6458,6 +6481,66 @@ Results
 2. **Typing duration badge** — на user-сообщениях, если пользователь печатал >2 секунд, показывается ⌨ Xs badge.
 3. **Timer lifecycle** — автозапуск при отправке, автоостановка при stream_end/error/cancel/WS close/tab close.
 4. **Persistence** — typing duration сохраняется в localStorag
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 163 — Chat toolbar cleanup — compact primary toolbar with MORE dropdown
+
+**Date:** 2026-03-20 19:22:00
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+Results
+
+**What was done:**
+1. Toolbar чата уменьшен с 16+ видимых кнопок до 3 primary (THINK, Search, FILTER) + контекстная информация (MSGS count, streaming stats, budget bar) + кнопка MORE.
+2. Все продвинутые функции (CLEAR, PANELS, MSG folding, PINS, EXPORT, STATS, FILE SEARCH, GLOBAL SEARCH, CMD PALETTE, KEYBOARD SHORTCUTS) консолидированы в единый dropdown "MORE" с под-секциями.
+3. Global search panel вынесен в detached позицию (не clutterит toolbar flow).
+4. Keyboard shortcuts (Ctrl+F, Ct
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 164 — Auto-judge integration in research loop
+
+**Date:** 2026-03-20 19:27:12
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- `agents/research.py` — EVENT_JUDGE, _run_judge(), auto-judge call in run_loop()
+- `ui/server.py` — judge_verdict event handler
+- `ui/static/js/modules/lab.js` — live log formatting, cat reaction
+
+### Results
+
+Results
+
+**What was done:**
+1. Добавлен `EVENT_JUDGE = "judge_verdict"` — новый тип события
+2. Метод `_run_judge()` на `ResearchRunner` — запускает `ExperimentJudge.evaluate_all()` после каждого успешного эксперимента. Non-fatal: ошибки логируются, не ломают цикл
+3. Judge автоматически вызывается в `run_loop()` после `EVENT_EXP_END` (только при status="success")
+4. Вердикты сохраняются в `.autoresearch/experiments/judge_{n}_all.json`
+5. Server логирует вердикты с per-profile breakdown
+6. Lab UI 
 
 ### Notes for Next
 
