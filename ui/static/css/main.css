@@ -286,6 +286,51 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     vertical-align: middle;
 }
 
+/* === MESSAGE REFERENCE BADGE (#N) === */
+.msg-ref-badge {
+    display: inline-block;
+    font-size: 0.5rem;
+    color: var(--v3);
+    background: var(--bg2);
+    border: 1px solid var(--v-dim);
+    border-radius: 3px;
+    padding: 0 4px;
+    cursor: pointer;
+    vertical-align: middle;
+    font-family: monospace;
+    letter-spacing: 0.02em;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    line-height: 1.4;
+}
+.msg-ref-badge:hover {
+    color: var(--v);
+    border-color: var(--v2);
+    background: rgba(180, 74, 255, 0.06);
+}
+
+/* === MESSAGE REFERENCE LINK (clickable #N in content) === */
+.msg-ref-link {
+    color: var(--cyan);
+    cursor: pointer;
+    border-bottom: 1px dashed rgba(0, 229, 255, 0.3);
+    font-family: monospace;
+    font-weight: bold;
+    transition: color 0.15s, border-color 0.15s;
+}
+.msg-ref-link:hover {
+    color: var(--v);
+    border-bottom-color: var(--v);
+}
+
+/* === MESSAGE REFERENCE HIGHLIGHT FLASH === */
+.msg-ref-highlight {
+    animation: msg-ref-flash 2s ease-out;
+}
+@keyframes msg-ref-flash {
+    0% { background: rgba(180, 74, 255, 0.15); box-shadow: inset 0 0 0 2px rgba(180, 74, 255, 0.4); }
+    100% { background: transparent; box-shadow: none; }
+}
+
 /* === CHAT MESSAGE AVATARS (IDE-style) === */
 .chat-msg-row { display: flex; gap: 10px; align-items: flex-start; }
 .chat-msg-row-user { flex-direction: row-reverse; }

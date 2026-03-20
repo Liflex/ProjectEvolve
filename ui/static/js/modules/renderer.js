@@ -111,5 +111,25 @@ window.AppRenderer = (function() {
                 return t.replace(/</g, '&lt;').replace(/\n/g, '<br>');
             }
         },
+        // Link #N message references — converts #42 to clickable scroll-to-msg link
+        linkMsgRefs(html, tabId) {
+            if (!html || !tabId) return html;
+            // Protect <code> blocks and <a> tags from modification
+            const protectedBlocks = [];
+            let result = html.replace(/<(?:code|a)[\s>][\s\S]*?<\/(?:code|a)>/gi, (m) => {
+                protectedBlocks.push(m);
+                return '\x00MR' + (protectedBlocks.length - 1) + '\x00';
+            });
+            // Match #N (1-4 digits), not inside existing HTML attributes
+            result = result.replace(/(?<!["\w#])#(\d{1,4})(?!\d)/g, (match, numStr) => {
+                const num = parseInt(numStr, 10);
+                if (num < 0 || num > 9999) return match;
+                return '<span class="msg-ref-link" onclick="event.stopPropagation();window._app&&window._app.scrollToMsg(\'' + tabId + '\',' + num + ')" title="Jump to message #' + num + '">#' + num + '</span>';
+            });
+            for (let i = 0; i < protectedBlocks.length; i++) {
+                result = result.replace('\x00MR' + i + '\x00', protectedBlocks[i]);
+            }
+            return result;
+        },
     };
 })();

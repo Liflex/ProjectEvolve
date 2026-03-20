@@ -1402,10 +1402,11 @@ window.AppChat = (function() {
                 const headedHtml = this._addHeadingIds(rawMdHtml, msgId);
                 const tocHtml = !msg.is_streaming ? this._buildMessageTOC(msg.content, msgId) : '';
                 const contentHtml = msg.is_streaming
-                    ? '<div class="md">' + this.linkFilePaths(headedHtml) + cursorHtml + '</div>'
-                    : '<div class="md">' + tocHtml + this.linkFilePaths(headedHtml) + '</div>';
+                    ? '<div class="md">' + this.linkMsgRefs(this.linkFilePaths(headedHtml), tab.tab_id) + cursorHtml + '</div>'
+                    : '<div class="md">' + tocHtml + this.linkMsgRefs(this.linkFilePaths(headedHtml), tab.tab_id) + '</div>';
                 const aTime = this.fmtTime(msg.ts);
                 const aFullTime = this.fmtFullTime(msg.ts);
+                const aRefBadge = ' <span class="msg-ref-badge" onclick="event.stopPropagation();window._app.copyMsgRef(\'' + tab.tab_id + '\',' + idx + ')" title="Click to copy #' + idx + ' reference">#' + idx + '</span>';
                 const aTimeHtml = aTime ? ' <span class="msg-ts" title="' + this.escHtml(aFullTime) + '" style="color:var(--v3);font-weight:normal;cursor:help">' + aTime + '</span>' : '';
                 const aRegenHtml = !msg.is_streaming && msg.regenerated ? ' <span class="msg-regen-badge" title="Response was regenerated">regen</span>' : '';
                 const isLastAssistant = !msg.is_streaming && !tab.is_streaming && msgs.slice(idx + 1).filter(m => m.role === 'assistant').length === 0;
@@ -1488,12 +1489,12 @@ window.AppChat = (function() {
                     + '<button class="act-dislike' + (msg.reaction === 'down' ? ' reacted' : '') + '" onclick="event.stopPropagation();window._app.reactToMessage(\'' + tab.tab_id + '\',' + idx + ',\'down\')" title="Not helpful">&#x1F44E;</button>' : '')
                     + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + idx + ')" title="Delete">DEL</button>'
                     + '</div>'
-                    + '<div class="chat-role chat-role-assistant">CLAUDE_' + (isPinned ? ' <span class="pin-indicator" title="Pinned message">&#x1F4CC;</span>' : '') + (msg.reaction === 'up' ? ' <span style="color:var(--ng);font-size:0.625rem" title="Helpful">&#x1F44D;</span>' : '') + (msg.reaction === 'down' ? ' <span style="color:var(--red);font-size:0.625rem" title="Not helpful">&#x1F44E;</span>' : '') + aTimeHtml + aRegenHtml + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + reactionHtml + '</div>'
+                    + '<div class="chat-role chat-role-assistant">CLAUDE_' + aRefBadge + (isPinned ? ' <span class="pin-indicator" title="Pinned message">&#x1F4CC;</span>' : '') + (msg.reaction === 'up' ? ' <span style="color:var(--ng);font-size:0.625rem" title="Helpful">&#x1F44D;</span>' : '') + (msg.reaction === 'down' ? ' <span style="color:var(--red);font-size:0.625rem" title="Not helpful">&#x1F44E;</span>' : '') + aTimeHtml + aRegenHtml + (aFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + aChars + 'ch · ' + aLines + 'ln</span>' : '') + aMetaHtml + reactionHtml + '</div>'
                     + (cf.thinking ? thinkingHtml : '')
                     + thinkingIndicatorHtml
                     + '<div class="chat-bubble-asst" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit">'
                     + (aCollapsed
-                        ? '<div class="chat-collapsed-preview"><div class="md">' + this.linkFilePaths(this.renderMarkdown(msg.content.slice(0, 300))) + '</div></div>'
+                        ? '<div class="chat-collapsed-preview"><div class="md">' + this.linkMsgRefs(this.linkFilePaths(this.renderMarkdown(msg.content.slice(0, 300))), tab.tab_id) + '</div></div>'
                           + '<div class="chat-expand-btn" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + idx + ')">&#x25BC; EXPAND (' + aChars + ' chars)</div>'
                         : contentHtml)
                     + (aRegenDiff && msg._showRegenDiff ? this._renderRegenDiffHtml(msg) : '')
@@ -1647,6 +1648,7 @@ window.AppChat = (function() {
                     }
                     const uTime = this.fmtTime(msg.ts);
                     const uFullTime = this.fmtFullTime(msg.ts);
+                    const uRefBadge = ' <span class="msg-ref-badge" onclick="event.stopPropagation();window._app.copyMsgRef(\'' + tab.tab_id + '\',' + i + ')" title="Click to copy #' + i + ' reference">#' + i + '</span>';
                     const uTimeHtml = uTime ? ' <span class="msg-ts" title="' + this.escHtml(uFullTime) + '" style="color:var(--v3);font-weight:normal;cursor:help">' + uTime + '</span>' : '';
                     const uEditedHtml = msg.edited ? ' <span class="msg-edited-badge" title="Message was edited and resent">edited</span>' : '';
                     const uFold = msg.content && msg.content.length > 500 && !msg.is_streaming;
@@ -1664,13 +1666,14 @@ window.AppChat = (function() {
                         + '<button class="act-del" onclick="event.stopPropagation();window._app.deleteChatMsg(\'' + tab.tab_id + '\',' + i + ')" title="Delete">DEL</button>'
                         + '</div>'
                         + '<div class="chat-role chat-role-user">USER_'
+                        + uRefBadge
                         + (turnCount === 1 ? '<span class="turn-collapse-btn" onclick="event.stopPropagation();window._app.toggleTurnCollapse(\'' + tab.tab_id + '\',' + turnCount + ')" title="Collapse turn">[-]</span> ' : '')
                         + uTimeHtml + uEditedHtml + (uFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + uChars + 'ch · ' + uLines + 'ln</span>' : '') + '</div>'
                         + '<div class="chat-bubble-user" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit;color:var(--ng2)">'
                         + (uCollapsed
-                            ? '<div class="chat-collapsed-preview">' + this.renderUserContent(msg.content.slice(0, 200)) + '</div>'
+                            ? '<div class="chat-collapsed-preview">' + this.linkMsgRefs(this.renderUserContent(msg.content.slice(0, 200)), tab.tab_id) + '</div>'
                               + '<div class="chat-expand-btn" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + i + ')">&#x25BC; EXPAND (' + uChars + ' chars)</div>'
-                            : this.renderUserContent(msg.content || ''))
+                            : this.linkMsgRefs(this.renderUserContent(msg.content || ''), tab.tab_id))
                         + '</div></div></div>';
                     i++;
                 } else if (msg.role === 'assistant' || msg.role === 'tool') {
@@ -3755,6 +3758,54 @@ window.AppChat = (function() {
             }
             const totalOut = data.reduce((s, v) => s + v, 0);
             return '<svg width="' + svgW + '" height="' + h + '" viewBox="0 0 ' + svgW + ' ' + h + '" style="vertical-align:middle;margin:0 4px;cursor:help" title="Token output per response — ' + data.length + ' responses, ' + (totalOut / 1000).toFixed(1) + 'K total output tokens">' + bars + '</svg>';
+        },
+
+        // ========== CHAT: MESSAGE REFERENCES (#N) ==========
+
+        // Scroll to message by index and flash-highlight it
+        scrollToMsg(tabId, msgIdx) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab) return;
+            // Switch to the tab if not active
+            if (this.activeChatTab !== tabId) {
+                this.activateChatTab(tabId);
+            }
+            this.$nextTick(() => {
+                const container = document.getElementById('chat-messages-' + tabId);
+                if (!container) return;
+                const msgEl = container.querySelector('[data-msg-idx="' + msgIdx + '"]');
+                if (!msgEl) {
+                    this.showToast('Message #' + msgIdx + ' not found', 'error');
+                    return;
+                }
+                // Remove any existing highlight
+                container.querySelectorAll('.msg-ref-highlight').forEach(el => el.classList.remove('msg-ref-highlight'));
+                // Scroll into view
+                msgEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Flash highlight
+                msgEl.classList.add('msg-ref-highlight');
+                setTimeout(() => msgEl.classList.remove('msg-ref-highlight'), 2000);
+            });
+        },
+
+        // Copy message reference (#N) to clipboard
+        copyMsgRef(tabId, msgIdx) {
+            const ref = '#' + msgIdx;
+            navigator.clipboard.writeText(ref).then(() => {
+                this.showToast('Reference ' + ref + ' copied to clipboard');
+            }).catch(() => {
+                // Fallback: insert into active tab input
+                const tab = this.chatTabs.find(t => t.tab_id === this.activeChatTab);
+                if (tab) {
+                    const ta = document.querySelector('#chat-messages-' + this.activeChatTab)?.closest('.absolute')?.querySelector('textarea');
+                    if (ta) {
+                        const start = ta.selectionStart || ta.value.length;
+                        const end = ta.selectionEnd || ta.value.length;
+                        tab.input_text = tab.input_text.slice(0, start) + ref + tab.input_text.slice(end);
+                        this.$nextTick(() => { ta.selectionStart = ta.selectionEnd = start + ref.length; });
+                    }
+                }
+            });
         },
     };
 })();
