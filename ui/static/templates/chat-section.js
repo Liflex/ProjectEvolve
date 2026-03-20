@@ -67,6 +67,9 @@
             <button class="chat-toolbar-btn" :class="chatBottomPanel === 'summary' && 'active'" @click="toggleBottomPanel('summary')" title="Toggle tools summary">
                 <span :style="'color:' + (chatBottomPanel === 'summary' ? 'var(--cyan)' : 'inherit')">&#x2699;</span> TOOLS
             </button>
+            <button class="chat-toolbar-btn" :class="chatBottomPanel === 'filepreview' && 'active'" @click="chatBottomPanel === 'filepreview' ? chatBottomPanel = 'closed' : (filePreview.path ? chatBottomPanel = 'filepreview' : null)" title="Toggle file preview">
+                <span :style="'color:' + (chatBottomPanel === 'filepreview' ? 'var(--ng)' : 'inherit')">&#x1f4c4;</span> FILE
+            </button>
             <div class="chat-toolbar-sep"></div>
             <button class="chat-toolbar-btn" :class="settings.showThinking && 'active'" @click="toggleSetting('showThinking')" title="Toggle thinking blocks visibility">
                 <span :style="'color:' + (settings.showThinking ? 'var(--amber)' : 'inherit')">&#x1f4ad;</span> THINK
@@ -317,8 +320,10 @@
                                 <div class="panel-tab-bar">
                                     <div class="panel-tab" :class="chatBottomPanel === 'rawlog' && 'active'" @click="chatBottomPanel = 'rawlog'">RAW LOG</div>
                                     <div class="panel-tab" :class="chatBottomPanel === 'summary' && 'active'" @click="chatBottomPanel = 'summary'">TOOLS SUMMARY</div>
+                                    <div class="panel-tab" :class="chatBottomPanel === 'filepreview' && 'active'" @click="chatBottomPanel = 'filepreview'">FILE PREVIEW</div>
                                     <div class="flex-1"></div>
-                                    <button class="chat-toolbar-btn" @click="clearBottomPanelLog()" title="Clear log">CLEAR</button>
+                                    <button x-show="chatBottomPanel === 'rawlog' || chatBottomPanel === 'summary'" class="chat-toolbar-btn" @click="clearBottomPanelLog()" title="Clear log">CLEAR</button>
+                                    <button x-show="chatBottomPanel === 'filepreview'" class="chat-toolbar-btn" @click="closeFilePreview()" title="Close preview">CLOSE</button>
                                 </div>
                                 <!-- RAW LOG content -->
                                 <div x-show="chatBottomPanel === 'rawlog'" class="panel-content">
@@ -341,6 +346,53 @@
                                         </div>
                                     </template>
                                     <div x-show="getToolSummary().length === 0" class="text-center py-4 text-[0.625rem] text-[var(--v3)] tracking-wider">NO_TOOLS_USED_YET_</div>
+                                </div>
+                                <!-- FILE PREVIEW content -->
+                                <div x-show="chatBottomPanel === 'filepreview'" class="panel-content fp-preview-panel">
+                                    <!-- Loading state -->
+                                    <div x-show="filePreview.loading" class="flex items-center justify-center py-4">
+                                        <span class="text-[0.625rem] text-[var(--v3)] tracking-wider animate-pulse">LOADING_</span>
+                                    </div>
+                                    <!-- Error state -->
+                                    <div x-show="filePreview.error && !filePreview.loading" class="flex items-center gap-2 py-3 px-2">
+                                        <span style="color:var(--red);font-size:0.75rem">&#x26A0;</span>
+                                        <span class="text-[0.625rem] text-[var(--red)] tracking-wider" x-text="filePreview.error"></span>
+                                    </div>
+                                    <!-- No file selected -->
+                                    <div x-show="!filePreview.path && !filePreview.loading && !filePreview.error" class="text-center py-4 text-[0.625rem] text-[var(--v3)] tracking-wider">
+                                        CLICK_A_FILE_PATH_IN_CHAT_TO_PREVIEW_
+                                    </div>
+                                    <!-- File loaded -->
+                                    <template x-if="filePreview.name && !filePreview.loading && !filePreview.error">
+                                        <div>
+                                            <!-- File header -->
+                                            <div class="fp-header">
+                                                <span class="fp-filename" x-text="filePreview.name"></span>
+                                                <span class="fp-meta">
+                                                    <span x-text="'[' + filePreview.lang.toUpperCase() + ']'" style="color:var(--cyan)"></span>
+                                                    <span x-text="' · ' + $app._fmtFileSize(filePreview.size)"></span>
+                                                    <span x-text="' · ' + filePreview.totalLines + ' lines'"></span>
+                                                </span>
+                                            </div>
+                                            <!-- Pagination -->
+                                            <div x-show="filePreview.totalLines > filePreview.limit" class="fp-pagination">
+                                                <button class="fp-page-btn" :disabled="filePreview.offset === 0" @click="loadFilePreviewPage(0)">&#x23EE;</button>
+                                                <button class="fp-page-btn" :disabled="filePreview.offset === 0" @click="loadFilePreviewPage(Math.max(0, filePreview.offset - filePreview.limit))">&#x25C0;</button>
+                                                <span class="fp-page-info" x-text="'L' + (filePreview.offset + 1) + '-' + Math.min(filePreview.offset + filePreview.limit, filePreview.totalLines) + ' / ' + filePreview.totalLines"></span>
+                                                <button class="fp-page-btn" :disabled="filePreview.offset + filePreview.limit >= filePreview.totalLines" @click="loadFilePreviewPage(filePreview.offset + filePreview.limit)">&#x25B6;</button>
+                                                <button class="fp-page-btn" :disabled="filePreview.offset + filePreview.limit >= filePreview.totalLines" @click="loadFilePreviewPage(filePreview.totalLines - filePreview.limit)">&#x23ED;</button>
+                                            </div>
+                                            <!-- Line content -->
+                                            <div class="fp-lines">
+                                                <template x-for="(line, idx) in filePreview.lines" :key="filePreview.offset + idx">
+                                                    <div class="fp-line">
+                                                        <span class="fp-ln" x-text="String(filePreview.offset + idx + 1).padStart(4, ' ')" @click="navigator.clipboard.writeText(String(filePreview.offset + idx + 1)).then(function(){$app.showToast('Line ' + (filePreview.offset + idx + 1) + ' copied')})"></span>
+                                                        <pre class="fp-code" x-text="line"></pre>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
                                 </div>
                             </div>
                         </div>

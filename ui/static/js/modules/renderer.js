@@ -18,7 +18,7 @@ window.AppRenderer = (function() {
             const pathRe = /((?:[a-zA-Z0-9_.\-]+[\\\/]|[A-Za-z]:[\\\/]|[.\/~])[a-zA-Z0-9_.\-\\\/]+\.[a-zA-Z0-9_\-]{1,8})/g;
             result = result.replace(pathRe, (match) => {
                 const rawPath = match.replace(/\\/g, '/').replace(/'/g, "\\'");
-                return '<span class="fp-link" onclick="event.stopPropagation();navigator.clipboard.writeText(\'' + rawPath + '\').then(function(){window._app&&window._app.showToast(\'Путь скопирован\')})" title="' + match.replace(/"/g, '&quot;') + ' \u2014 click to copy">' + match + '</span>';
+                return '<span class="fp-link" onclick="event.stopPropagation();if(event.ctrlKey||event.metaKey){navigator.clipboard.writeText(\'' + rawPath + '\').then(function(){window._app&&window._app.showToast(\'Путь скопирован\')})}else{window._app&&window._app.previewFile(\'' + rawPath + '\')}" title="' + match.replace(/"/g, '&quot;') + ' \u2014 click: preview | Ctrl+click: copy">' + match + '</span>';
             });
             for (let i = 0; i < protectedBlocks.length; i++) {
                 result = result.replace('\x00PB' + i + '\x00', protectedBlocks[i]);

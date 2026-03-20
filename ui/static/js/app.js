@@ -285,6 +285,9 @@ function _buildAppData() {
         chatBottomPanelHeight: 180,
         _panelResizing: false,
 
+        // File preview panel
+        filePreview: { loading: false, path: null, name: null, lang: null, size: 0, totalLines: 0, offset: 0, limit: 500, lines: [], error: null },
+
         // Slash command menu
         slashMenu: { show: false, items: [], filter: '', selected: 0, _tabId: null },
         // @-mention file autocomplete

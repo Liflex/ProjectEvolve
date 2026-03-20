@@ -1273,6 +1273,57 @@ async def search_files(path: str, q: str, max_results: int = 30):
     return {"query": q, "results": results, "total": len(results), "truncated": len(results) >= max_results}
 
 
+@app.get("/api/fs/read")
+async def read_file(path: str, offset: int = 0, limit: int = 500):
+    """Read file content for the file preview panel in chat. Supports line-range pagination."""
+    if not path:
+        raise HTTPException(status_code=400, detail="path parameter required")
+    abs_path = Path(path).resolve()
+    allowed_bases = {get_project_dir().resolve(), Path.cwd().resolve()}
+    if not any(str(abs_path).startswith(str(base)) for base in allowed_bases):
+        raise HTTPException(status_code=403, detail="Path traversal blocked")
+    if not abs_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    # Block binary files and very large files
+    stat = abs_path.stat()
+    if stat.st_size > 2_000_000:  # 2MB max
+        raise HTTPException(status_code=413, detail="File too large (max 2MB)")
+    BINARY_EXTS = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.otf', '.zip', '.gz', '.tar', '.7z', '.exe', '.dll', '.so', '.dylib', '.bin', '.pyc', '.wasm'}
+    if abs_path.suffix.lower() in BINARY_EXTS:
+        raise HTTPException(status_code=400, detail="Binary files not supported for preview")
+    try:
+        content = abs_path.read_text(encoding="utf-8", errors="replace")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)[:200])
+    lines = content.split('\n')
+    total_lines = len(lines)
+    # Remove trailing empty line from split
+    if lines and lines[-1] == '':
+        total_lines -= 1
+    offset = max(0, min(offset, total_lines))
+    limit = max(1, min(limit, 1000))
+    page_lines = lines[offset:offset + limit]
+    # Guess language from extension
+    ext_to_lang = {'.py': 'python', '.js': 'javascript', '.ts': 'typescript', '.jsx': 'jsx', '.tsx': 'tsx',
+                   '.html': 'html', '.css': 'css', '.scss': 'scss', '.json': 'json', '.yaml': 'yaml', '.yml': 'yaml',
+                   '.md': 'markdown', '.sh': 'bash', '.bash': 'bash', '.sql': 'sql', '.rs': 'rust', '.go': 'go',
+                   '.java': 'java', '.kt': 'kotlin', '.rb': 'ruby', '.php': 'php', '.vue': 'vue', '.svelte': 'svelte',
+                   '.toml': 'toml', '.ini': 'ini', '.cfg': 'ini', '.xml': 'xml', '.svg': 'xml'}
+    lang = ext_to_lang.get(abs_path.suffix.lower(), 'text')
+    return {
+        "path": str(abs_path),
+        "name": abs_path.name,
+        "lang": lang,
+        "size": stat.st_size,
+        "total_lines": total_lines,
+        "offset": offset,
+        "limit": limit,
+        "lines": page_lines,
+    }
+
+
 @app.get("/api/fs/preflight")
 async def preflight_check(path: str):
     """Pre-flight check: verify project has required files for AutoResearch."""

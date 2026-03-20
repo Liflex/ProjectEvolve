@@ -1472,7 +1472,7 @@ window.AppChat = (function() {
                         detailHtml += '<div style="display:flex;align-items:center;gap:6px;padding:2px 0 2px 18px">'
                             + '<span style="font-size:0.625rem">' + (icons[tt] || icons.other) + '</span>'
                             + '<span style="font-size:0.5rem;color:' + (colors[tt] || colors.other) + ';letter-spacing:0.12em;font-weight:bold;min-width:36px">[' + (labels[tt] || 'TOOL') + ']</span>'
-                            + '<span class="fp-link" style="font-size:0.625rem" title="' + this.escHtml(tp) + ' — click to copy" onclick="event.stopPropagation();navigator.clipboard.writeText(\'' + this.escHtml(tp).replace(/'/g, "\\'") + '\').then(function(){window._app&&window._app.showToast(\'Путь скопирован\')})">' + this.escHtml(tp.split(/[\\/]/).pop()) + '</span>'
+                            + '<span class="fp-link" style="font-size:0.625rem" title="' + this.escHtml(tp) + ' — click: preview | Ctrl+click: copy" onclick="event.stopPropagation();if(event.ctrlKey||event.metaKey){navigator.clipboard.writeText(\'' + this.escHtml(tp).replace(/'/g, "\\'") + '\').then(function(){window._app&&window._app.showToast(\'Путь скопирован\')})}else{window._app&&window._app.previewFile(\'' + this.escHtml(tp).replace(/'/g, "\\'") + '\')}">' + this.escHtml(tp.split(/[\\/]/).pop()) + '</span>'
                             + '<span style="font-size:0.5625rem;color:var(--v3);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0" title="' + this.escHtml(tp) + '">' + this.escHtml(tp) + '</span>'
                             + '</div>';
                         if (tt === 'edit' && (t.toolEditOld || t.toolEditNew)) {
@@ -1519,7 +1519,7 @@ window.AppChat = (function() {
                     }
                 }
                 const headerTarget = primaryTarget
-                    ? '<span class="fp-link" style="font-size:0.625rem" title="' + this.escHtml(primaryTarget) + ' — click to copy" onclick="event.stopPropagation();navigator.clipboard.writeText(\'' + this.escHtml(primaryTarget).replace(/'/g, "\\'") + '\').then(function(){window._app&&window._app.showToast(\'Путь скопирован\')})">' + this.escHtml(primaryTarget.split(/[\\/]/).pop()) + '</span>'
+                    ? '<span class="fp-link" style="font-size:0.625rem" title="' + this.escHtml(primaryTarget) + ' — click: preview | Ctrl+click: copy" onclick="event.stopPropagation();if(event.ctrlKey||event.metaKey){navigator.clipboard.writeText(\'' + this.escHtml(primaryTarget).replace(/'/g, "\\'") + '\').then(function(){window._app&&window._app.showToast(\'Путь скопирован\')})}else{window._app&&window._app.previewFile(\'' + this.escHtml(primaryTarget).replace(/'/g, "\\'") + '\')}">' + this.escHtml(primaryTarget.split(/[\\/]/).pop()) + '</span>'
                     + '<span style="font-size:0.5rem;color:var(--v3);font-family:monospace;margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:30ch" title="' + this.escHtml(primaryTarget) + '">' + this.escHtml(primaryTarget) + '</span>'
                     + diffBadge
                     : '<span style="font-size:0.5625rem;color:var(--ng3);letter-spacing:0.08em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:50ch" title="' + this.escHtml(summaryText) + '">' + this.escHtml(summaryText) + '</span>';
@@ -2600,6 +2600,53 @@ window.AppChat = (function() {
             document.body.style.userSelect = 'none';
         },
 
+        // ========== CHAT: FILE PREVIEW PANEL ==========
+        async previewFile(path) {
+            this.filePreview = { loading: true, path: path, name: null, lang: null, size: 0, totalLines: 0, offset: 0, limit: 500, lines: [], error: null };
+            this.chatBottomPanel = 'filepreview';
+            this.chatTick++;
+            try {
+                const data = await this.api('/api/fs/read?path=' + encodeURIComponent(path) + '&offset=0&limit=500');
+                this.filePreview.loading = false;
+                this.filePreview.name = data.name;
+                this.filePreview.lang = data.lang;
+                this.filePreview.size = data.size;
+                this.filePreview.totalLines = data.total_lines;
+                this.filePreview.lines = data.lines;
+                this.filePreview.error = null;
+            } catch (e) {
+                this.filePreview.loading = false;
+                this.filePreview.error = e.message || 'Failed to load file';
+            }
+            this.chatTick++;
+        },
+        async loadFilePreviewPage(offset) {
+            if (!this.filePreview.path || this.filePreview.loading) return;
+            this.filePreview.loading = true;
+            this.filePreview.offset = offset;
+            this.chatTick++;
+            try {
+                const data = await this.api('/api/fs/read?path=' + encodeURIComponent(this.filePreview.path) + '&offset=' + offset + '&limit=500');
+                this.filePreview.loading = false;
+                this.filePreview.lines = data.lines;
+                this.filePreview.offset = data.offset;
+            } catch (e) {
+                this.filePreview.loading = false;
+                this.filePreview.error = e.message || 'Failed to load';
+            }
+            this.chatTick++;
+        },
+        closeFilePreview() {
+            if (this.chatBottomPanel === 'filepreview') {
+                this.chatBottomPanel = 'closed';
+            }
+        },
+        _fmtFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        },
+
         // ========== SESSION PICKER ==========
         async showSessionPicker() {
             this.sessionPickerSearch = '';
@@ -2665,6 +2712,7 @@ window.AppChat = (function() {
                 const tt = msg.toolType || 'other';
                 const fp = msg.toolPath || '';
                 if (fp) {
+                    items.push({ label: 'PREVIEW FILE', icon: '&#x1f4c4;', action: () => { this.previewFile(fp); } });
                     items.push({ label: 'COPY PATH', icon: '&#x1f4c1;', action: () => { navigator.clipboard.writeText(fp).then(() => this.showToast('Path copied')); } });
                 }
                 items.push({ label: 'COPY DETAIL', icon: '&#x1f4cb;', action: () => { navigator.clipboard.writeText(msg.toolDetail || msg.content || '').then(() => this.showToast('Copied')); } });

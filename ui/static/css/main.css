@@ -1017,6 +1017,47 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 .chat-bottom-panel .panel-content .log-time { color: var(--v3); margin-right: 6px; }
 .chat-bottom-panel .panel-content .log-type { font-weight: bold; margin-right: 6px; }
 .chat-bottom-panel .panel-content .log-detail { color: var(--ng3); }
+/* File preview panel */
+.fp-preview-panel { padding: 0 !important; display: flex; flex-direction: column; }
+.fp-preview-panel .fp-header {
+    display: flex; align-items: center; gap: 8px; padding: 4px 10px;
+    border-bottom: 1px solid var(--v-dim); background: rgba(0,0,0,0.1); flex-shrink: 0;
+}
+.fp-preview-panel .fp-filename {
+    font-size: 0.6875rem; font-weight: bold; color: var(--v); letter-spacing: 0.05em;
+}
+.fp-preview-panel .fp-meta {
+    font-size: 0.5625rem; color: var(--v3); letter-spacing: 0.08em;
+}
+.fp-preview-panel .fp-pagination {
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    padding: 3px 8px; border-bottom: 1px solid var(--v-dim); flex-shrink: 0;
+}
+.fp-preview-panel .fp-page-btn {
+    font-size: 0.5625rem; padding: 1px 6px; color: var(--v3); background: none;
+    border: 1px solid var(--v-dim); cursor: pointer; transition: all 0.15s; letter-spacing: 0.05em;
+}
+.fp-preview-panel .fp-page-btn:hover:not(:disabled) { color: var(--v); border-color: var(--v2); background: rgba(180,74,255,0.06); }
+.fp-preview-panel .fp-page-btn:disabled { opacity: 0.3; cursor: default; }
+.fp-preview-panel .fp-page-info { font-size: 0.5625rem; color: var(--v3); letter-spacing: 0.08em; padding: 0 6px; }
+.fp-preview-panel .fp-lines {
+    flex: 1; overflow-y: auto; overflow-x: auto; padding: 0;
+}
+.fp-preview-panel .fp-line {
+    display: flex; min-height: 1.25em; transition: background 0.1s;
+}
+.fp-preview-panel .fp-line:hover { background: rgba(180,74,255,0.04); }
+.fp-preview-panel .fp-ln {
+    min-width: 3.5em; text-align: right; padding: 0 0.6em; color: var(--v3);
+    opacity: 0.5; font-size: 0.6875em; user-select: none; border-right: 1px solid var(--v-dim);
+    cursor: pointer; flex-shrink: 0; line-height: 1.4em; transition: opacity 0.15s, color 0.15s;
+}
+.fp-preview-panel .fp-line:hover .fp-ln { opacity: 0.8; color: var(--v2); }
+.fp-preview-panel .fp-code {
+    margin: 0; padding: 0 0.6em; color: var(--ng2); white-space: pre; font-size: 0.75rem;
+    line-height: 1.4em; font-family: var(--code-font, 'JetBrains Mono', 'Fira Code', monospace);
+    flex: 1; min-width: 0; background: none; border: none;
+}
 /* Resize handle */
 .chat-resize-handle {
     height: 4px;
