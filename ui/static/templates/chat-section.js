@@ -129,10 +129,10 @@
             </div>
             <div class="chat-toolbar-sep"></div>
             <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider" x-show="activeTab" x-text="getChatFilterCount(activeTab) + '/' + (activeTab?.messages?.length || 0) + ' MSGS'"></span>
-            <!-- Streaming elapsed timer -->
+            <!-- Streaming elapsed timer + word count + speed -->
             <span x-show="activeTab && activeTab.is_streaming && activeTab._msgStartTime"
                   class="text-[0.5625rem] text-[var(--cyan)] tracking-wider tabular-nums"
-                  x-text="(_clockTick, 'ELAPSED ' + getStreamingElapsed(activeTab))"></span>
+                  x-text="(_clockTick, 'ELAPSED ' + getStreamingElapsed(activeTab) + ' · ' + (getStreamingWordCount(activeTab) || 0) + 'w' + (getStreamingSpeed(activeTab) ? ' · ' + getStreamingSpeed(activeTab) + ' w/s' : ''))"></span>
             <span x-show="activeTab && activeTab.is_streaming && activeTab._msgStartTime"
                   class="w-1.5 h-1.5 rounded-full bg-[var(--cyan)] animate-pulse ml-1"></span>
             <span class="text-[0.5rem] text-[var(--v)] tracking-wider blink" x-show="_chatNavIdx >= 0" x-text="'NAV #' + (_chatNavIdx + 1) + ' [c q e f p d t n m g]'"></span>

@@ -1374,13 +1374,25 @@ window.AppChat = (function() {
                 const reaction = msg.reaction || '';
                 if (!msg.is_streaming) {
                     const metaParts = [];
-                    if (msg.duration) metaParts.push(this.fmtDuration(msg.duration));
+                    let metaStyle = '';
+                    if (msg.duration) {
+                        const content = msg.content || '';
+                        const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
+                        const speedSec = msg.duration / 1000;
+                        const wps = speedSec >= 1 && wordCount > 0 ? Math.round(wordCount / speedSec) : 0;
+                        metaParts.push(this.fmtDuration(msg.duration));
+                        if (wordCount > 0) metaParts.push(wordCount + 'w');
+                        if (wps > 0) {
+                            metaParts.push(wps + ' w/s');
+                            metaStyle = wps >= 60 ? 'color:var(--ng)' : wps >= 30 ? 'color:var(--cyan)' : 'color:var(--amber)';
+                        }
+                    }
                     if (msg.msgTokens) {
                         if (msg.msgTokens.output) metaParts.push((msg.msgTokens.output / 1000).toFixed(1) + 'K out');
                         if (msg.msgTokens.cost > 0) metaParts.push('$' + msg.msgTokens.cost.toFixed(4));
                     }
                     if (metaParts.length) {
-                        aMetaHtml = ' <span class="msg-meta-badge">' + metaParts.join(' · ') + '</span>';
+                        aMetaHtml = ' <span class="msg-meta-badge" style="' + metaStyle + '">' + metaParts.join(' · ') + '</span>';
                     }
                 }
                 let reactionHtml = '';
@@ -2680,6 +2692,26 @@ window.AppChat = (function() {
             if (!tab || !tab._msgStartTime) return '';
             const ms = Date.now() - tab._msgStartTime;
             return this.fmtDuration(ms);
+        },
+        /** Streaming speed — words per second for the currently streaming assistant message. */
+        getStreamingSpeed(tab) {
+            if (!tab || !tab.is_streaming || !tab._msgStartTime) return null;
+            const lastMsg = tab.messages[tab.messages.length - 1];
+            if (!lastMsg || lastMsg.role !== 'assistant' || !lastMsg.is_streaming) return null;
+            const content = lastMsg.content || '';
+            if (!content.trim()) return null;
+            const words = content.trim().split(/\s+/).length;
+            const seconds = (Date.now() - tab._msgStartTime) / 1000;
+            if (seconds < 1) return null;
+            return Math.round(words / seconds);
+        },
+        /** Streaming word count for the currently streaming assistant message. */
+        getStreamingWordCount(tab) {
+            if (!tab || !tab.is_streaming) return null;
+            const lastMsg = tab.messages[tab.messages.length - 1];
+            if (!lastMsg || lastMsg.role !== 'assistant' || !lastMsg.is_streaming) return null;
+            const content = (lastMsg.content || '').trim();
+            return content ? content.split(/\s+/).length : 0;
         },
         /** Format token info for a single message. */
         getMsgTokenMeta(msg) {

@@ -2408,3 +2408,25 @@ Results
 4. **Cyan pulse
 
 
+## Experiment 124 — Chat — enhanced sidebar content for chat mode
+
+**Time:** 2026-03-20 02:58:55
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **Chat sidebar content** — заменил пустой "ACTIVE_SESSIONS / 5 LIMIT" на богатый контент:
+   - **Aggregate stats grid**: количество сессий (x/5), общее число сообщений, токены, стоимость
+   - **Session cards**: кликабельный список с индикатором статуса (streaming/connected/connecting/error), лейблом, числом сообщений и превью последнего сообщения
+   - **Quick actions**: + NEW TAB, RESUME, CLOSE ALL (показываются по условию)
+2. **Compact mode** — в компактном sideba
+
+
