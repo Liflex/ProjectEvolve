@@ -10,6 +10,7 @@ Usage:
 
 import asyncio
 import json
+import logging
 import os
 import re
 import subprocess
@@ -18,6 +19,8 @@ import threading
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -2110,6 +2113,11 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
         await websocket.send_json({"type": "error", "code": 404, "message": "Session not found", "recoverable": False})
         await websocket.close()
         return
+
+    # Cancel grace period timer if client is reconnecting after a disconnect
+    reactivated = session_manager.reactivate(session_id)
+    if reactivated:
+        logger.info("WebSocket reconnected for session %s", session_id)
 
     await websocket.send_json({
         "type": "connected",

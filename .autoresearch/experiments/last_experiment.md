@@ -1,30 +1,28 @@
 # Last Experiment Summary
 
-**Experiment #185** — Structured system messages in chat with actionable buttons
+**Experiment #187** — Session grace period on WebSocket disconnect
 **Date:** 2026-03-20
 
 ## What Was Done
 
-1. **`_renderSystemBlock()`** — новый helper для рендеринга `[ERROR]`, `[INFO]`, `[WARNING]`, `[RECONNECT FAILED]` сообщений как структурированных блоков вместо обычных assistant bubbles.
-2. **CSS стили** — `.chat-sys-block`, `.chat-sys-error/info/warning` с цветовой кодировкой, `.chat-sys-actions` для кнопок действий.
-3. **ERROR блоки** — красный фон, иконка, текст ошибки, кнопки RECONNECT (connection errors) + COPY.
-4. **INFO блоки** — cyan фон, markdown рендеринг, иконка информации.
-5. **WARNING блоки** — amber фон, markdown рендеринг, иконка предупреждения.
-6. **Avatar SVG константы** — вынесены на уровень модуля.
+1. `SessionManager.deactivate()` — no longer immediately cancels the session. Starts a 60-second grace period timer instead.
+2. `SessionManager.reactivate()` — new method to cancel grace period timer on client reconnect.
+3. WebSocket handler — calls `reactivate()` on connect for existing sessions.
+4. 8 tests covering grace period lifecycle.
 
 ## Files Modified
 
-- `ui/static/css/main.css` (+67 lines)
-- `ui/static/js/modules/chat.js` (+66 lines, -3 lines)
+- `agents/manager.py` (rewritten)
+- `ui/server.py` (+7 lines)
+- `tests/test_session_grace_period.py` (+109 lines, new)
 
 ## Key Results
 
-- System messages now have distinct visual styling (color-coded blocks)
-- ERROR messages have actionable RECONNECT and COPY buttons
-- INFO/WARNING messages render markdown for formatted text
-- Pre-existing tests (13) still pass
-- JS syntax validated
+- All 21 tests pass (8 new + 13 existing)
+- Session survives transient WebSocket disconnects (up to 60s)
+- Explicit close (tab close) still immediately removes session
+- No breaking changes to existing API
 
 ## For Next Iteration
 
-N/A
+- The in-progress query is still lost on WS disconnect (async generator abandoned). Future improvement: decouple query execution from WebSocket, buffer events for replay.

@@ -1,3 +1,23 @@
+## Experiment 187 — Session grace period on WebSocket disconnect
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`SessionManager.deactivate()`** — no longer immediately cancels the session. Instead starts a 60-second grace period timer. If the client reconnects within this window, the timer is cancelled and the session resumes.
+2. **`SessionManager.reactivate()`** — new method that cancels the grace period timer when a client reconnects. Returns True if the session was in grace period.
+3. **`SessionManager.cancel_session()`** — unchanged: still immediately removes and cleans up (used for explicit user close actions). Overrides any pending grace period timer.
+4. **WebSocket handler** — calls `reactivate()` on connect for existing sessions, enabling seamless reconnection.
+5. **8 tests** covering: no immediate cancel on deactivate, reactivate cancels timer, grace period expiry cleanup, immediate cancel overrides grace period, double deactivate resets timer.
+
+### Files Modified
+
+- `agents/manager.py` (rewritten: grace period with asyncio timers)
+- `ui/server.py` (+7 lines: reactivation on WS connect, logger import)
+- `tests/test_session_grace_period.py` (+109 lines, new file)
+
+---
+
 ## Experiment 185 — Structured system messages in chat with actionable buttons
 
 **Date:** 2026-03-20
@@ -4002,6 +4022,46 @@ N/A
 
 **Completed:** 3/3
 **Cost:** $1.1903
+**Conflicts:** None
+
+**Per-task Results:**
+
+
+## Experiment 185 — Structured system messages in chat with actionable buttons
+
+**Time:** 2026-03-20 21:17:07
+
+**Files:** `ui/static/css/main.css` (+67 lines) — стили для `.chat-sys-block`, `.chat-sys-error/info/warning`, `.chat-sys-actions`, `ui/static/js/modules/chat.js` (+66/-3 lines) — `_renderSystemBlock()` helper, avatar SVG константы на уровне модуля
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**Quality Gate Score:** N/A (UI improvement, нет автоматического quality gate)
+**Tests:** 13/13 pass (pre-existing, не сломаны)
+**Build:** JS syntax validated, server module imports OK
+
+
+## Experiment 186 — Untitled
+
+**Time:** 2026-03-20 21:18:26
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+## Parallel Execution Summary
+
+**Completed:** 3/3
+**Cost:** $0.7531
 **Conflicts:** None
 
 **Per-task Results:**
