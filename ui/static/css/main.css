@@ -1674,6 +1674,57 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     text-overflow: ellipsis;
 }
 
+/* ========== Collapsible Markdown Sections (IDE code folding) ========== */
+.md-section {
+    margin-bottom: 0;
+}
+.md-heading {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px !important;
+    margin: 8px 0 2px 0 !important;
+    border-radius: 2px;
+    transition: background 0.15s;
+    user-select: none;
+}
+.md-heading:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+.md-fold-arrow {
+    font-size: 0.4375rem;
+    color: var(--v3);
+    transition: transform 0.15s;
+    flex-shrink: 0;
+    min-width: 8px;
+    text-align: center;
+}
+.md-section-collapsed .md-fold-arrow {
+    transform: rotate(-90deg);
+}
+.md-section-body {
+    overflow: hidden;
+    transition: opacity 0.15s;
+}
+.md-section-collapsed .md-section-body {
+    display: none;
+}
+/* Collapse/Expand buttons in TOC */
+.msg-toc-collapse-btn {
+    font-size: 0.5rem;
+    color: var(--v3);
+    cursor: pointer;
+    padding: 1px 4px;
+    border-radius: 2px;
+    letter-spacing: 0.05em;
+    transition: color 0.15s, background 0.15s;
+}
+.msg-toc-collapse-btn:hover {
+    color: var(--v);
+    background: var(--bg3);
+}
+
 /* === CHAT MESSAGE KEYBOARD NAVIGATION FOCUS === */
 .msg-focused {
     border-left: 2px solid var(--v) !important;

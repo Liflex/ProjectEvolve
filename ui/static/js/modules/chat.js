@@ -1346,12 +1346,16 @@ window.AppChat = (function() {
                 }
             }
             if (headings.length < 3) return '';
+            const bubbleId = msgId.replace(/-h\d+$/, '');
             let html = '<div class="msg-toc open">'
                 + '<div class="msg-toc-header" onclick="event.stopPropagation();this.parentElement.classList.toggle(\'open\')">'
                 + '<span class="msg-toc-arrow">&#x25B6;</span>'
                 + '<span class="msg-toc-icon">&#x2630;</span>'
                 + '<span class="msg-toc-label">OUTLINE</span>'
                 + '<span class="msg-toc-count">' + headings.length + ' sections</span>'
+                + '<span style="flex:1"></span>'
+                + '<span class="msg-toc-collapse-btn" onclick="event.stopPropagation();window._app._toggleAllSections(this.closest(\'.chat-bubble-asst\'),true)" title="Collapse all">&#x25B2; FOLD</span>'
+                + '<span class="msg-toc-collapse-btn" onclick="event.stopPropagation();window._app._toggleAllSections(this.closest(\'.chat-bubble-asst\'),false)" title="Expand all">&#x25BC; OPEN</span>'
                 + '</div>'
                 + '<div class="msg-toc-body">';
             for (const h of headings) {
@@ -1365,14 +1369,57 @@ window.AppChat = (function() {
             html += '</div></div>';
             return html;
         },
-        _addHeadingIds(html, prefix) {
+        _addSectionFolding(html, prefix) {
             if (!html) return html;
+            // Only enable folding for messages with 3+ headings
+            const headingCount = (html.match(/<h[2-4][\s>]/g) || []).length;
+            if (headingCount < 3) {
+                // Fallback: just add IDs (no folding)
+                let hIdx = 0;
+                return html.replace(/<(h[2-4])(\s[^>]*)?>/g, (match, tag, attrs) => {
+                    if (attrs && /id\s*=/i.test(attrs)) return match;
+                    const id = prefix + '-h' + hIdx++;
+                    return '<' + tag + (attrs || '') + ' id="' + id + '">';
+                });
+            }
+            // Split HTML by headings and wrap each section
+            const parts = html.split(/(?=<h[2-4][\s>])/);
+            let result = '';
             let hIdx = 0;
-            return html.replace(/<(h[2-4])(\s[^>]*)?>/g, (match, tag, attrs) => {
-                if (attrs && /id\s*=/i.test(attrs)) return match;
-                const id = prefix + '-h' + hIdx++;
-                return '<' + tag + (attrs || '') + ' id="' + id + '">';
-            });
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i];
+                if (!part) continue;
+                const hm = part.match(/^<h([2-4])(\s[^>]*)?>([\s\S]*?)<\/h\1>/);
+                if (hm) {
+                    const id = prefix + '-h' + hIdx++;
+                    const level = hm[1];
+                    const attrs = hm[2] || '';
+                    const inner = hm[3];
+                    const afterHeading = part.slice(hm[0].length);
+                    result += '<div class="md-section">'
+                        + '<h' + level + attrs + ' id="' + id + '" class="md-heading" onclick="event.stopPropagation();this.parentElement.classList.toggle(\'md-section-collapsed\')">'
+                        + '<span class="md-fold-arrow">&#x25BC;</span>'
+                        + inner + '</h' + level + '>'
+                        + '<div class="md-section-body">' + afterHeading + '</div>'
+                        + '</div>';
+                } else {
+                    // Content before first heading
+                    result += part;
+                }
+            }
+            return result;
+        },
+        /** Collapse or expand all sections in a message. */
+        _toggleAllSections(msgEl, collapse) {
+            if (!msgEl) return;
+            const sections = msgEl.querySelectorAll('.md-section');
+            for (const s of sections) {
+                if (collapse) {
+                    s.classList.add('md-section-collapsed');
+                } else {
+                    s.classList.remove('md-section-collapsed');
+                }
+            }
         },
 
         // ========== CHAT: RENDER ==========
@@ -1407,7 +1454,7 @@ window.AppChat = (function() {
                 const msgId = tab.tab_id + '-' + idx;
                 const cursorHtml = msg.is_streaming ? '<span class="streaming-cursor"></span>' : '';
                 const rawMdHtml = this.renderMarkdown(msg.content);
-                const headedHtml = this._addHeadingIds(rawMdHtml, msgId);
+                const headedHtml = this._addSectionFolding(rawMdHtml, msgId);
                 const tocHtml = !msg.is_streaming ? this._buildMessageTOC(msg.content, msgId) : '';
                 const contentHtml = msg.is_streaming
                     ? '<div class="md">' + this.linkMsgRefs(this.linkFilePaths(headedHtml), tab.tab_id) + cursorHtml + '</div>'
