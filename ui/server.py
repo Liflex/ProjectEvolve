@@ -613,6 +613,56 @@ async def judge_history():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/judge/weights")
+async def judge_weights():
+    """Get current judge weights (defaults + custom overrides)."""
+    from utils.judge import JUDGE_PROFILES, JudgeHistory
+    project = get_project_dir()
+    try:
+        history = JudgeHistory(project)
+        custom = history.load_custom_weights()
+        result = {}
+        for pname, prof in JUDGE_PROFILES.items():
+            result[pname] = {
+                "weights": dict(prof.weights),
+                "custom_overrides": custom.get(pname, {}) if custom else {},
+            }
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/judge/weights/adjust")
+async def judge_weights_adjust():
+    """Force-trigger judge weight auto-adjustment from history."""
+    from utils.judge import JudgeHistory
+    project = get_project_dir()
+    try:
+        history = JudgeHistory(project)
+        result = history.auto_adjust(min_verdicts=3)
+        return result or {"applied": False, "reason": "No verdicts to analyze"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/judge/weights/reset")
+async def judge_weights_reset():
+    """Reset judge weights to defaults."""
+    from utils.judge import JudgeHistory, JUDGE_PROFILES, _DEFAULT_WEIGHTS
+    project = get_project_dir()
+    try:
+        history = JudgeHistory(project)
+        deleted = history.reset_weights()
+        # Restore defaults in-memory
+        for pname, defaults in _DEFAULT_WEIGHTS.items():
+            prof = JUDGE_PROFILES.get(pname)
+            if prof:
+                prof.weights = dict(defaults)
+        return {"reset": deleted, "message": "Weights reset to defaults" if deleted else "No custom weights to reset"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/changes-log")
 async def get_changes_log():
     log_file = get_exp_dir() / "changes_log.md"

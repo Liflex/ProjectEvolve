@@ -112,6 +112,11 @@ JUDGE_PROFILES: Dict[str, JudgeProfile] = {
     ),
 }
 
+# Snapshot of default weights for reset (taken once at module load)
+_DEFAULT_WEIGHTS: Dict[str, Dict[str, float]] = {
+    name: dict(profile.weights) for name, profile in JUDGE_PROFILES.items()
+}
+
 
 # ---------------------------------------------------------------------------
 # Judge
@@ -136,6 +141,23 @@ class ExperimentJudge:
 
     def __init__(self, project_dir: Path):
         self.project_dir = Path(project_dir).resolve()
+        self._load_custom_weights()
+
+    def _load_custom_weights(self) -> None:
+        """Load persisted custom weights into JUDGE_PROFILES."""
+        path = self.project_dir / ".autoresearch" / "judge_weights.json"
+        if not path.exists():
+            return
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            for pname, weights in data.items():
+                profile = JUDGE_PROFILES.get(pname)
+                if profile and isinstance(weights, dict):
+                    for check_name, weight in weights.items():
+                        if isinstance(weight, (int, float)):
+                            profile.weights[check_name] = float(weight)
+        except (json.JSONDecodeError, OSError, TypeError):
+            pass
 
     def _run_git(self, *args: str, timeout: int = 10) -> str:
         """Run a git command and return stdout."""
@@ -693,3 +715,142 @@ class JudgeHistory:
             adjustments[cname] = adj
 
         return adjustments
+
+    # ------------------------------------------------------------------
+    #  Weight persistence & auto-adjustment
+    # ------------------------------------------------------------------
+
+    _WEIGHTS_FILE = "judge_weights.json"
+
+    def _weights_path(self) -> Path:
+        return self.project_dir / ".autoresearch" / self._WEIGHTS_FILE
+
+    def load_custom_weights(self) -> Optional[Dict[str, Dict[str, float]]]:
+        """Load previously saved per-profile custom weights.
+
+        Returns dict ``{profile_name: {check_name: weight}}`` or None.
+        """
+        path = self._weights_path()
+        if not path.exists():
+            return None
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            # Validate structure
+            if not isinstance(data, dict):
+                return None
+            return data
+        except (json.JSONDecodeError, OSError):
+            return None
+
+    def save_custom_weights(self, weights: Dict[str, Dict[str, float]]) -> None:
+        """Persist custom weights to disk."""
+        path = self._weights_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(weights, indent=2), encoding="utf-8",
+        )
+
+    def reset_weights(self) -> bool:
+        """Delete custom weights file, restoring defaults. Returns True if deleted."""
+        path = self._weights_path()
+        if path.exists():
+            path.unlink()
+            return True
+        return False
+
+    def apply_weight_adjustments(
+        self,
+        min_verdicts: int = 5,
+        max_weight: float = 3.0,
+        min_weight: float = 0.2,
+        blend_factor: float = 0.3,
+    ) -> Dict[str, Any]:
+        """Apply computed weight adjustments to JUDGE_PROFILES with safeguards.
+
+        Args:
+            min_verdicts: Minimum verdicts needed before adjustments kick in.
+            max_weight: Upper clamp for any weight value.
+            min_weight: Lower clamp for any weight value.
+            blend_factor: How aggressively to apply (0.0 = no change, 1.0 = full).
+
+        Returns:
+            Dict with applied_changes, skipped, and summary.
+        """
+        analytics = self.get_analytics()
+        total = analytics.get("total_verdicts", 0)
+
+        if total < min_verdicts:
+            return {
+                "applied": False,
+                "reason": f"Only {total} verdicts (need {min_verdicts})",
+                "changes": {},
+            }
+
+        adjustments = analytics.get("weight_adjustments", {})
+        if not adjustments:
+            return {
+                "applied": False,
+                "reason": "No adjustments computed",
+                "changes": {},
+            }
+
+        # Load existing custom weights as base (or start from defaults)
+        custom = self.load_custom_weights() or {}
+
+        applied: Dict[str, Dict[str, Any]] = {}
+
+        for cname, adj in adjustments.items():
+            if adj.get("suggestion") == "keep":
+                continue
+
+            multiplier = adj.get("multiplier", 1.0)
+            reason = adj.get("reason", "")
+
+            for pname in JUDGE_PROFILES:
+                profile = JUDGE_PROFILES[pname]
+                default_w = profile.weights.get(cname, 1.0)
+                # Get current base: custom override or default
+                current_base = custom.get(pname, {}).get(cname, default_w)
+
+                # Blend: new = current * (1 - factor) + (current * multiplier) * factor
+                target = current_base * multiplier
+                new_w = current_base * (1 - blend_factor) + target * blend_factor
+                new_w = max(min_weight, min(max_weight, round(new_w, 2)))
+
+                if abs(new_w - current_base) < 0.01:
+                    continue  # negligible change
+
+                if pname not in custom:
+                    custom[pname] = {}
+                custom[pname][cname] = new_w
+
+                # Also update in-memory profile weights for immediate effect
+                profile.weights[cname] = new_w
+
+                if cname not in applied:
+                    applied[cname] = {}
+                applied[cname][pname] = {
+                    "old": round(current_base, 2),
+                    "new": new_w,
+                    "reason": reason,
+                }
+
+        if applied:
+            self.save_custom_weights(custom)
+
+        return {
+            "applied": bool(applied),
+            "verdicts_used": total,
+            "changes": applied,
+            "reason": f"Adjusted {sum(len(v) for v in applied.values())} weight(s) across {len(applied)} check(s)",
+        }
+
+    def auto_adjust(self, min_verdicts: int = 5) -> Optional[Dict[str, Any]]:
+        """One-shot: load history, compute analytics, apply adjustments.
+
+        Returns the adjustment result dict or None if skipped.
+        """
+        self.load()
+        if not self._verdicts:
+            return None
+        return self.apply_weight_adjustments(min_verdicts=min_verdicts)

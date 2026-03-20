@@ -237,7 +237,7 @@ class ResearchRunner:
         Judge failures are non-fatal — logged but don't break the loop.
         """
         try:
-            from utils.judge import ExperimentJudge
+            from utils.judge import ExperimentJudge, JudgeHistory
             import json as _json
 
             judge = ExperimentJudge(self.project_dir)
@@ -252,6 +252,18 @@ class ResearchRunner:
                 judge_file.write_text(
                     _json.dumps(verdict, indent=2), encoding="utf-8"
                 )
+
+            # Auto-adjust weights based on accumulated history
+            try:
+                history = JudgeHistory(self.project_dir)
+                result = history.auto_adjust(min_verdicts=5)
+                if result and result.get("applied"):
+                    logger.info(
+                        "Judge weights auto-adjusted after exp %d: %s",
+                        experiment_number, result.get("reason", ""),
+                    )
+            except Exception as adj_err:
+                logger.debug("Judge weight auto-adjust skipped: %s", adj_err)
 
             return verdict
         except Exception as e:
