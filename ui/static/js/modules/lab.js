@@ -158,6 +158,60 @@ window.AppLab = (function() {
             return html;
         },
 
+        // --- Score distribution histogram ---
+        scoreDistribution() {
+            const exps = this.experiments || [];
+            if (!exps.length) return [];
+            const buckets = [
+                { label: '0.0-0.2', min: 0, max: 0.2, count: 0 },
+                { label: '0.2-0.4', min: 0.2, max: 0.4, count: 0 },
+                { label: '0.4-0.6', min: 0.4, max: 0.6, count: 0 },
+                { label: '0.6-0.8', min: 0.6, max: 0.8, count: 0 },
+                { label: '0.8-1.0', min: 0.8, max: 1.01, count: 0 },
+            ];
+            for (const exp of exps) {
+                const s = parseFloat(exp.score);
+                if (isNaN(s)) continue;
+                for (const b of buckets) {
+                    if (s >= b.min && s < b.max) { b.count++; break; }
+                }
+            }
+            return buckets;
+        },
+        scoreDistributionMax() {
+            const dist = this.scoreDistribution();
+            return Math.max(1, ...dist.map(b => b.count));
+        },
+        scoreDistributionBarColor(idx) {
+            const colors = ['var(--red)', 'var(--amber)', 'var(--yellow)', 'var(--cyan)', 'var(--ng)'];
+            return colors[idx] || 'var(--v3)';
+        },
+
+        // --- Average score by type ---
+        scoreByType() {
+            const exps = this.experiments || [];
+            if (!exps.length) return [];
+            const map = {};
+            for (const exp of exps) {
+                const t = exp.type || 'Other';
+                if (!map[t]) map[t] = { type: t, scores: [], keep: 0, discard: 0 };
+                map[t].scores.push(parseFloat(exp.score) || 0);
+                if (exp.decision === 'KEEP' || exp.decision === 'ACCEPT') map[t].keep++;
+                else if (exp.decision === 'DISCARD') map[t].discard++;
+            }
+            return Object.values(map)
+                .map(g => ({
+                    type: g.type,
+                    avg: g.scores.length ? g.scores.reduce((a, b) => a + b, 0) / g.scores.length : 0,
+                    count: g.scores.length,
+                    keep: g.keep,
+                    discard: g.discard,
+                    min: Math.min(...g.scores),
+                    max: Math.max(...g.scores),
+                }))
+                .sort((a, b) => b.count - a.count);
+        },
+
         // --- Streak tracking ---
         streakData() {
             const exps = this.experiments || [];

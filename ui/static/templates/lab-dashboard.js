@@ -233,6 +233,77 @@
             </div>
         </div>
 
+        <!-- Score Distribution + Score by Type -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-3">
+            <!-- Score Distribution Histogram -->
+            <div class="pixel-border bg-[var(--bg2)] p-4">
+                <div class="text-[0.5625rem] tracking-widest text-[var(--v3)] mb-3">SCORE_DISTRIBUTION_</div>
+                <template x-if="scoreDistribution().length === 0">
+                    <div class="text-center py-6 text-[var(--v3)] text-sm tracking-widest">NO_DATA</div>
+                </template>
+                <template x-if="scoreDistribution().length > 0">
+                    <div>
+                        <div class="flex items-end gap-1.5" style="height:80px">
+                            <template x-for="(bucket, bi) in scoreDistribution()" :key="bi">
+                                <div class="flex-1 flex flex-col items-center gap-1">
+                                    <div class="text-[0.5rem] text-[var(--v3)] tabular-nums" x-text="bucket.count || ''"></div>
+                                    <div class="w-full transition-all duration-500 rounded-t-sm"
+                                         :style="'height:' + Math.max(2, (bucket.count / scoreDistributionMax()) * 60) + 'px;background:' + scoreDistributionBarColor(bi)"
+                                         :title="bucket.label + ': ' + bucket.count + ' exp' + (bucket.count !== 1 ? 's' : '')">
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="flex gap-1.5 mt-1">
+                            <template x-for="(bucket, bi) in scoreDistribution()" :key="'l-'+bi">
+                                <div class="flex-1 text-center">
+                                    <span class="text-[0.4375rem] text-[var(--v3)] tracking-wider" x-text="bucket.label"></span>
+                                </div>
+                            </template>
+                        </div>
+                        <div class="flex items-center gap-2 mt-2 text-[0.5rem] text-[var(--v3)]">
+                            <span>BAD</span>
+                            <div class="flex-1 h-px bg-[var(--v-dim)]"></div>
+                            <span>GOOD</span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Average Score by Type -->
+            <div class="pixel-border bg-[var(--bg2)] p-4">
+                <div class="text-[0.5625rem] tracking-widest text-[var(--v3)] mb-3">SCORE_BY_TYPE_</div>
+                <template x-if="scoreByType().length === 0">
+                    <div class="text-center py-6 text-[var(--v3)] text-sm tracking-widest">NO_DATA</div>
+                </template>
+                <template x-if="scoreByType().length > 0">
+                    <div class="space-y-2">
+                        <template x-for="(item, ti) in scoreByType()" :key="item.type">
+                            <div>
+                                <div class="flex items-center gap-2 mb-0.5">
+                                    <span class="text-[0.6875rem] px-1.5 py-px w-20 truncate" :class="typeBadgeCls(item.type)" x-text="item.type"></span>
+                                    <div class="flex-1 h-2 bg-[var(--bg)] overflow-hidden rounded-sm">
+                                        <div class="h-full transition-all duration-500 rounded-sm"
+                                             :class="item.avg >= 0.7 ? 'bg-[var(--ng)]' : item.avg >= 0.5 ? 'bg-[var(--cyan)]' : item.avg >= 0.3 ? 'bg-[var(--amber)]' : 'bg-[var(--red)]'"
+                                             :style="'width:' + (item.avg * 100) + '%'">
+                                        </div>
+                                    </div>
+                                    <span class="text-[0.6875rem] tabular-nums w-10 text-right" :class="item.avg >= 0.7 ? 'text-[var(--ng)]' : item.avg >= 0.5 ? 'text-[var(--cyan)]' : item.avg >= 0.3 ? 'text-[var(--amber)]' : 'text-[var(--red)]'"
+                                          x-text="item.avg.toFixed(2)"></span>
+                                </div>
+                                <div class="flex items-center gap-3 text-[0.5rem] text-[var(--v3)]">
+                                    <span x-text="item.count + ' exp' + (item.count !== 1 ? 's' : '')"></span>
+                                    <span class="text-[var(--ng)]" x-text="item.keep + ' keep'"></span>
+                                    <span class="text-[var(--red)]" x-text="item.discard + ' discard'"></span>
+                                    <span x-text="'range: ' + item.min.toFixed(1) + '-' + item.max.toFixed(1)"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </div>
+        </div>
+
         <!-- Last Experiment -->
         <div x-show="stats.last_experiment && stats.last_experiment.number" class="mt-3 pixel-border bg-[var(--bg2)] p-4">
             <div class="flex items-center justify-between mb-2">
