@@ -1,3 +1,41 @@
+## Experiment 127 — Cat — contextual observation tooltip near companion
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`CatModule.getContextTooltip(page, ctx)`** — метод, возвращающий контекстную строку-наблюдение кота на основе текущей страницы и состояния приложения
+2. **Tooltip HTML** — маленький тултип под speech bubble в sidebar с цветной точкой-индикатором
+3. **CSS** — `.cat-obs-tooltip` с mood-вариантами и анимацией пульсации точки
+4. **Alpine wiring** — `catContextTooltip` data, `_buildCatTooltipContext()`, polling каждые 3s
+
+### Files Modified
+
+- `ui/static/modules/cat.js` — getContextTooltip() method
+- `ui/static/templates/sidebar.js` — tooltip HTML element
+- `ui/static/css/main.css` — .cat-obs-tooltip styles
+- `ui/static/js/app.js` — catContextTooltip, _buildCatTooltipContext()
+
+---
+
+## Experiment 126 — Cat — real-time tool call reactions (read/edit/write/bash/search)
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`TOOL_CALL_REACTIONS`** — конфигурация реакций кота на каждый тип tool call'а
+2. **`TOOL_PATTERN_REACTIONS`** — реакции на последовательности tool call'ов
+3. **`reactToToolCall(toolType, detail)`** — метод CatModule
+4. **WebSocket hook** — вызов reactToToolCall в tool event handler
+
+### Files Modified
+
+- `ui/static/modules/cat.js`
+- `ui/static/js/modules/chat.js`
+
+---
+
 ## Experiment 125 — Chat — streaming speed indicator (words/sec) + response stats badge
 
 **Date:** 2026-03-20
@@ -2452,5 +2490,52 @@ Results
    - **Session cards**: кликабельный список с индикатором статуса (streaming/connected/connecting/error), лейблом, числом сообщений и превью последнего сообщения
    - **Quick actions**: + NEW TAB, RESUME, CLOSE ALL (показываются по условию)
 2. **Compact mode** — в компактном sideba
+
+
+## Experiment 125 — Chat — streaming speed indicator (words/sec) + response stats badge
+
+**Time:** 2026-03-20 03:48:17
+
+**Files:** Target:** `ui/static/js/modules/chat.js`, `ui/static/templates/chat-section.js`, `ui/static/js/modules/chat.js` — `getStreamingSpeed()`, `getStreamingWordCount()`, enhanced `aMetaHtml` with word count + speed + color coding, `ui/static/templates/chat-section.js` — toolbar streaming indicator with word count + w/s
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **Streaming toolbar indicator** — при стриминге ответа агента в toolbar показывается: `ELAPSED 12s · 847w · 68 w/s` — обновляется каждую секунду
+2. **Response stats badge** — после завершения стриминга на assistant сообщении: `12s · 847w · 68 w/s · 1.2K out · $0.032` с цветовым кодированием скорости (green ≥60 w/s, cyan ≥30, amber <30)
+3. **Два новых хелпера**: `getStreamingSpeed(tab)` и `getStreamingWordCount(tab)`
+
+**Working:** yes
+**Tests:** skipped — frontend-o
+
+
+## Experiment 126 — Cat — real-time tool call reactions (read/edit/write/bash/search)
+
+**Time:** 2026-03-20 03:53:41
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **`TOOL_CALL_REACTIONS`** — конфигурация реакций для каждого типа tool call'а:
+   - **Read** (25% chance): "Читаю файл... *прищурился*", "Читаю {file}... *прищурился*"
+   - **Edit** (45% chance): "Правка! *ушами шевелит*", "Правим {file}! =^.^="
+   - **Write** (55% chance): "Новый файл: {file}! Мяу!", paw wave анимация
+   - **Bash** (40% chance): "Запускаю: {detail}... *напряжённо*", ear twitch
+   - **Search** (20% chance): "Ищу: {detail}..."
+   - Expression change
 
 

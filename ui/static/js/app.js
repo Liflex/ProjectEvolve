@@ -262,6 +262,7 @@ function _buildAppData() {
         catSpeech: '',
         catSpeechAction: null,
         catExpression: 'neutral',
+        catContextTooltip: '',
         organismSVG: '',
         organismStage: 'DORMANT',
         runElapsed: '',
@@ -548,6 +549,11 @@ function _buildAppData() {
                     this.catSpeech = CatModule.getSpeech();
                     this.catSpeechAction = CatModule.getSpeechAction();
                     this.catExpression = CatModule.getExpression();
+                    // Update contextual tooltip every 3s
+                    if (this._clockTick % 3 === 0) {
+                        const tooltipCtx = this._buildCatTooltipContext();
+                        this.catContextTooltip = CatModule.getContextTooltip(this.page, tooltipCtx);
+                    }
                 }
                 // Refresh chat relative time every 30s
                 if (this._clockTick % 30 === 0 && this.activeChatTab) {
@@ -682,6 +688,32 @@ function _buildAppData() {
             if (window.CatModule && CatModule.isActive() && CatModule.onClick) {
                 CatModule.onClick();
             }
+        },
+
+        /** Build context object for CatModule.getContextTooltip(). */
+        _buildCatTooltipContext() {
+            const ctx = {};
+            if (this.page === 'dashboard') {
+                ctx.totalExperiments = this.stats.total_experiments || 0;
+                ctx.totalKeeps = this.stats.total_kept || 0;
+                ctx.avgScore = this.stats.avg_score;
+            } else if (this.page === 'experiments') {
+                ctx.totalExperiments = this.experiments.length || 0;
+                ctx.filteredCount = this.experiments.length; // could add filter info
+            } else if (this.page === 'chat') {
+                ctx.sessionCount = this.chatTabs.length;
+                const activeTab = this.activeTab;
+                ctx.messageCount = activeTab ? (activeTab.messages || []).length : 0;
+                ctx.isStreaming = activeTab ? activeTab.is_streaming : false;
+                ctx.totalCost = this.chatTabs.reduce((sum, t) => sum + (t.tokens?.cost || 0), 0);
+            } else if (this.page === 'settings') {
+                ctx.theme = this.settings.theme || 'synthwave';
+                ctx.fontSize = this.settings.fontSize || 16;
+            } else if (this.page === 'run') {
+                ctx.isRunning = this.runStatus.running || false;
+                ctx.elapsed = this.runElapsed || '';
+            }
+            return ctx;
         },
 
         onCatSpeechClick() {

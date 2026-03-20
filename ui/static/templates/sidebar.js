@@ -57,6 +57,13 @@
                 <span x-show="catSpeechAction" class="cat-speech-action-hint">&#x2726;</span>
                 <span x-text="settings.compactSidebar ? (catSpeech.length > 8 ? catSpeech.slice(0,8) + '..' : catSpeech) : catSpeech"></span>
             </div>
+            <!-- Cat contextual observation tooltip -->
+            <div x-show="catContextTooltip && settings.catCompanion && !settings.compactSidebar" x-cloak
+                 class="cat-obs-tooltip"
+                 :class="'cat-mood-' + (catExpression || 'neutral')">
+                <span class="cat-obs-dot" :class="catExpression === 'happy' ? 'dot-happy' : catExpression === 'angry' ? 'dot-angry' : catExpression === 'sleepy' ? 'dot-sleepy' : 'dot-neutral'"></span>
+                <span x-text="catContextTooltip"></span>
+            </div>
         </div>
 
         <!-- === MAIN NAV: Research Lab / Chat === -->

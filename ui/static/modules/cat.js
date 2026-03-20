@@ -1822,6 +1822,84 @@
             }
         },
 
+        /**
+         * Get contextual observation tooltip based on current page and app state.
+         * Returns a short string with the cat's "observation" about what's happening.
+         * @param {string} page - 'dashboard'|'experiments'|'chat'|'settings'|'run'
+         * @param {object} ctx - context data (varies by page)
+         * @returns {string} tooltip text (1-2 lines)
+         */
+        getContextTooltip(page, ctx) {
+            if (!animating) return '';
+            const p = page || _currentPage || 'dashboard';
+            const c = ctx || {};
+
+            // Idle state overrides — cat is sleeping
+            if (_idleLevel >= 3) {
+                return pickRandom([
+                    '*храпит* zZzZ...',
+                    '*свернулся* ...zzz...',
+                    '*сонно* Мурр... zzz',
+                ]);
+            }
+            if (_idleLevel >= 2) {
+                return pickRandom([
+                    '*зевает* Скучно...',
+                    '*сонно моргает* Жду...',
+                    '*крутит головой*...',
+                ]);
+            }
+
+            // Page-specific observations
+            switch (p) {
+                case 'dashboard': {
+                    const total = c.totalExperiments || 0;
+                    const keeps = c.totalKeeps || 0;
+                    const score = c.avgScore;
+                    if (total === 0) return 'Пусто... Начни исследование!';
+                    let line = total + ' эксп. · ' + keeps + ' KEEP';
+                    if (score !== undefined) line += ' · ' + (score * 100).toFixed(0) + '%';
+                    return line;
+                }
+                case 'experiments': {
+                    const total = c.totalExperiments || 0;
+                    const filtered = c.filteredCount;
+                    let line = 'Журнал: ' + total + ' записей';
+                    if (filtered !== undefined && filtered !== total) line += ' (' + filtered + ' видно)';
+                    return line;
+                }
+                case 'chat': {
+                    const sessions = c.sessionCount || 0;
+                    const msgs = c.messageCount || 0;
+                    const streaming = c.isStreaming;
+                    const cost = c.totalCost;
+                    if (streaming) {
+                        return 'Агент работает... ' + msgs + ' сообщ.';
+                    }
+                    let line = sessions + ' сессия' + (sessions === 1 ? '' : sessions < 5 ? 'и' : 'й');
+                    if (msgs > 0) line += ' · ' + msgs + ' сообщ.';
+                    if (cost > 0) line += ' · $' + cost.toFixed(2);
+                    if (sessions === 0) return 'Нет сессий... Начни чат!';
+                    return line;
+                }
+                case 'settings': {
+                    const theme = c.theme || '?';
+                    const fontSize = c.fontSize;
+                    let line = 'Тема: ' + theme;
+                    if (fontSize) line += ' · ' + fontSize + 'px';
+                    return line;
+                }
+                case 'run': {
+                    if (c.isRunning) {
+                        return 'Эксперимент идёт... ' + (c.elapsed || '');
+                    }
+                    return 'Жду запуска...';
+                }
+                default:
+                    return '*наблюдает*';
+            }
+        },
+
     };
 
     // [CatModule] Loaded — catode32 cat sprite engine

@@ -1,4 +1,57 @@
 
+## Experiment 127 — Cat — contextual observation tooltip near companion
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`CatModule.getContextTooltip(page, ctx)`** — метод, возвращающий контекстную строку-наблюдение кота на основе текущей страницы и состояния приложения:
+   - **Dashboard**: количество экспериментов, KEEP, средний score
+   - **Experiments**: общее количество записей
+   - **Chat**: количество сессий, сообщений, streaming статус, стоимость
+   - **Settings**: текущая тема, размер шрифта
+   - **Run**: статус эксперимента, elapsed time
+   - **Idle override**: при idle level ≥2 показывает состояния сна/скуки
+2. **Tooltip HTML element** — маленький тултип под speech bubble в sidebar, с цветной точкой-индикатором (нейтральная/счастливая/злая/сонная)
+3. **CSS стили** — `.cat-obs-tooltip`, `.cat-obs-dot`, mood-варианты с анимацией пульсации точки
+4. **Alpine wiring** — `catContextTooltip` в data, `_buildCatTooltipContext()` собирает контекст из stats/chatTabs/settings, обновление каждые 3 секунды в setInterval
+
+### Files Modified
+
+- `ui/static/modules/cat.js` — getContextTooltip() method
+- `ui/static/templates/sidebar.js` — tooltip HTML element below speech bubble
+- `ui/static/css/main.css` — .cat-obs-tooltip styles with mood variants
+- `ui/static/js/app.js` — catContextTooltip data, _buildCatTooltipContext(), polling
+
+---
+
+## Experiment 126 — Cat — real-time tool call reactions (read/edit/write/bash/search)
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`TOOL_CALL_REACTIONS`** — конфигурация реакций кота на каждый тип tool call'а (read, edit, write, bash, search, other):
+   - Per-tool chance (reads 25%, edits 45%, writes 55%, bash 40%, search 20%, other 15%)
+   - Generic speech messages + contextual templates с `{file}`/`{detail}` плейсхолдерами
+   - Expression changes per tool type (thinking для reads, surprised для edits/bash, happy для writes)
+2. **`TOOL_PATTERN_REACTIONS`** — реакции на последовательности tool call'ов:
+   - `many_edits` / `many_reads` / `many_bash` — 3+ одинаковых подряд
+   - `edit_after_write` / `bash_after_edit` / `search_then_read` — cross-tool паттерны
+3. **`reactToToolCall(toolType, detail)`** — метод CatModule с:
+   - Rate limiting через `_toolReactCooldown` (ticks)
+   - `_toolHistory` — последние 20 tool call'ов для pattern detection
+   - Контекстные сообщения с именем файла/команды
+   - Paw wave для новых файлов, ear twitch для правок
+4. **WebSocket hook** — в `etype === 'tool'` handler вызывается `CatModule.reactToToolCall(toolType, toolDetail)`
+
+### Files Modified
+
+- `ui/static/modules/cat.js` — TOOL_CALL_REACTIONS, TOOL_PATTERN_REACTIONS, reactToToolCall(), _toolHistory, _toolReactCooldown
+- `ui/static/js/modules/chat.js` — CatModule.reactToToolCall hook in tool event handler
+
+---
+
 ## Experiment 125 — Chat — streaming speed indicator (words/sec) + response stats badge
 
 **Date:** 2026-03-20

@@ -841,6 +841,44 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
     50% { opacity: 1; }
 }
 
+/* Cat contextual observation tooltip */
+.cat-obs-tooltip {
+    margin-top: 4px;
+    padding: 2px 8px;
+    font-size: 0.5rem;
+    font-family: 'VT323', monospace;
+    color: var(--v3);
+    background: rgba(180, 74, 255, 0.03);
+    border: 1px solid rgba(180, 74, 255, 0.08);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    letter-spacing: 0.05em;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 0.3s, border-color 0.3s;
+}
+.cat-obs-tooltip.cat-mood-happy { color: var(--ng3); border-color: rgba(57,255,20,0.12); }
+.cat-obs-tooltip.cat-mood-angry { color: var(--red); border-color: rgba(255,51,102,0.12); }
+.cat-obs-tooltip.cat-mood-sleepy { color: var(--v3); opacity: 0.6; }
+.cat-obs-tooltip.cat-mood-surprised { color: var(--yellow); border-color: rgba(255,224,51,0.12); }
+.cat-obs-tooltip.cat-mood-thinking { color: var(--cyan); border-color: rgba(0,229,255,0.1); }
+.cat-obs-dot {
+    width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+    animation: cat-obs-pulse 3s ease-in-out infinite;
+}
+.cat-obs-dot.dot-neutral { background: var(--v3); }
+.cat-obs-dot.dot-happy { background: var(--ng); box-shadow: 0 0 4px rgba(57,255,20,0.4); }
+.cat-obs-dot.dot-angry { background: var(--red); box-shadow: 0 0 4px rgba(255,51,102,0.4); }
+.cat-obs-dot.dot-sleepy { background: var(--v3); opacity: 0.4; }
+@keyframes cat-obs-pulse {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.2); }
+}
+
 /* === ORGANISM === */
 .organism-frame { border: 1px solid var(--v-dim); image-rendering: auto; box-shadow: 0 0 8px rgba(0,229,255,0.05); }
 
