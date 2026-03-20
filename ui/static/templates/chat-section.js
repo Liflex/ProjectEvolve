@@ -809,6 +809,7 @@
                         <div class="chat-shortcut-row"><kbd>Ctrl+F</kbd><span>Search in chat</span></div>
                         <div class="chat-shortcut-row"><kbd>/</kbd><span>Skill autocomplete</span></div>
                         <div class="chat-shortcut-row"><kbd>Up/Down</kbd><span>Message history</span></div>
+                        <div class="chat-shortcut-row"><kbd>Ctrl+Up</kbd><span>Edit last message</span></div>
                         <div class="chat-shortcut-row"><kbd>Alt+Up/Down</kbd><span>Jump between turns</span></div>
                         <div class="chat-shortcut-row"><kbd x-text="settings.chatSendMode === 'ctrlenter' ? 'Ctrl+Enter' : 'Enter'"></kbd><span x-text="settings.chatSendMode === 'ctrlenter' ? 'Send message' : 'Send message'"></span></div>
                         <div class="chat-shortcut-row"><kbd x-text="settings.chatSendMode === 'ctrlenter' ? 'Enter' : 'Shift+Enter'"></kbd><span>New line</span></div>

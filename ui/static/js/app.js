@@ -442,6 +442,7 @@ function _buildAppData() {
                 { keys: 'Enter', desc: 'Send message' },
                 { keys: 'Shift+Enter', desc: 'New line' },
                 { keys: 'Up / Down', desc: 'Message history (shell-style)' },
+                { keys: 'Ctrl+Up', desc: 'Edit last user message' },
                 { keys: 'ESC', desc: 'Cancel edit / exit history / close panels' },
                 { keys: '/', desc: 'Skill autocomplete menu' },
                 { keys: 'Ctrl+G', desc: 'Go to message by number' },

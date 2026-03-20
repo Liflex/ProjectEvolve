@@ -1,7 +1,7 @@
 # Last Experiment Summary
 
-**Experiment #154** — Chat STOP button replaces SEND during streaming + ESC shortcut
-**Date:** 2026-03-20 17:44:56
+**Experiment #155** — Judge profiles — multiple evaluation perspectives (strict/balanced/lenient)
+**Date:** 2026-03-20 17:58:43
 
 ## What Was Done
 
@@ -9,20 +9,22 @@ N/A
 
 ## Files Modified
 
-- Target:** chat-section.js template, chat.js, main.css
-- `ui/static/templates/chat-section.js` — SEND/STOP toggle buttons, dynamic hint
-- `ui/static/js/modules/chat.js` — ESC handler, `_stopped` flag, `aStoppedHtml`, persistence
-- `ui/static/css/main.css` — `.msg-stopped-badge`, `.chat-stop-btn` pulse animation
+- `utils/judge.py` — `JudgeProfile` dataclass, `JUDGE_PROFILES` dict (3 профиля), `evaluate_all()`, поддержка `profile=` параметра
+- `ui/server.py` — `/api/judge/{n}/all` endpoint, `profile` query param, авто all-judges после каждого эксперимента
+- `ui/static/js/modules/lab.js` — `judgeExperiment(n, profile)`, `judgeExperimentAll(n)`
+- `ui/static/js/app.js` — `judgeAllVerdicts`, `judgeProfileView` state
+- `ui/static/templates/lab-experiments.js` — ALL JUDGES button, consensus bar, profile cards с expand
 
 ## Key Results
 
 Results
 
 **What was done:**
-1. **SEND/STOP toggle** — вместо отключённой SEND + отдельного маленького `[X]`, теперь SEND полностью заменяется на STOP кнопку во время стриминга (паттерн ChatGPT/Claude.ai)
-2. **STOP button** — красная рамка, текст `[X] STOP`, hover заполняет фон красным, пульсирующая анимация opacity, плавное появление через Alpine transition
-3. **ESC shortcut** — Escape останавливает генерацию (высший приоритет среди всех ESC-обработчиков в handleChatKeydown)
-4. **`[stopped]` bad
+1. 3 judge-профиля с разными фокусами: **STRICT** (код-качество, минимальность), **BALANCED** (равные веса), **LENIENT** (функциональность, толерантность)
+2. Каждый профиль имеет свои веса проверок, пороги fail/warn и корректировку финального score
+3. `evaluate_all()` запускает все профили, вычисляет consensus (majority vote) и средний score
+4. Новый API endpoint `/api/judge/{n}/all` + параметр `profile` для `/api/judge/{n}`
+5. UI: кнопка `[ALL JUDGES]` показывает con
 
 ## For Next Iteration
 

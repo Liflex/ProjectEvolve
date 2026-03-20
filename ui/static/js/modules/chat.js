@@ -957,6 +957,21 @@ window.AppChat = (function() {
                 if (e.key === 'ArrowUp') { e.preventDefault(); this.jumpToPrevTurn(tab); return; }
                 if (e.key === 'ArrowDown') { e.preventDefault(); this.jumpToNextTurn(tab); return; }
             }
+            // Ctrl+Up — edit last user message (quick edit shortcut)
+            if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (!tab.is_streaming && !tab._editMode) {
+                    // Find the last user message
+                    let lastUserIdx = -1;
+                    for (let i = tab.messages.length - 1; i >= 0; i--) {
+                        if (tab.messages[i].role === 'user') { lastUserIdx = i; break; }
+                    }
+                    if (lastUserIdx >= 0) {
+                        this.editUserMsg(tab.tab_id, lastUserIdx);
+                    }
+                }
+                return;
+            }
             // ESC cancels edit mode
             if (e.key === 'Escape' && tab._editMode) {
                 e.preventDefault();
