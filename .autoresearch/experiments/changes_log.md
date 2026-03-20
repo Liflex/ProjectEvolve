@@ -3820,3 +3820,26 @@ Results
 2. **Sneeze** — редкое случайное событие (~0.1% за tick ≈ раз в 2 минуты idle). 3 фазы: pre-sneeze (голова тянутся назад) → jerk (голова резко вперёд) → recovery (микро-дрожь). Expression → surprised, 5 вариантов "Апчхи!" на русском, ear twitch, burst 
 
 
+## Experiment 177 — Cat expression overlays + yawn mouth sprite
+
+**Time:** 2026-03-20 20:37:40
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **MOUTH_YAWN sprite** (7×5 px) — широко открытый рот для зевания. Заменяет обычный рот во время stretch/yawn анимации (фазы 1-2), делая зевок реалистичным.
+2. **renderExpressionOverlays()** — система визуальных overlay-эффектов для выражений лица:
+   - **Blush** — розовые пиксели на щеках при love/happy (stronger для love)
+   - **Sweat drop** — пульсирующая аниме-капля при thinking
+   - **Tear** — капающая слеза при sad (анимированный цикл капания)
+   - **Angry vei
+
+

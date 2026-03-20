@@ -272,6 +272,10 @@
     const PAW_OUTLINE = decode([0x07, 0x05, 0x07], 3, 4);
     const PAW_FILL = decode([0x07, 0x07, 0x07], 3, 4);
 
+    // Kneading paw — spread toes when pushing down (5×4)
+    const PAW_SPREAD_OUTLINE = decode([0x11, 0x15, 0x0d, 0x11], 5, 4);
+    const PAW_SPREAD_FILL = decode([0x11, 0x15, 0x0d, 0x11], 5, 4);
+
     // ================================================================
     //  MOUTH SPRITES — per-expression (width × 2 rows)
     // ================================================================
@@ -571,6 +575,15 @@
             'А-апчхи!... *трёт нос*',
             '*чихает* Мяу! Прости_',
             'Апчхи! *вздрагивает*',
+        ],
+        knead: [
+            '*массажирует лапками* Мурр...',
+            '*топчет тесто* Уютно_',
+            '*замешивает* Мур-мур-мур!',
+            '*лапками-лапками* ^=^=',
+            '*замешивает бисквит* Мяу~',
+            '*массаж* Здесь мягко!',
+            '*топчет* Мурр... идеально...',
         ],
     };
 
@@ -1041,6 +1054,8 @@
     let _bounceOffset = 0;                 // current bounce Y offset (pixels)
     let _sneezeTicks = 0;                  // remaining ticks for sneeze animation
     let _sneezePhase = 0;                  // 0=none, 1=pre, 2=jerks, 3=recover
+    let _kneadTicks = 0;                   // remaining ticks for kneading animation
+    let _kneadPhase = 0;                   // 0=none, 1=left down, 2=both up, 3=right down, 4=both up
 
     // Mouse move handler for eye tracking
     function _onMouseMove(e) {
@@ -1344,6 +1359,33 @@
                 outlineColor, fillColor);
         }
 
+        // Kneading animation (sitting only — two paws alternating push down at body base)
+        if (!isLying && _kneadTicks > 0 && _kneadPhase > 0) {
+            const kneadBaseY = bodyBase.y + 14 + bodyOffY + _bounceOffset;
+            const leftPawX = bodyBase.x + 2 + bodyOffX;
+            const rightPawX = bodyBase.x + 11 + bodyOffX;
+
+            if (_kneadPhase === 1) {
+                // Left paw pushing down (spread), right paw lifted
+                drawFilled(PAW_SPREAD_OUTLINE, PAW_SPREAD_FILL,
+                    { x: leftPawX - 1, y: kneadBaseY + 1 }, outlineColor, fillColor);
+                drawFilled(PAW_OUTLINE, PAW_FILL,
+                    { x: rightPawX, y: kneadBaseY - 1 }, outlineColor, fillColor);
+            } else if (_kneadPhase === 3) {
+                // Right paw pushing down (spread), left paw lifted
+                drawFilled(PAW_OUTLINE, PAW_FILL,
+                    { x: leftPawX, y: kneadBaseY - 1 }, outlineColor, fillColor);
+                drawFilled(PAW_SPREAD_OUTLINE, PAW_SPREAD_FILL,
+                    { x: rightPawX - 1, y: kneadBaseY + 1 }, outlineColor, fillColor);
+            } else {
+                // Phase 2 or 4: both paws in neutral/up position
+                drawFilled(PAW_OUTLINE, PAW_FILL,
+                    { x: leftPawX, y: kneadBaseY - 1 }, outlineColor, fillColor);
+                drawFilled(PAW_OUTLINE, PAW_FILL,
+                    { x: rightPawX, y: kneadBaseY - 1 }, outlineColor, fillColor);
+            }
+        }
+
         // Paw wave animation (sitting only — drawn before head tilt so it's not rotated)
         if (!isLying && _pawWaveTicks > 0 && (_pawWavePhase === 1 || _pawWavePhase === 2)) {
             const pawX = bodyBase.x + 12 + bodyOffX;
@@ -1533,9 +1575,33 @@
             } else {
                 _sneezePhase = 1; // pre-sneeze pull back
             }
-        } else if (expression === 'neutral' && _idleLevel < 2 && _stretchTicks === 0 && _pawWaveTicks === 0 && Math.random() < 0.001) {
+        } else if (expression === 'neutral' && _idleLevel < 2 && _stretchTicks === 0 && _pawWaveTicks === 0 && _kneadTicks === 0 && Math.random() < 0.001) {
             // ~0.1% per tick ≈ every ~2 min at 120ms interval
             triggerSneeze();
+        }
+
+        // Kneading: rhythmic alternating paw push animation (happy/love/petting)
+        if (_kneadTicks > 0) {
+            _kneadTicks--;
+            // Phase cycle: 1(left down) → 2(both up) → 3(right down) → 4(both up) → repeat
+            const cycleLen = 6; // ticks per full cycle
+            const phase = cycleLen - (_kneadTicks % cycleLen);
+            if (_kneadTicks === 0) {
+                _kneadPhase = 0;
+            } else if (phase <= 1) {
+                _kneadPhase = 1; // left paw pushes down
+            } else if (phase <= 3) {
+                _kneadPhase = 2; // both up
+            } else if (phase <= 4) {
+                _kneadPhase = 3; // right paw pushes down
+            } else {
+                _kneadPhase = 4; // both up
+            }
+        } else if ((expression === 'happy' || expression === 'love') && _pawWaveTicks === 0 && _stretchTicks === 0 && Math.random() < 0.006) {
+            // ~0.6% chance during happy/love idle (~every 20s at 120ms)
+            _kneadTicks = 24 + Math.floor(Math.random() * 12); // 3-5 knead cycles
+            _kneadPhase = 1;
+            setSpeechText(pickRandom(SPEECH.knead), 4000);
         }
 
         // Paw wave: random animation during idle
@@ -1546,7 +1612,7 @@
             else if (_pawWaveTicks < 3) { _pawWavePhase = 3; }
             else if (_pawWaveTicks < 6) { _pawWavePhase = 2; }
             else { _pawWavePhase = 1; }
-        } else if (expression === 'neutral' && _stretchTicks === 0 && Math.random() < 0.008) {
+        } else if (expression === 'neutral' && _stretchTicks === 0 && _kneadTicks === 0 && Math.random() < 0.008) {
             // ~0.8% chance per tick (~every 15s at 120ms interval)
             _pawWaveTicks = 10;
             _pawWavePhase = 1;
@@ -1578,7 +1644,7 @@
             if (_stretchPhase >= 1 && _stretchPhase <= 2 && expression === 'neutral') {
                 // Temporarily show sleepy-like half-closed eyes by forcing eyeFrame
             }
-        } else if (expression === 'neutral' && _pawWaveTicks === 0 && Math.random() < 0.004) {
+        } else if (expression === 'neutral' && _pawWaveTicks === 0 && _kneadTicks === 0 && Math.random() < 0.004) {
             // ~0.4% chance per tick (~every 30s at 120ms interval)
             _stretchTicks = 12;
             _stretchPhase = 0;
@@ -1937,6 +2003,14 @@
         /** Trigger a sneeze animation (rare random, or call manually). */
         triggerSneeze() {
             triggerSneeze();
+        },
+
+        /** Trigger a paw kneading animation (making biscuits). */
+        triggerKnead() {
+            if (_kneadTicks > 0) return;
+            _kneadTicks = 24 + Math.floor(Math.random() * 12);
+            _kneadPhase = 1;
+            setSpeechText(pickRandom(SPEECH.knead), 4000);
         },
 
         /**
@@ -2411,6 +2485,11 @@
                     setSpeechText(pickRandom(SPEECH.love), 5000);
                     _purrrTicks = 35;
                     _tailSpeed = 1;
+                    // Start kneading during deep petting
+                    if (_kneadTicks <= 0) {
+                        _kneadTicks = 30 + Math.floor(Math.random() * 12);
+                        _kneadPhase = 1;
+                    }
                     // Extra heart burst for deep petting
                     for (let h = 0; h < 6; h++) {
                         spawnParticle({

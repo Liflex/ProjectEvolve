@@ -1,28 +1,38 @@
 # Last Experiment Summary
 
-**Experiment #177** — Cat expression overlays + yawn mouth sprite
+**Experiment #178** — Paw kneading animation
 **Date:** 2026-03-20
 
 ## What Was Done
 
-1. **Yawn mouth sprite** (MOUTH_YAWN) — широко открытый рот 7×5 пикселей для анимации зевания. Показывается вместо обычного рта во время stretch/yawn фаз (phase 1-2).
-2. **Expression overlays** — визуальные эффекты поверх головы для усиления эмоций:
-   - **Blush** — розовые пиксели на щеках при love/happy выражениях
-   - **Sweat drop** — анимированная капля при thinking (аниме-стиль, пульсирует)
-   - **Tear** — капля слезы при sad (капает вниз по циклу)
-   - **Angry vein** — крестик на лбу при angry (пульсирует)
-3. Все overlays используют `ctx.globalAlpha` для плавного мерцания и `Math.sin(_tickCount)` для анимации.
+1. **PAW_SPREAD sprite** (5×4 px) — расширенная лапка с растопыренными когтями для фазы нажатия вниз при kneading.
+2. **Kneading animation system** — ритмичное чередование двух передних лап:
+   - Phase 1: левая лапа нажимает вниз (spread), правая поднята
+   - Phase 2: обе в нейтральном положении
+   - Phase 3: правая лапа нажимает вниз (spread), левая поднята
+   - Phase 4: обе в нейтральном положении
+3. **Триггеры kneading:**
+   - Глубокое поглаживание (7+ кликов) — автоматический запуск
+   - Случайно при happy/love выражении (0.6% per tick)
+4. **SPEECH.knead** — 7 фраз на русском о массаже лапками ("массажирует лапками", "топчет тесто", "замешивает бисквит")
+5. **Public API**: `CatModule.triggerKnead()` для внешнего вызова
+6. **Взаимоисключение**: kneading блокирует paw wave, stretch и sneeze (и наоборот)
 
 ## Files Modified
 
-- `ui/static/modules/cat.js` (+60 lines)
+- `ui/static/modules/cat.js` — kneading sprites, state vars, tick logic, render, triggers, speech, API
 
 ## Key Results
 
-- Кот стал более выразительным — каждая эмоция теперь имеет уникальный визуальный маркер
-- Yawn делает stretch анимацию реалистичнее — рот действительно открывается
+Cat companion цель теперь полностью выполнена — все запланированные анимации реализованы:
+- Выражения: neutral, happy, sleepy, surprised, angry, thinking, love, sad
+- Анимации: ear twitch, stretch, paw wave, head tilt, body bounce, breathing, sneeze, paw kneading
+- Expression overlays: blush, tear, sweat, angry vein
+- Yawn mouth sprite
 
 ## For Next Iteration
 
-- Добавить больше overlay-эффектов (например, звёздочки в глазах при surprise)
-- Paw kneading animation для happy/love
+Оставшиеся цели проекта:
+- SDK continue_conversation multi-turn stability
+- Judge auto-revert data accumulation
+- Multi-agent production tests
