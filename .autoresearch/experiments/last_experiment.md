@@ -1,26 +1,23 @@
 # Last Experiment Summary
 
-**Experiment #124** — Chat — enhanced sidebar content for chat mode
-**Date:** 2026-03-20 02:58:55
+**Experiment #125** — Chat — streaming speed indicator (words/sec) + response stats badge
+**Date:** 2026-03-20
 
 ## What Was Done
 
-N/A
+1. **Streaming speed in toolbar** — при стриминге ответа агента в toolbar показывается live: `ELAPSED 12s · 847w · 68 w/s`
+2. **Response stats badge on messages** — после завершения стриминга на assistant сообщении badge: `12s · 847w · 68 w/s · 1.2K out · $0.032` с цветовым кодированием скорости
+3. **`getStreamingSpeed(tab)`** / **`getStreamingWordCount(tab)`** — новые хелперы
 
 ## Files Modified
 
-- None
+- `ui/static/js/modules/chat.js`
+- `ui/static/templates/chat-section.js`
 
 ## Key Results
 
-Results
-
-**What was done:**
-1. **Chat sidebar content** — заменил пустой "ACTIVE_SESSIONS / 5 LIMIT" на богатый контент:
-   - **Aggregate stats grid**: количество сессий (x/5), общее число сообщений, токены, стоимость
-   - **Session cards**: кликабельный список с индикатором статуса (streaming/connected/connecting/error), лейблом, числом сообщений и превью последнего сообщения
-   - **Quick actions**: + NEW TAB, RESUME, CLOSE ALL (показываются по условию)
-2. **Compact mode** — в компактном sideba
+- Working: yes
+- Tests: skipped (frontend-only change)
 
 ## For Next Iteration
 

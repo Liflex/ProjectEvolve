@@ -1,3 +1,27 @@
+## Experiment 125 — Chat — streaming speed indicator (words/sec) + response stats badge
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **Streaming speed in toolbar** — при стриминге ответа агента в toolbar показывается live: `ELAPSED 12s · 847w · 68 w/s`
+   - Word count обновляется каждую секунду через `_clockTick`
+   - Words/sec рассчитывается как wordCount / elapsedSeconds
+2. **Response stats badge on messages** — после завершения стриминга на assistant сообщении появляется badge: `12s · 847w · 68 w/s · 1.2K out · $0.032`
+   - Word count (words)
+   - Duration (seconds)
+   - Speed (words/sec) с цветовым кодированием: green ≥60 w/s, cyan ≥30, amber <30
+   - Token output и cost (уже были)
+3. **`getStreamingSpeed(tab)`** — вычисляет w/s для текущего стримящегося сообщения
+4. **`getStreamingWordCount(tab)`** — возвращает количество слов в стримящемся сообщении
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` — added `getStreamingSpeed()`, `getStreamingWordCount()`, enhanced `aMetaHtml` with word count + speed + color coding
+- `ui/static/templates/chat-section.js` — updated streaming toolbar to show word count + w/s
+
+---
+
 ## Experiment 124 — Chat — enhanced sidebar content for chat mode
 
 **Date:** 2026-03-20
