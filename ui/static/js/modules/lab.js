@@ -704,7 +704,7 @@ window.AppLab = (function() {
         _showSetupWizard: false,
         _setupStep: 0,
         _setupSaving: false,
-        _setupData: { name: '', description: '', goals: '', tech_stack: '', focus_areas: '', constraints: '' },
+        _setupData: { name: '', description: '', goals: '', tech_stack: '', constraints: '' },
 
         _setupSteps: [
             { key: 'name', label: 'PROJECT_INFO', icon: '>' },
@@ -717,7 +717,7 @@ window.AppLab = (function() {
             // Pre-fill from existing preflight data if available
             this._setupStep = 0;
             this._setupSaving = false;
-            this._setupData = { name: '', description: '', goals: '', tech_stack: '', focus_areas: '', constraints: '' };
+            this._setupData = { name: '', description: '', goals: '', tech_stack: '', constraints: '' };
             // Try to load existing config for pre-fill
             const path = this.runConfig.project || '.';
             this.api('/api/config?project=' + encodeURIComponent(path)).then(data => {
@@ -725,7 +725,6 @@ window.AppLab = (function() {
                 if (data && data.description) this._setupData.description = data.description;
                 if (data && data.goals && data.goals.length) this._setupData.goals = data.goals.join('\n');
                 if (data && data.tech_stack && data.tech_stack.length) this._setupData.tech_stack = data.tech_stack.join(', ');
-                if (data && data.focus_areas && data.focus_areas.length) this._setupData.focus_areas = data.focus_areas.join(', ');
                 if (data && data.constraints && data.constraints.length) this._setupData.constraints = data.constraints.join('\n');
             }).catch(() => {});
             this._showSetupWizard = true;
@@ -743,7 +742,6 @@ window.AppLab = (function() {
             try {
                 const goals = this._setupData.goals.split('\n').map(l => l.trim()).filter(Boolean);
                 const techStack = this._setupData.tech_stack.split(',').map(s => s.trim()).filter(Boolean);
-                const focusAreas = this._setupData.focus_areas.split(',').map(s => s.trim()).filter(Boolean);
                 const constraints = this._setupData.constraints.split('\n').map(l => l.trim()).filter(Boolean);
                 await this.api('/api/setup', {
                     method: 'POST',
@@ -752,7 +750,7 @@ window.AppLab = (function() {
                         project: this.runConfig.project || '.',
                         name: this._setupData.name.trim(),
                         description: this._setupData.description.trim(),
-                        goals, tech_stack: techStack, focus_areas: focusAreas, constraints,
+                        goals, tech_stack: techStack, constraints,
                     }),
                 });
                 this.showToast('PROJECT CONFIGURED', 'success');

@@ -252,7 +252,6 @@ class ProjectConfig:
         "goals": [],
         "constraints": [],
         "tech_stack": [],
-        "focus_areas": [],
         "memory_files": [],
         "context_files": []
     }
@@ -543,7 +542,6 @@ def build_agent_prompt(config: ProjectConfig, iteration: int, total: int, strate
         "completed_goals": "\n".join(f"- {g}" for g in cfg.get("completed_goals", [])) or "",
         "tech_stack": ", ".join(cfg.get("tech_stack", [])) or "Не определён",
         "constraints": "\n".join(f"- {c}" for c in cfg.get("constraints", [])) or "- Нет",
-        "focus_areas": "\n".join(f"- {a}" for a in cfg.get("focus_areas", [])) or "- Исследуй любые улучшения",
         "agent_instructions": cfg.get("agent_instructions", ""),
     }
 

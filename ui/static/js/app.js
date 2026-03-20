@@ -249,7 +249,7 @@ function _buildAppData() {
         judgeVerdict: null,
         judgeAllVerdicts: null,
         judgeProfileView: null,
-        config: { name: '', description: '', goals: [], constraints: [], tech_stack: [], focus_areas: [] },
+        config: { name: '', description: '', goals: [], constraints: [], tech_stack: [] },
         prompt: '',
         changesLog: '',
         promptSaving: false,

@@ -323,12 +323,6 @@
             <div x-show="config.name || config.description" class="mb-3 pb-3" style="border-bottom:1px solid var(--v-dim)">
                 <div x-show="config.name" class="text-sm text-[var(--v)] tracking-wider" x-text="config.name"></div>
                 <div x-show="config.description" class="text-[0.625rem] text-[var(--v3)] mt-1 leading-relaxed" x-text="config.description"></div>
-                <!-- Focus areas as tags -->
-                <div x-show="(config.focus_areas || []).length > 0" class="flex flex-wrap gap-1 mt-2">
-                    <template x-for="(area, ai) in (config.focus_areas || [])" :key="ai">
-                        <span class="goal-focus-tag" x-text="'&#x25C6; ' + area"></span>
-                    </template>
-                </div>
             </div>
             <!-- Active goals with status classification -->
             <div x-show="goalProgressData().goals.length > 0">

@@ -312,7 +312,6 @@ _DEFAULT_PROJECT_CONFIG = {
     "completed_goals": [],
     "constraints": [],
     "tech_stack": [],
-    "focus_areas": [],
 }
 
 _MEMORY_HEADER = """# {title}
@@ -719,7 +718,7 @@ async def get_config(project: str = ""):
         config_file = get_project_dir() / ".autoresearch.json"
     if not config_file.exists():
         return {"name": "", "description": "", "goals": [], "completed_goals": [],
-                "constraints": [], "tech_stack": [], "focus_areas": []}
+                "constraints": [], "tech_stack": []}
     try:
         with open(config_file, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -728,7 +727,7 @@ async def get_config(project: str = ""):
         return data
     except (json.JSONDecodeError, UnicodeDecodeError):
         return {"name": "", "description": "", "goals": [], "completed_goals": [],
-                "constraints": [], "tech_stack": [], "focus_areas": [], "_error": "Malformed config file"}
+                "constraints": [], "tech_stack": [], "_error": "Malformed config file"}
 
 
 class ConfigUpdate(BaseModel):
@@ -740,7 +739,6 @@ class ConfigUpdate(BaseModel):
     completed_goals: List[str] = []
     constraints: List[str] = []
     tech_stack: List[str] = []
-    focus_areas: List[str] = []
 
 
 @app.put("/api/config")
@@ -757,7 +755,6 @@ async def update_config(data: ConfigUpdate):
         "name": data.name, "description": data.description,
         "goals": data.goals, "completed_goals": data.completed_goals,
         "constraints": data.constraints, "tech_stack": data.tech_stack,
-        "focus_areas": data.focus_areas,
     })
     with open(config_file, "w", encoding="utf-8") as f:
         json.dump(existing, f, indent=2, ensure_ascii=False)
@@ -773,7 +770,6 @@ class SetupRequest(BaseModel):
     goals: List[str] = []
     constraints: List[str] = []
     tech_stack: List[str] = []
-    focus_areas: List[str] = []
 
 
 @app.post("/api/setup")
@@ -804,7 +800,6 @@ async def setup_project(data: SetupRequest):
         "goals": data.goals,
         "constraints": data.constraints,
         "tech_stack": data.tech_stack,
-        "focus_areas": data.focus_areas,
     })
     if "completed_goals" not in existing:
         existing["completed_goals"] = []

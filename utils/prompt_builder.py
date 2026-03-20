@@ -211,7 +211,6 @@ def build_agent_prompt(config, iteration: int, total: int) -> str:
         "completed_goals": _format_completed_goals(cfg.get("completed_goals", [])),
         "tech_stack": ", ".join(cfg.get("tech_stack", [])) or "Не определён",
         "constraints": "\n".join(f"- {c}" for c in cfg.get("constraints", [])) or "- Нет",
-        "focus_areas": "\n".join(f"- {a}" for a in cfg.get("focus_areas", [])) or "- Исследуй любые улучшения",
         "agent_instructions": cfg.get("agent_instructions", ""),
     }
 

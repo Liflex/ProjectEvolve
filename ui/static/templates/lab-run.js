@@ -177,13 +177,6 @@
                                        class="w-full bg-[var(--bg)] border border-[var(--v-dim)] px-3 py-2 text-sm text-[var(--ng2)] focus:border-[var(--v2)] outline-none transition-colors"
                                        placeholder="Python, FastAPI, PostgreSQL, React">
                             </div>
-                            <div>
-                                <label class="text-[0.5625rem] text-[var(--v3)] tracking-wider">FOCUS_AREAS</label>
-                                <p class="text-[0.5rem] text-[var(--v3)] mb-1">Comma-separated. Where the agent should focus improvements.</p>
-                                <input x-model="_setupData.focus_areas"
-                                       class="w-full bg-[var(--bg)] border border-[var(--v-dim)] px-3 py-2 text-sm text-[var(--ng2)] focus:border-[var(--v2)] outline-none transition-colors"
-                                       placeholder="API, UI, Performance, Security">
-                            </div>
                         </div>
                         <!-- Step 3: Constraints & Review -->
                         <div x-show="_setupStep === 3" class="space-y-3">
@@ -214,10 +207,6 @@
                                 <div class="flex gap-2 text-[0.5625rem]" x-show="_setupData.tech_stack">
                                     <span class="text-[var(--v3)] shrink-0 w-20">STACK:</span>
                                     <span class="text-[var(--ng2)]" x-text="_setupData.tech_stack"></span>
-                                </div>
-                                <div class="flex gap-2 text-[0.5625rem]" x-show="_setupData.focus_areas">
-                                    <span class="text-[var(--v3)] shrink-0 w-20">FOCUS:</span>
-                                    <span class="text-[var(--ng2)]" x-text="_setupData.focus_areas"></span>
                                 </div>
                             </div>
                         </div>

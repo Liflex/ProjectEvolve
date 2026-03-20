@@ -6385,3 +6385,31 @@ Results
 N/A
 
 ---
+
+## Experiment 159 — Chat streaming thinking preview — live-updating thinking content display
+
+**Date:** 2026-03-20 18:18:59
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- None
+
+### Results
+
+Results
+
+**What was done:**
+1. **Live thinking preview** — Во время thinking-фазы агента, когда `_thinkingBuffer` накапливает контент, теперь показывается live-превью в collapsible блоке с blinking cursor вместо простого "THINKING..." индикатора.
+2. **Collapsible toggle** — Пользователь может свернуть/развернуть live preview (respecting `settings.showThinking`).
+3. **Character count** — Показывает количество символов в буфере мышления.
+4. **CSS анимации** — Blinking cursor в конце текста и в hea
+
+### Notes for Next
+
+N/A
+
+---

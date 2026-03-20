@@ -31,7 +31,7 @@
         <div class="pixel-border bg-[var(--bg2)] overflow-hidden">
             <div class="flex items-center justify-between px-3 py-1.5 bg-[var(--bg)] border-b border-[var(--v-dim)]">
                 <span class="text-[0.5625rem] text-[var(--v3)] tracking-wider">config/default_prompt.md</span>
-                <span class="text-[0.5625rem] text-[var(--v3)]">VARS: {iteration} {total} {project_name} {goals} {tech_stack} {constraints} {focus_areas}</span>
+                <span class="text-[0.5625rem] text-[var(--v3)]">VARS: {iteration} {total} {project_name} {goals} {tech_stack} {constraints}</span>
             </div>
             <textarea x-model="prompt" @keydown.tab.prevent="insertTab($event)"
                       class="editor w-full h-[70vh] p-4 bg-transparent text-[var(--ng2)] text-sm leading-relaxed resize-none border-none"
@@ -104,15 +104,6 @@
                         <div class="flex items-center gap-1.5"><span class="text-[0.5625rem] text-[var(--v3)] w-4">C</span><input x-model="config.constraints[i]" class="flex-1 bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1 text-sm text-[var(--ng2)]"><button @click="config.constraints.splice(i,1)" class="text-[var(--v3)] hover:text-[var(--red)] text-xs px-1">X</button></div>
                     </template>
                     <button @click="config.constraints.push('')" class="text-[0.625rem] text-[var(--pink)] hover:text-white tracking-wider">+ ADD_CONSTRAINT</button>
-                </div>
-            </div>
-            <div class="pixel-border bg-[var(--bg2)] p-3">
-                <div class="flex justify-between mb-2"><label class="text-[0.5625rem] tracking-widest text-[var(--v3)]">FOCUS_AREAS_</label><span class="text-[0.5625rem] text-[var(--v)]" x-text="config.focus_areas.length + ' ACTIVE'"></span></div>
-                <div class="space-y-1">
-                    <template x-for="(f,i) in config.focus_areas" :key="'f'+i">
-                        <div class="flex items-center gap-1.5"><span class="text-[0.5625rem] text-[var(--v3)] w-4">F</span><input x-model="config.focus_areas[i]" class="flex-1 bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1 text-sm text-[var(--ng2)]"><button @click="config.focus_areas.splice(i,1)" class="text-[var(--v3)] hover:text-[var(--red)] text-xs px-1">X</button></div>
-                    </template>
-                    <button @click="config.focus_areas.push('')" class="text-[0.625rem] text-[var(--v)] hover:text-white tracking-wider">+ ADD_FOCUS</button>
                 </div>
             </div>
         </div>
