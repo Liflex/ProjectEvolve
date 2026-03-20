@@ -65,6 +65,20 @@
                     <span class="text-[0.5rem] text-[var(--v3)] opacity-60" x-show="runConfig.parallel_judges">3 independent agents</span>
                 </div>
 
+                <!-- Decompose Toggle -->
+                <div class="mt-2 flex items-center gap-3">
+                    <label class="text-[0.5625rem] text-[var(--v3)] tracking-wider cursor-pointer select-none flex items-center gap-2"
+                           @click="runConfig.decompose = !runConfig.decompose">
+                        <span class="inline-block w-8 h-4 rounded-full transition-colors relative"
+                              :class="runConfig.decompose ? 'bg-[var(--v)]' : 'bg-[var(--v-dim)]'">
+                            <span class="absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform"
+                                  :class="runConfig.decompose ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                        </span>
+                        DECOMPOSE_TASKS
+                    </label>
+                    <span class="text-[0.5rem] text-[var(--v3)] opacity-60" x-show="runConfig.decompose">LLM splits goals into parallel sub-tasks</span>
+                </div>
+
                 <!-- File Browser Panel -->
                 <div x-show="_showBrowsePanel" x-transition class="mt-3 border border-[var(--v-dim)] bg-[var(--bg)]">
                     <!-- Browser header / breadcrumb -->
