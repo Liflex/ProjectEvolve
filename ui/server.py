@@ -1606,10 +1606,21 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
 
             elif msg_type == "message":
                 content = msg.get("content", "")
-                if not content:
+                images = msg.get("images", [])
+                if not content and not images:
                     continue
+                # Build multimodal prompt if images are present
+                if images:
+                    prompt_blocks = []
+                    if content:
+                        prompt_blocks.append({"type": "text", "text": content})
+                    for img in images:
+                        prompt_blocks.append(img)
+                    prompt = prompt_blocks
+                else:
+                    prompt = content
                 try:
-                    async for event in session.send(content):
+                    async for event in session.send(prompt):
                         await websocket.send_json({
                             "type": "claude_event",
                             "event_type": event.get("type", "unknown"),

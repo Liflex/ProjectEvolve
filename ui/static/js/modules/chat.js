@@ -585,17 +585,32 @@ window.AppChat = (function() {
             this.mentionMenu.show = false;
             this.mentionMenu.items = [];
             let content = tab.input_text.trim();
-            // Append attached images as markdown
+            // Extract image attachments for multimodal Claude Vision
+            let visionImages = [];
+            let displayContent = content; // content for display in chat history
             if (tab._attachments && tab._attachments.length > 0) {
                 for (const att of tab._attachments) {
-                    content += (content ? '\n\n' : '') + '![' + att.name + '](' + att.dataUrl + ')';
+                    if (att.type?.startsWith('image/') && att.dataUrl) {
+                        // Extract base64 data from data URL (data:image/png;base64,XXXX)
+                        const commaIdx = att.dataUrl.indexOf(',');
+                        if (commaIdx > -1) {
+                            const base64Data = att.dataUrl.slice(commaIdx + 1);
+                            const mediaType = att.dataUrl.slice(5, att.dataUrl.indexOf(';'));
+                            visionImages.push({
+                                type: 'image',
+                                source: { type: 'base64', media_type: mediaType, data: base64Data }
+                            });
+                        }
+                    }
+                    // Add image as markdown for display in chat history
+                    displayContent += (displayContent ? '\n\n' : '') + '![' + att.name + '](' + att.dataUrl + ')';
                 }
                 tab._attachments = [];
             }
-            if (!content) return;
+            if (!content && visionImages.length === 0) return;
             // Push to message history BEFORE adding prefixes (shell-style Up/Down navigation)
-            if (tab._msgHistory.length === 0 || tab._msgHistory[tab._msgHistory.length - 1] !== content) {
-                tab._msgHistory.push(content);
+            if (tab._msgHistory.length === 0 || tab._msgHistory[tab._msgHistory.length - 1] !== displayContent) {
+                tab._msgHistory.push(displayContent);
                 if (tab._msgHistory.length > 100) tab._msgHistory.shift();
             }
             // Prepend queued reaction feedback (invisible to user, sent to agent)
@@ -616,7 +631,8 @@ window.AppChat = (function() {
             tab._editMode = null; // clear edit mode on send
             this.resizeInputForTab(tab);
             tab.scrolledUp = false;
-            tab.messages.push({ role: 'user', content: content, id: 'msg-' + Date.now(), ts: Date.now(), edited: wasEditing || undefined });
+            // Store message with images for rendering; content includes image markdown for display
+            tab.messages.push({ role: 'user', content: displayContent, id: 'msg-' + Date.now(), ts: Date.now(), edited: wasEditing || undefined, _hasImages: visionImages.length > 0 });
             tab._msgStartTime = Date.now();
             this.chatNavClear();
             tab._msgTokens = null;
@@ -624,15 +640,33 @@ window.AppChat = (function() {
             this._scheduleChatSave();
             // Cat: analyze user message for contextual skill tips
             if (window.CatModule && CatModule.isActive() && CatModule.analyzeChatContext) {
-                CatModule.analyzeChatContext(content);
+                CatModule.analyzeChatContext(displayContent);
+            }
+            // Cat: react to vision (image) messages
+            if (window.CatModule && CatModule.isActive() && visionImages.length > 0) {
+                CatModule.setExpression('surprised');
+                if (CatModule.triggerEarTwitch) CatModule.triggerEarTwitch();
+                const visionTips = [
+                    'Картинка для Клода! *заинтересовался* Давай посмотрим!',
+                    'Изображение! *прищурился* Клод увидит!',
+                    '*задрожал от excitment* Визуальный анализ! Мяу!',
+                    'Ого, картинка! *хвост дёрнулся* Клод разберётся!',
+                ];
+                CatModule.setSpeechText(visionTips[Math.floor(Math.random() * visionTips.length)], 3000);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('thinking'); }, 3000);
             }
             setTimeout(() => {
                 const el = document.getElementById('chat-messages-' + tab.tab_id);
                 if (el) el.scrollTop = el.scrollHeight;
             }, 50);
+            // Build WS message — separate text and images for multimodal
+            const wsPayload = { type: 'message', content: content };
+            if (visionImages.length > 0) {
+                wsPayload.images = visionImages;
+            }
             const ws = this.chatWs[tab.tab_id];
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'message', content: content }));
+                ws.send(JSON.stringify(wsPayload));
             } else if (tab._restored) {
                 // Auto-reconnect restored tab before sending
                 this.showToast('RECONNECTING...', 'info');
@@ -640,8 +674,7 @@ window.AppChat = (function() {
                 // Retry send after reconnect
                 const newWs = this.chatWs[tab.tab_id];
                 if (newWs && newWs.readyState === WebSocket.OPEN) {
-                    // Re-send: push the user message again (it was already pushed above)
-                    newWs.send(JSON.stringify({ type: 'message', content: content }));
+                    newWs.send(JSON.stringify(wsPayload));
                 } else {
                     tab.messages.push({ role: 'assistant', content: '[ERROR] Reconnect failed. Click RECONNECT on tab.', ts: Date.now() });
                     this.chatTick++;
@@ -1771,6 +1804,7 @@ window.AppChat = (function() {
                     const uRefBadge = ' <span class="msg-ref-badge" onclick="event.stopPropagation();window._app.copyMsgRef(\'' + tab.tab_id + '\',' + i + ')" title="Click to copy #' + i + ' reference">#' + i + '</span>';
                     const uTimeHtml = uTime ? ' <span class="msg-ts" title="' + this.escHtml(uFullTime) + '" style="color:var(--v3);font-weight:normal;cursor:help">' + uTime + '</span>' : '';
                     const uEditedHtml = msg.edited ? ' <span class="msg-edited-badge" title="Message was edited and resent">edited</span>' : '';
+                    const uVisionHtml = msg._hasImages ? ' <span class="msg-vision-badge" title="Sent with image(s) for Claude Vision analysis">&#x1f441; VISION</span>' : '';
                     const uFold = msg.content && msg.content.length > 500 && !msg.is_streaming;
                     const uCollapsed = msg.collapsed && uFold;
                     const uChars = (msg.content || '').length;
@@ -1788,7 +1822,7 @@ window.AppChat = (function() {
                         + '<div class="chat-role chat-role-user">USER_'
                         + uRefBadge
                         + (turnCount === 1 ? '<span class="turn-collapse-btn" onclick="event.stopPropagation();window._app.toggleTurnCollapse(\'' + tab.tab_id + '\',' + turnCount + ')" title="Collapse turn">[-]</span> ' : '')
-                        + uTimeHtml + uEditedHtml + (uFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + uChars + 'ch · ' + uLines + 'ln</span>' : '') + '</div>'
+                        + uTimeHtml + uEditedHtml + uVisionHtml + (uFold ? ' <span style="color:var(--v3);font-weight:normal;font-size:0.5rem">' + uChars + 'ch · ' + uLines + 'ln</span>' : '') + '</div>'
                         + '<div class="chat-bubble-user" style="max-width:100%;padding:var(--chat-msg-padding,8px 12px);font-size:inherit;color:var(--ng2)">'
                         + (uCollapsed
                             ? '<div class="chat-collapsed-preview">' + this.linkMsgRefs(this.renderUserContent(msg.content.slice(0, 200)), tab.tab_id) + '</div>'
@@ -3736,9 +3770,12 @@ window.AppChat = (function() {
                         .filter(m => m.role !== 'tool')
                         .slice(-MAX_MSGS_PER_TAB)
                         .map(m => {
+                            // Strip data URLs from content to avoid bloating localStorage
+                            let saveContent = (m.content || '').replace(/!\[[^\]]*\]\(data:[^)]+\)/g, '[image]');
+                            if (m._hasImages && !saveContent.trim()) saveContent = '[image sent]';
                             const out = {
                                 role: m.role,
-                                content: (m.content || '').slice(0, MAX_CONTENT_LEN),
+                                content: saveContent.slice(0, MAX_CONTENT_LEN),
                                 ts: m.ts,
                                 reaction: m.reaction || null,
                                 duration: m.duration || null,
@@ -3746,6 +3783,7 @@ window.AppChat = (function() {
                             };
                             if (m.regenerated) out.regenerated = true;
                             if (m._regenOriginal) out._regenOriginal = (m._regenOriginal || '').slice(0, MAX_CONTENT_LEN);
+                            if (m._hasImages) out._hasImages = true;
                             return out;
                         });
                     return {

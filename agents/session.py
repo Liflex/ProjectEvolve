@@ -62,13 +62,18 @@ class ClaudeSession:
 
     async def send(
         self,
-        prompt: str,
+        prompt,
         continue_conversation: bool = True,
     ) -> AsyncIterator[dict]:
         """Send a prompt to the agent and yield stream events.
 
         Supports re-sending after COMPLETED/CANCELLED/ERROR by resetting
         to ACTIVE and using continue_conversation for multi-turn context.
+
+        Args:
+            prompt: str (text-only) or list of content blocks (multimodal).
+                    Multimodal: [{"type":"text","text":"..."},
+                                 {"type":"image","source":{"type":"base64","media_type":"image/png","data":"..."}}]
         """
         if self.status == SessionStatus.ACTIVE and self._task and not self._task.done():
             raise RuntimeError(
@@ -122,8 +127,12 @@ class ClaudeSession:
 
             # Use streaming mode (AsyncIterable prompt) to avoid Windows
             # command-line length limit when prompts are large.
+            # Support multimodal content (text + images) or plain text string.
             async def _single_message():
-                yield {"type": "user", "message": {"role": "user", "content": prompt}}
+                if isinstance(prompt, list):
+                    yield {"type": "user", "message": {"role": "user", "content": prompt}}
+                else:
+                    yield {"type": "user", "message": {"role": "user", "content": prompt}}
 
             self._query_result = query(prompt=_single_message(), options=options)
             async for message in self._query_result:

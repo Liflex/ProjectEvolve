@@ -3454,6 +3454,22 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     object-fit: contain;
 }
 
+/* Vision indicator badge for messages with images */
+.msg-vision-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 0.5rem;
+    color: var(--cyan);
+    background: rgba(0, 229, 255, 0.08);
+    border: 1px solid rgba(0, 229, 255, 0.2);
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.08em;
+    font-weight: normal;
+    margin-left: 4px;
+}
+
 /* === KEYBOARD SHORTCUTS PANEL === */
 .shortcuts-panel {
     background: var(--bg2);
