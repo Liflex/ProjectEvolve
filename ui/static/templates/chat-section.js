@@ -39,6 +39,8 @@
                             <span x-show="tab._unread > 0 && activeChatTab !== tab.tab_id && _renamingTabId !== tab.tab_id" class="tab-unread-badge" x-text="tab._unread"></span>
                             <!-- Total message count (shown when no unread or tab is active) -->
                             <span x-show="(tab._unread === 0 || activeChatTab === tab.tab_id) && tab.messages.length > 0 && _renamingTabId !== tab.tab_id" class="text-[0.5rem] tabular-nums px-1 bg-[var(--v-dim)] text-[var(--v3)]" x-text="tab.messages.length"></span>
+                            <!-- Branch indicator badge -->
+                            <span x-show="tab._branchedFrom && _renamingTabId !== tab.tab_id" class="tab-branch-badge" :title="'Branched from ' + (tab._branchedFrom?.label || '?') + ' at #' + (tab._branchedFrom?.msgIdx ?? '?')">BRANCH</span>
                         </button>
                         <button @click="closeChatTab(tab.tab_id)"
                                 x-show="_renamingTabId !== tab.tab_id"
@@ -305,7 +307,13 @@
                         <button @click="tab._restored = false" class="chat-restored-dismiss-btn" title="Dismiss">&#x2715;</button>
                     </div>
                     <!-- Messages area with minimap -->
-                    <div class="flex-1 overflow-hidden relative" style="min-height:0">
+                    <div class="flex-1 overflow-hidden relative flex flex-col" style="min-height:0">
+                        <!-- Branch watermark banner -->
+                        <div x-show="tab._branchedFrom" class="branch-watermark shrink-0">
+                            <span>&#x2693;</span>
+                            <span>Branched from <span x-text="'#' + (tab._branchedFrom?.msgIdx ?? '?')" style="color:var(--v)"></span> in <span x-text="tab._branchedFrom?.label || '?'" style="color:var(--ng2)"></span> — <span x-text="tab.messages.length + ' messages'" style="color:var(--v3)"></span></span>
+                            <button @click="startBranchSession(tab.tab_id)" class="branch-start-btn" title="Create a new Claude session for this branch">START SESSION</button>
+                        </div>
                         <div class="absolute inset-0 overflow-y-auto p-4 space-y-3" :id="'chat-messages-' + tab.tab_id"
                              x-html="renderChatHTML(tab)"
                              @click="onChatClick($event)"

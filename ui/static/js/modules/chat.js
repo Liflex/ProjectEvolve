@@ -604,6 +604,10 @@ window.AppChat = (function() {
                     tab.messages.push({ role: 'assistant', content: '[ERROR] Reconnect failed. Click RECONNECT on tab.', ts: Date.now() });
                     this.chatTick++;
                 }
+            } else if (tab._branchedFrom && !tab.session_id) {
+                // Branched tab without session — prompt user to start a session
+                tab.messages.push({ role: 'assistant', content: '[INFO] This is a branched view (read-only). Click **START SESSION** in the branch banner above to begin a new session, or press **+ NEW TAB** to start fresh.', ts: Date.now() });
+                this.chatTick++;
             } else {
                 tab.messages.push({ role: 'assistant', content: '[ERROR] Not connected. Session may have ended.', ts: Date.now() });
                 this.chatTick++;
@@ -1485,6 +1489,7 @@ window.AppChat = (function() {
                     + '<div class="msg-actions">'
                     + '<button class="act-copy" onclick="event.stopPropagation();window._app.copyChatMsg(\'' + tab.tab_id + '\',' + idx + ')" title="Copy">COPY</button>'
                     + '<button class="act-quote" onclick="event.stopPropagation();window._app.quoteMessage(\'' + tab.tab_id + '\',' + idx + ')" title="Quote in reply">QUOTE</button>'
+                    + '<button class="act-branch" onclick="event.stopPropagation();window._app.branchFrom(\'' + tab.tab_id + '\',' + idx + ')" title="Branch conversation from this point">BRANCH</button>'
                     + (isLastAssistant ? '<button class="act-regen" onclick="event.stopPropagation();window._app.regenerateResponse(\'' + tab.tab_id + '\')" title="Regenerate">REGEN</button>' : '')
                     + (aRegenDiff ? '<button class="act-diff' + (msg._showRegenDiff ? ' active' : '') + '" onclick="event.stopPropagation();window._app.toggleRegenDiff(\'' + tab.tab_id + '\',' + idx + ')" title="Compare with original">' + (msg._showRegenDiff ? 'HIDE DIFF' : 'DIFF') + '</button>' : '')
                     + '<button class="act-pin' + (isPinned ? ' pinned' : '') + '" onclick="event.stopPropagation();window._app.togglePinMessage(\'' + tab.tab_id + '\',' + idx + ')" title="' + (isPinned ? 'Unpin' : 'Pin') + ' message">' + (isPinned ? 'UNPIN' : 'PIN') + '</button>'
@@ -1872,6 +1877,7 @@ window.AppChat = (function() {
                 case 'fold': this.toggleMsgCollapse(tabId, idx); break;
                 case 'del': this.deleteChatMsg(tabId, idx); break;
                 case 'pin': this.togglePinMessage(tabId, idx); break;
+                case 'branch': this.branchFrom(tabId, idx); break;
                 case 'edit': this.editUserMsg(tabId, idx); break;
                 case 'turn': {
                     // Find turn number from the focused message
@@ -2394,6 +2400,100 @@ window.AppChat = (function() {
                 CatModule.setSpeechText('*успокоился* Хорошо, не меняем_', 2000);
             }
             this.$nextTick(() => this.resizeInputForTab(tab));
+        },
+
+        // ========== CHAT: BRANCH / FORK ==========
+        branchFrom(tabId, msgIdx) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab || tab.is_streaming) return;
+            if (msgIdx < 0 || msgIdx >= tab.messages.length) return;
+            if (this.chatTabs.length >= 5) { this.showTabLimitWarning = true; return; }
+            // Copy messages up to and including msgIdx
+            const branchedMsgs = tab.messages.slice(0, msgIdx + 1).map(m => ({
+                ...m,
+                // Strip streaming state from copied messages
+                is_streaming: false,
+            }));
+            // Build a descriptive label
+            const branchPoint = branchedMsgs[branchedMsgs.length - 1];
+            const roleLabel = (branchPoint.role || 'msg').toUpperCase();
+            const preview = (branchPoint.content || '').replace(/<[^>]*>/g, '').replace(/\n/g, ' ').trim().slice(0, 40);
+            const branchLabel = 'Branch #' + msgIdx;
+            const newTab = {
+                tab_id: 'tab-' + Date.now(),
+                session_id: null,  // No backend session — user can start a new one
+                project_path: tab.project_path,
+                label: branchLabel,
+                messages: branchedMsgs,
+                is_active: true,
+                is_streaming: false,
+                is_thinking: false,
+                ws_state: 'disconnected',
+                input_text: '',
+                scrolledUp: false,
+                created_at: new Date().toISOString(),
+                tokens: { input: 0, output: 0, cost: 0, threshold: 180000 },
+                _msgHistory: [],
+                _msgHistoryIdx: -1,
+                _msgDraft: '',
+                _attachments: [],
+                _pendingFeedback: [],
+                _unread: 0,
+                _agentDone: false,
+                _catCtx80Warned: false,
+                _catCtxWarned: false,
+                _catCostMilestone: 0,
+                _catStreamPatienceTimer: null,
+                _agentActivity: { type: 'idle', text: '', icon: '', color: '' },
+                _turnToolCount: 0,
+                _editDiffOpen: false,
+                _collapsedTurns: new Set(),
+                _mmTop: 0,
+                _mmHeight: 100,
+                _branchedFrom: { tabId: tabId, msgIdx: msgIdx, label: tab.label },
+                _restored: false,
+            };
+            this.chatTabs.push(newTab);
+            this.activeChatTab = newTab.tab_id;
+            this._scheduleChatSave();
+            this.showToast('BRANCHED from #' + msgIdx + ' (' + branchedMsgs.length + ' messages)', 'success');
+            // Cat: notice branching
+            if (window.CatModule && CatModule.isActive()) {
+                CatModule.setExpression('surprised');
+                CatModule.setSpeechText('* удивился* Ветвление! Новая реальность! Мяу!', 3000);
+                setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 3500);
+            }
+        },
+
+        /** Start a live session for a branched tab (converts read-only branch to active session). */
+        async startBranchSession(tabId) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab || !tab._branchedFrom) return;
+            if (tab.session_id) return;
+            try {
+                const res = await this.api('/api/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cwd: tab.project_path, resume: null }),
+                });
+                if (res.warning) this.showToast(res.warning, 'error');
+                if (!res.session_id) { this.showToast('Failed to create session', 'error'); return; }
+                tab.session_id = res.session_id;
+                tab.ws_state = 'connecting';
+                tab._branchedFrom = null;
+                this._setupScrollPreservation(tab);
+                this.connectChatWebSocket(tab);
+                this._scheduleChatSave();
+                this.showToast('SESSION STARTED — branch is now live', 'success');
+                if (window.CatModule && CatModule.isActive()) {
+                    CatModule.setExpression('happy');
+                    CatModule.setSpeechText('Сессия запущена! *виляет хвостом*', 3000);
+                    setTimeout(() => { if (CatModule.isActive()) CatModule.setExpression('neutral'); }, 3500);
+                }
+            } catch (e) {
+                console.error('[chat] startBranchSession failed:', e);
+                this.showToast('SESSION FAILED: ' + e.message, 'error');
+            }
         },
 
         isInEditMode(tabId) {
@@ -2964,11 +3064,13 @@ window.AppChat = (function() {
                 if (!tab.is_streaming) {
                     items.push({ label: 'EDIT & RESEND', icon: '&#x270f;', action: () => this.editUserMsg(tab.tab_id, msgIdx) });
                 }
+                items.push({ label: 'BRANCH FROM HERE', icon: '&#x2693;', action: () => this.branchFrom(tab.tab_id, msgIdx) });
                 items.push({ sep: true });
                 items.push({ label: 'DELETE', icon: '&#x1f5d1;', action: () => this.deleteChatMsg(tab.tab_id, msgIdx), danger: true });
             } else if (msg.role === 'assistant') {
                 items.push({ label: 'COPY', icon: '&#x1f4cb;', action: () => this.copyChatMsg(tab.tab_id, msgIdx) });
                 items.push({ label: 'QUOTE', icon: '&#x275d;', action: () => this.quoteMessage(tab.tab_id, msgIdx) });
+                items.push({ label: 'BRANCH FROM HERE', icon: '&#x2693;', action: () => this.branchFrom(tab.tab_id, msgIdx) });
                 // Check if this is the last assistant message
                 const isLastAsst = !msg.is_streaming && !tab.is_streaming && tab.messages.slice(msgIdx + 1).filter(m => m.role === 'assistant').length === 0;
                 if (isLastAsst && !tab.is_streaming) {
@@ -3421,6 +3523,7 @@ window.AppChat = (function() {
                         created_at: tab.created_at,
                         tokens: tab.tokens ? { input: tab.tokens.input || 0, output: tab.tokens.output || 0, cost: tab.tokens.cost || 0 } : null,
                         messages: msgs,
+                        branchedFrom: tab._branchedFrom || null,
                     };
                 });
                 const pinned = this.pinnedMessages.map(p => ({
@@ -3488,6 +3591,7 @@ window.AppChat = (function() {
                         _restored: true,
                         _restoredSessionId: saved.session_id,
                         _editDiffOpen: false,
+                        _branchedFrom: saved.branchedFrom || null,
                     };
                     this.chatTabs.push(tab);
                 }

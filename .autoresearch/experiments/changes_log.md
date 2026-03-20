@@ -2841,3 +2841,40 @@ Results
 3. **`scrollToMsg(tabId, msgIdx)`** — плавный скролл к целевому сообщению с 2-секундной пурпурной подсвет
 
 
+## Experiment 138 — Cat — typing awareness (reacts when user types in chat)
+
+**Time:** 2026-03-20 04:59:14
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **`onUserTyping(textLength)`** — метод CatModule, вызываемый при каждом нажатии клавиши в chat input. Кот просыпается от idle, меняет выражение на 'thinking', показывает речевую реакцию (~30% шанс, чтобы не спамить).
+2. **3 категории speech-реакций на набор текста:**
+   - `typing_start` — начальная реакция ("*подкрался* Что пишешь?")
+   - `typing_long` — подбадривание при длинных сообщениях (>200 символов)
+   - `typing_stop` — пуш после остановки набора ("Enter наж
+
+
+## Experiment 139 — Untitled
+
+**Time:** 2026-03-20 05:06:27
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+N/A
+
+

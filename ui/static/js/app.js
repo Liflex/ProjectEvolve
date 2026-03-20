@@ -399,6 +399,7 @@ function _buildAppData() {
             { id: 'chat-file-search', label: 'Chat: Search Project Files', shortcut: 'Ctrl+Shift+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.toggleFileSearch()); } },
             { id: 'chat-global-search', label: 'Chat: Search All Sessions', shortcut: 'Ctrl+Alt+F', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.toggleGlobalSearch()); } },
             { id: 'chat-goto-msg', label: 'Chat: Go to Message', shortcut: 'Ctrl+G', category: 'CHAT', action: () => { if (this.section !== 'chat') this.navigateSection('chat'); this.$nextTick(() => this.openGoToMsg()); } },
+            { id: 'chat-branch', label: 'Chat: Branch from Last Message', category: 'CHAT', action: () => { if (this.section === 'chat' && this.activeTab) { const t = this.activeTab; let lastIdx = -1; for (let i = t.messages.length - 1; i >= 0; i--) { if (t.messages[i].role === 'assistant') { lastIdx = i; break; } } if (lastIdx >= 0) this.branchFrom(t.tab_id, lastIdx); else this.showToast('No assistant message to branch from', 'error'); } } },
             // Themes
             { id: 'theme-synthwave', label: 'Theme: Synthwave', category: 'THEME', action: () => { this.settings.theme = 'synthwave'; localStorage.setItem('ar-settings', JSON.stringify(this.settings)); this.applySettings(); this.showToast('Synthwave'); } },
             { id: 'theme-darcula', label: 'Theme: Darcula (JetBrains)', category: 'THEME', action: () => { this.settings.theme = 'darcula'; localStorage.setItem('ar-settings', JSON.stringify(this.settings)); this.applySettings(); this.showToast('Darcula'); } },
@@ -442,6 +443,7 @@ function _buildAppData() {
                 { keys: 'e', desc: 'Edit focused message (user only)' },
                 { keys: 'f', desc: 'Fold / unfold focused message' },
                 { keys: 'p', desc: 'Pin / unpin focused message' },
+                { keys: 'b', desc: 'Branch conversation from this message' },
                 { keys: 'd', desc: 'Delete focused message' },
             ]},
             { category: 'INPUT FORMATTING', items: [
@@ -669,6 +671,7 @@ function _buildAppData() {
                             else if (e.key === 'f') { e.preventDefault(); this.chatNavAction('fold'); }
                             else if (e.key === 'd') { e.preventDefault(); this.chatNavAction('del'); }
                             else if (e.key === 'p') { e.preventDefault(); this.chatNavAction('pin'); }
+                            else if (e.key === 'b') { e.preventDefault(); this.chatNavAction('branch'); }
                             else if (e.key === 'e') { e.preventDefault(); this.chatNavAction('edit'); }
                             else if (e.key === 't') { e.preventDefault(); this.chatNavAction('turn'); }
                             else if (e.key === 'n') { e.preventDefault(); this.chatNavJumpNext('user'); }
