@@ -234,8 +234,9 @@ window.AppChat = (function() {
                                 } else {
                                     const thinkingContent = tab._thinkingBuffer || '';
                                     const isRegen = tab._regenerating || false;
+                                    const regenOriginal = isRegen ? tab._regenOriginalContent : undefined;
                                     tab._regenerating = false;
-                                    tab.messages.push({ role: 'assistant', content: text, thinking: thinkingContent || undefined, is_streaming: true, ts: Date.now(), regenerated: isRegen || undefined });
+                                    tab.messages.push({ role: 'assistant', content: text, thinking: thinkingContent || undefined, is_streaming: true, ts: Date.now(), regenerated: isRegen || undefined, _regenOriginal: regenOriginal });
                                     tab._thinkingBuffer = '';
                                     _app._incrementUnread(tab);
                                 }
@@ -306,8 +307,9 @@ window.AppChat = (function() {
                                     if (thinkingText) realLast.thinking = (realLast.thinking ? realLast.thinking + '\n---\n' : '') + thinkingText;
                                 } else {
                                     const isRegen2 = tab._regenerating || false;
+                                    const regenOriginal2 = isRegen2 ? tab._regenOriginalContent : undefined;
                                     tab._regenerating = false;
-                                    tab.messages.push({ role: 'assistant', content: text, thinking: thinkingText || undefined, is_streaming: true, ts: Date.now(), regenerated: isRegen2 || undefined });
+                                    tab.messages.push({ role: 'assistant', content: text, thinking: thinkingText || undefined, is_streaming: true, ts: Date.now(), regenerated: isRegen2 || undefined, _regenOriginal: regenOriginal2 });
                                     _app._incrementUnread(tab);
                                 }
                                 tab._thinkingBuffer = '';
@@ -1388,6 +1390,7 @@ window.AppChat = (function() {
                 }
                 const aFold = !msg.is_streaming && msg.content && msg.content.length > 500;
                 const aCollapsed = msg.collapsed && aFold;
+                const aRegenDiff = !msg.is_streaming && msg.regenerated && msg._regenOriginal && msg.content !== msg._regenOriginal;
                 const aChars = (msg.content || '').length;
                 const aLines = (msg.content || '').split('\n').length;
                 let aMetaHtml = '';
@@ -1437,6 +1440,7 @@ window.AppChat = (function() {
                     + '<button class="act-copy" onclick="event.stopPropagation();window._app.copyChatMsg(\'' + tab.tab_id + '\',' + idx + ')" title="Copy">COPY</button>'
                     + '<button class="act-quote" onclick="event.stopPropagation();window._app.quoteMessage(\'' + tab.tab_id + '\',' + idx + ')" title="Quote in reply">QUOTE</button>'
                     + (isLastAssistant ? '<button class="act-regen" onclick="event.stopPropagation();window._app.regenerateResponse(\'' + tab.tab_id + '\')" title="Regenerate">REGEN</button>' : '')
+                    + (aRegenDiff ? '<button class="act-diff' + (msg._showRegenDiff ? ' active' : '') + '" onclick="event.stopPropagation();window._app.toggleRegenDiff(\'' + tab.tab_id + '\',' + idx + ')" title="Compare with original">' + (msg._showRegenDiff ? 'HIDE DIFF' : 'DIFF') + '</button>' : '')
                     + '<button class="act-pin' + (isPinned ? ' pinned' : '') + '" onclick="event.stopPropagation();window._app.togglePinMessage(\'' + tab.tab_id + '\',' + idx + ')" title="' + (isPinned ? 'Unpin' : 'Pin') + ' message">' + (isPinned ? 'UNPIN' : 'PIN') + '</button>'
                     + (aFold ? '<button class="act-fold" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + idx + ')" title="Fold/Unfold">' + (msg.collapsed ? 'UNFOLD' : 'FOLD') + '</button>' : '')
                     + (!msg.is_streaming ? '<button class="act-like' + (msg.reaction === 'up' ? ' reacted' : '') + '" onclick="event.stopPropagation();window._app.reactToMessage(\'' + tab.tab_id + '\',' + idx + ',\'up\')" title="Helpful">&#x1F44D;</button>'
@@ -1451,6 +1455,7 @@ window.AppChat = (function() {
                         ? '<div class="chat-collapsed-preview"><div class="md">' + this.linkFilePaths(this.renderMarkdown(msg.content.slice(0, 300))) + '</div></div>'
                           + '<div class="chat-expand-btn" onclick="event.stopPropagation();window._app.toggleMsgCollapse(\'' + tab.tab_id + '\',' + idx + ')">&#x25BC; EXPAND (' + aChars + ' chars)</div>'
                         : contentHtml)
+                    + (aRegenDiff && msg._showRegenDiff ? this._renderRegenDiffHtml(msg) : '')
                     + '</div></div></div>';
             };
             // Helper: render a tool group (extracted for grouping)
@@ -2293,6 +2298,15 @@ window.AppChat = (function() {
                 originalMessages: tab.messages.slice(),
                 originalContent: tab.messages[lastUserIdx].content,
             };
+            // Save original assistant response content for diff view
+            let origAsstContent = '';
+            for (let k = tab.messages.length - 1; k >= 0; k--) {
+                if (tab.messages[k].role === 'assistant' && !tab.messages[k].is_regenerating) {
+                    origAsstContent = tab.messages[k].content || '';
+                    break;
+                }
+            }
+            tab._regenOriginalContent = origAsstContent;
             tab.messages = tab.messages.slice(0, lastUserIdx + 1);
             // Mark next assistant message as regenerated
             tab._regenerating = true;
@@ -2476,6 +2490,74 @@ window.AppChat = (function() {
             const tabId = this.activeChatTab;
             if (!tabId) return [];
             return this.pinnedMessages.filter(p => p.tabId === tabId);
+        },
+
+        // ========== CHAT: REGEN DIFF VIEW ==========
+        toggleRegenDiff(tabId, msgIdx) {
+            const tab = this.chatTabs.find(t => t.tab_id === tabId);
+            if (!tab || !tab.messages[msgIdx]) return;
+            const msg = tab.messages[msgIdx];
+            if (!msg.regenerated || !msg._regenOriginal) return;
+            msg._showRegenDiff = !msg._showRegenDiff;
+            this.chatTick++;
+        },
+        _renderRegenDiffHtml(msg) {
+            const oldContent = msg._regenOriginal || '';
+            const newContent = msg.content || '';
+            const oldLines = oldContent.split('\n');
+            const newLines = newContent.split('\n');
+            const diff = this.simpleLineDiff(oldLines, newLines);
+            let added = 0, removed = 0;
+            for (const d of diff) {
+                if (d.type === 'ins') added++;
+                if (d.type === 'del') removed++;
+            }
+            const MAX_LINES = 80;
+            const truncated = diff.length > MAX_LINES;
+            const displayDiff = truncated ? diff.slice(0, MAX_LINES) : diff;
+            let html = '<div class="regen-diff-panel">';
+            html += '<div class="regen-diff-header">';
+            html += '<span class="regen-diff-label">&#x21bb; REGEN_DIFF</span>';
+            html += '<span class="regen-diff-stats"><span class="diff-stats-del">-' + removed + '</span> <span class="diff-stats-ins">+' + added + '</span></span>';
+            html += '</div>';
+            html += '<div class="regen-diff-body">';
+            let pendingDel = [];
+            let i = 0;
+            while (i < displayDiff.length) {
+                const d = displayDiff[i];
+                if (d.type === 'del') {
+                    pendingDel.push(d);
+                    i++;
+                } else if (d.type === 'ins' && pendingDel.length > 0) {
+                    const paired = Math.min(pendingDel.length, 1);
+                    for (let p = 0; p < paired; p++) {
+                        const wd = this._highlightWordDiff(pendingDel[p].text, d.text);
+                        html += '<div class="diff-line diff-del"><span class="diff-gutter-del">-</span><span class="diff-line-num">' + (oldLines.indexOf(pendingDel[p].text) + 1) + '</span>' + wd.oldHtml + '</div>';
+                    }
+                    html += '<div class="diff-line diff-ins"><span class="diff-gutter-ins">+</span><span class="diff-line-num">' + (newLines.indexOf(d.text) + 1) + '</span>' + wd.newHtml + '</div>';
+                    pendingDel = pendingDel.slice(paired);
+                    i++;
+                } else {
+                    for (const pd of pendingDel) {
+                        html += '<div class="diff-line diff-del"><span class="diff-gutter-del">-</span><span class="diff-line-num">' + (oldLines.indexOf(pd.text) + 1) + '</span>' + this.escHtml(pd.text) + '</div>';
+                    }
+                    pendingDel = [];
+                    if (d.type === 'ins') {
+                        html += '<div class="diff-line diff-ins"><span class="diff-gutter-ins">+</span><span class="diff-line-num">' + (newLines.indexOf(d.text) + 1) + '</span>' + this.escHtml(d.text) + '</div>';
+                    } else {
+                        html += '<div class="diff-line diff-ctx"><span class="diff-gutter-ctx"> </span>' + this.escHtml(d.text) + '</div>';
+                    }
+                    i++;
+                }
+            }
+            for (const pd of pendingDel) {
+                html += '<div class="diff-line diff-del"><span class="diff-gutter-del">-</span><span class="diff-line-num">' + (oldLines.indexOf(pd.text) + 1) + '</span>' + this.escHtml(pd.text) + '</div>';
+            }
+            if (truncated) {
+                html += '<div class="diff-truncated">... ' + (diff.length - MAX_LINES) + ' more lines</div>';
+            }
+            html += '</div></div>';
+            return html;
         },
         collapseAllMessages() {
             const tab = this.activeTab;
@@ -2746,6 +2828,9 @@ window.AppChat = (function() {
                 const isLastAsst = !msg.is_streaming && !tab.is_streaming && tab.messages.slice(msgIdx + 1).filter(m => m.role === 'assistant').length === 0;
                 if (isLastAsst && !tab.is_streaming) {
                     items.push({ label: 'REGEN', icon: '&#x21bb;', action: () => this.regenerateResponse(tab.tab_id) });
+                }
+                if (msg.regenerated && msg._regenOriginal && msg.content !== msg._regenOriginal) {
+                    items.push({ label: msg._showRegenDiff ? 'HIDE DIFF' : 'SHOW DIFF', icon: '&#x21bb;', action: () => this.toggleRegenDiff(tab.tab_id, msgIdx) });
                 }
                 if (!msg.content?.startsWith('[ERROR]')) {
                     items.push({ label: this.pinnedMessages.some(p => p.tabId === tab.tab_id && p.msgIdx === msgIdx) ? 'UNPIN' : 'PIN', icon: '&#x1f4cc;', action: () => this.togglePinMessage(tab.tab_id, msgIdx) });
@@ -3179,6 +3264,8 @@ window.AppChat = (function() {
                                 duration: m.duration || null,
                                 msgTokens: m.msgTokens ? { input: m.msgTokens.input, output: m.msgTokens.output, cost: m.msgTokens.cost } : null,
                             };
+                            if (m.regenerated) out.regenerated = true;
+                            if (m._regenOriginal) out._regenOriginal = (m._regenOriginal || '').slice(0, MAX_CONTENT_LEN);
                             return out;
                         });
                     return {

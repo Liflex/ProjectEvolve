@@ -1014,6 +1014,23 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
 /* Word-level diff highlights — stronger accent on top of line background */
 .diff-hl-del { background: rgba(255, 51, 102, 0.3); border-radius: 2px; padding: 0 1px; }
 .diff-hl-ins { background: rgba(57, 255, 20, 0.3); border-radius: 2px; padding: 0 1px; }
+/* Regen diff panel — compare original vs regenerated response */
+.regen-diff-panel { border: 1px solid var(--v-dim); border-radius: 3px; overflow: hidden; margin-top: 6px; font-size: 0.625rem; }
+.regen-diff-header { display: flex; align-items: center; gap: 8px; padding: 3px 8px; background: var(--tool-header-bg); border-bottom: 1px solid var(--v-dim); }
+.regen-diff-label { color: var(--cyan); letter-spacing: 0.1em; font-weight: bold; }
+.regen-diff-stats { margin-left: auto; display: flex; gap: 6px; }
+.regen-diff-body { max-height: 400px; overflow-y: auto; background: var(--code-bg, var(--bg)); padding: 2px 0; }
+.regen-diff-body .diff-line { padding: 0 8px; white-space: pre-wrap; word-break: break-all; line-height: 1.6; font-family: var(--font-mono, monospace); }
+.regen-diff-body .diff-ctx { color: var(--v3); opacity: 0.6; }
+.regen-diff-body .diff-del { background: rgba(255, 51, 102, 0.08); color: var(--ng2); }
+.regen-diff-body .diff-ins { background: rgba(57, 255, 20, 0.08); color: var(--ng2); }
+.regen-diff-body .diff-gutter-del { color: var(--red); user-select: none; margin-right: 4px; font-weight: bold; }
+.regen-diff-body .diff-gutter-ins { color: var(--ng); user-select: none; margin-right: 4px; font-weight: bold; }
+.regen-diff-body .diff-gutter-ctx { color: var(--v3); opacity: 0.3; user-select: none; margin-right: 4px; }
+.regen-diff-body .diff-line-num { color: var(--v3); opacity: 0.4; user-select: none; margin-right: 8px; font-size: 0.5rem; min-width: 2ch; display: inline-block; text-align: right; }
+.regen-diff-body .diff-truncated { padding: 4px 8px; color: var(--v3); font-size: 0.5rem; text-align: center; border-top: 1px solid var(--v-dim); letter-spacing: 0.1em; }
+.act-diff { color: var(--cyan); opacity: 0.7; }
+.act-diff.active { opacity: 1; color: var(--ng); }
 /* Write preview in tool messages */
 .tool-write-preview { border: 1px solid var(--v-dim); border-radius: 2px; overflow: hidden; margin-top: 4px; font-size: 0.625rem; }
 .tool-write-preview .write-header { display: flex; align-items: center; gap: 8px; padding: 3px 8px; background: var(--tool-header-bg); border-bottom: 1px solid var(--v-dim); }
