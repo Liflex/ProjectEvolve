@@ -1,0 +1,39 @@
+{
+  "score": 0.83,
+  "recommendation": "KEEP",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "pass",
+      "message": "Experiment commit found: exp #158: cat contextual skill suggestions \u2014 keyword analysi"
+    },
+    {
+      "name": "file_consistency",
+      "status": "warn",
+      "message": "Agent claimed no files but 2 actually changed: ui/static/modules/cat.js, ui/static/js/modules/chat.js"
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected"
+    },
+    {
+      "name": "diff_size",
+      "status": "pass",
+      "message": "2 file(s), +214/-4 lines"
+    },
+    {
+      "name": "report_quality",
+      "status": "warn",
+      "message": "No report text provided"
+    },
+    {
+      "name": "code_quality",
+      "status": "pass",
+      "message": "No code smells detected"
+    }
+  ],
+  "summary": "4/6 checks passed, 2 warnings",
+  "agent_decision": "",
+  "agent_score": null
+}

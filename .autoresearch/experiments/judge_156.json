@@ -1,0 +1,39 @@
+{
+  "score": 0.75,
+  "recommendation": "REVIEW",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "pass",
+      "message": "Experiment commit found: exp #156: chat Ctrl+Up to edit last user message"
+    },
+    {
+      "name": "file_consistency",
+      "status": "fail",
+      "message": "No claimed files found in diff. Actual: ui/static/js/modules/chat.js, ui/static/templates/chat-section.js, autoresearch/experiments/accumulation_context.md, ui/static/js/app.js, autoresearch/experiments/last_experiment.md"
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected"
+    },
+    {
+      "name": "diff_size",
+      "status": "pass",
+      "message": "6 file(s), +84/-10 lines"
+    },
+    {
+      "name": "report_quality",
+      "status": "warn",
+      "message": "No report text provided"
+    },
+    {
+      "name": "code_quality",
+      "status": "pass",
+      "message": "No code smells detected"
+    }
+  ],
+  "summary": "4/6 checks passed, 1 failed, 1 warnings",
+  "agent_decision": "",
+  "agent_score": null
+}

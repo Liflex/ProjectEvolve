@@ -1,0 +1,39 @@
+{
+  "score": 0.75,
+  "recommendation": "REVIEW",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "pass",
+      "message": "Experiment commit found: exp #155: judge profiles \u2014 multiple evaluation perspectives "
+    },
+    {
+      "name": "file_consistency",
+      "status": "fail",
+      "message": "No claimed files found in diff. Actual: ui/server.py, ui/static/js/modules/lab.js, autoresearch/experiments/accumulation_context.md, ui/static/js/app.js, utils/judge.py"
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected"
+    },
+    {
+      "name": "diff_size",
+      "status": "pass",
+      "message": "8 file(s), +419/-69 lines"
+    },
+    {
+      "name": "report_quality",
+      "status": "warn",
+      "message": "No report text provided"
+    },
+    {
+      "name": "code_quality",
+      "status": "pass",
+      "message": "No code smells detected"
+    }
+  ],
+  "summary": "4/6 checks passed, 1 failed, 1 warnings",
+  "agent_decision": "",
+  "agent_score": null
+}

@@ -1,0 +1,39 @@
+{
+  "score": 0.42,
+  "recommendation": "DISCARD",
+  "checks": [
+    {
+      "name": "commit_exists",
+      "status": "warn",
+      "message": "Last commit is not an experiment: docs: update experiment logs for exp #154"
+    },
+    {
+      "name": "file_consistency",
+      "status": "fail",
+      "message": "No claimed files found in diff. Actual: autoresearch/experiments/output_149.md, autoresearch/experiments/prompt_137.md, autoresearch/experiments/prompt_136.md, autoresearch/experiments/output_142.md, autoresearch/experiments/prompt_146.md"
+    },
+    {
+      "name": "syntax_check",
+      "status": "pass",
+      "message": "No syntax errors detected"
+    },
+    {
+      "name": "diff_size",
+      "status": "fail",
+      "message": "Very large change: 73 files, +18614/-13 lines"
+    },
+    {
+      "name": "report_quality",
+      "status": "warn",
+      "message": "No report text provided"
+    },
+    {
+      "name": "code_quality",
+      "status": "warn",
+      "message": "70 very long lines (>300 chars)"
+    }
+  ],
+  "summary": "1/6 checks passed, 2 failed, 3 warnings",
+  "agent_decision": "",
+  "agent_score": null
+}

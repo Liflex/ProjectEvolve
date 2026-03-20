@@ -1,3 +1,22 @@
+## Experiment 159 — Chat streaming thinking preview — live-updating thinking content display
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **Live thinking preview** — Во время thinking-фазы агента, когда `_thinkingBuffer` накапливает контент, теперь показывается live-превью в collapsible блоке с blinking cursor.
+2. **Collapsible toggle** — Пользователь может свернуть/развернуть live thinking preview (respecting `settings.showThinking`).
+3. **Character count** — Показывает количество символов в буфере мышления.
+4. **Blinking cursor** — CSS анимация мигающего курсора в конце текста и в header toggle.
+5. **Graceful fallback** — Когда буфер пуст, показывается стандартный "THINKING..." с анимированными точками (без изменений).
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` — Enhanced `thinkingIndicatorHtml` with live preview when `_thinkingBuffer` has content
+- `ui/static/css/main.css` — Added `.thinking-streaming-live`, `.thinking-live-block`, `.tsi-typing-cursor`, `.tsi-live-cursor` styles
+
+---
+
 ## Experiment 156 — Chat Ctrl+Up to edit last user message
 
 **Date:** 2026-03-20
@@ -3369,5 +3388,47 @@ Results
 1. **Ctrl+Up shortcut** — Нажатие Ctrl+Up (Cmd+Up на Mac) мгновенно входит в режим редактирования последнего сообщения пользователя. Находит последнее user-сообщение и вызывает `editUserMsg()`. Защита: не работает во время стриминга и когда уже в режиме редактирования.
 2. **Keyboard shortcuts reference** — Добавлено "Ctrl+Up: Edit last user message" в CHAT секцию панели горячих клавиш.
 3. **Welcome screen** — Добавлена подсказка Ctrl+Up в список шорткатов пустого чата
+
+
+## Experiment 157 — Chat reply-to indicator — visual thread link between quoted and original message
+
+**Time:** 2026-03-20 18:07:25
+
+**Files:** `ui/static/js/modules/chat.js` — quoteMessage сохраняет msgIdx, sendChatMessage сохраняет _replyTo, render показывает индикатор, persistence, export, `ui/static/templates/chat-section.js` — reply bar HTML перед textarea, `ui/static/css/main.css` — стили для reply indicator и reply bar
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **Reply-to indicator в user-сообщениях** — при цитировании через QUOTE и отправке, в bubble отображается "↩ ROLE #N" с превью текста. Клик прокручивает к оригиналу.
+2. **Reply bar в input area** — при цитировании над textarea появляется "↩ Replying to ROLE #N" с превью и кнопкой dismiss (✕).
+3. **Визуальный бордер** — сообщения с reply-to получают левый бордер `msg-has-reply`.
+4. **Persistence** — `_replyTo` сохраняется в localStorage.
+5. **Export** — Markdown эксп
+
+
+## Experiment 158 — Cat contextual skill suggestions — keyword analysis of agent responses and follow-up tips
+
+**Time:** 2026-03-20 18:13:27
+
+**Files:** None
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **AGENT_CONTEXT_SKILL_TIPS** — 10 keyword-групп (commit, refactor, test, security, spec, deploy, bug, docs, prompt, performance) каждая с релевантными slash-командами и русскими советами от кота
+2. **Расширенный `analyzeAgentResponse()`** — приоритетный keyword-based анализ текста агента (выше приоритет чем структурный анализ code/table). Если найден keyword → показывает skill tip с кликабельной командой
+3. **`getContextualSkillSuggestion(messages)`** — анализирует
 
 
