@@ -116,6 +116,40 @@ def get_project_dir() -> Path:
     return Path(os.environ.get("AUTORESEARCH_PROJECT", Path.cwd()))
 
 
+# File extensions that may contain secrets — blocked from read/search APIs
+SECRET_EXTS = {'.env', '.env.local', '.env.production', '.env.staging',
+              '.env.development', '.env.test', '.key', '.pem', '.p12',
+              '.pfx', '.jks', '.keystore', '.credentials', '.htpasswd'}
+
+# File names that may contain secrets — blocked from read/search APIs
+SECRET_NAMES = {'.env', '.env.local', '.env.production', '.env.staging',
+                '.env.development', '.env.test', 'credentials', '.credentials',
+                '.htpasswd', 'id_rsa', 'id_ed25519', 'id_ecdsa',
+                'id_rsa.pub', 'id_ed25519.pub', 'id_ecdsa.pub'}
+
+
+def _validate_project_path(raw_path: str) -> Path:
+    """Validate and resolve a project path, blocking path traversal outside allowed bases.
+
+    Returns the resolved Path if valid.
+    Raises HTTPException(403) if path escapes allowed directories.
+    """
+    resolved = Path(raw_path).resolve()
+    allowed_bases = {get_project_dir().resolve(), Path.cwd().resolve()}
+    if not any(_is_subpath(resolved, base) for base in allowed_bases):
+        raise HTTPException(status_code=403, detail="Path traversal blocked")
+    return resolved
+
+
+def _is_subpath(child: Path, parent: Path) -> bool:
+    """Check if child path is within parent directory (or equal to it)."""
+    try:
+        child.relative_to(parent)
+        return True
+    except ValueError:
+        return False
+
+
 def get_exp_dir() -> Path:
     d = get_project_dir() / ".autoresearch" / "experiments"
     # Auto-create directory structure if missing
@@ -721,7 +755,7 @@ async def get_git_diff_file(filepath: str):
     project = get_project_dir()
     # Prevent path traversal
     safe_path = (project / filepath).resolve()
-    if not str(safe_path).startswith(str(project.resolve())):
+    if not _is_subpath(safe_path, project.resolve()):
         raise HTTPException(status_code=403, detail="Path traversal blocked")
     try:
         result = subprocess.run(
@@ -759,7 +793,7 @@ async def get_prompt():
 
 
 class PromptUpdate(BaseModel):
-    content: str
+    content: str = Field(..., max_length=500_000)
 
 
 @app.put("/api/prompt")
@@ -773,9 +807,7 @@ async def update_prompt(data: PromptUpdate):
 @app.get("/api/config")
 async def get_config(project: str = ""):
     if project:
-        target = Path(project).resolve()
-        if ".." in Path(project).parts:
-            raise HTTPException(status_code=400, detail="Path traversal detected")
+        target = _validate_project_path(project)
         config_file = target / ".autoresearch.json"
     else:
         config_file = get_project_dir() / ".autoresearch.json"
@@ -838,9 +870,7 @@ class SetupRequest(BaseModel):
 @app.post("/api/setup")
 async def setup_project(data: SetupRequest):
     """Create or update .autoresearch.json for a given project path."""
-    project_dir = Path(data.project).resolve()
-    if ".." in Path(data.project).parts:
-        raise HTTPException(status_code=400, detail="Path traversal detected")
+    project_dir = _validate_project_path(data.project)
     if not project_dir.exists():
         raise HTTPException(status_code=404, detail=f"Directory not found: {data.project}")
     if not project_dir.is_dir():
@@ -1002,9 +1032,7 @@ async def start_run(data: RunRequest):
     if _active_runner and _active_runner.is_running:
         raise HTTPException(status_code=409, detail="Already running")
 
-    project_dir = Path(data.project).resolve()
-    if ".." in Path(data.project).parts:
-        raise HTTPException(status_code=400, detail="Path traversal detected: '..' not allowed in project path")
+    project_dir = _validate_project_path(data.project)
     if not project_dir.exists():
         raise HTTPException(status_code=404, detail=f"Project not found: {data.project}")
 
@@ -1664,7 +1692,7 @@ async def create_session(data: SessionCreateRequest):
             "warning": f"Active session limit ({session_manager._max_sessions}) reached.",
             "active_count": session_manager.active_count,
         }
-    project_path = Path(data.cwd).resolve()
+    project_path = _validate_project_path(data.cwd)
     if not project_path.is_dir():
         raise HTTPException(status_code=404, detail=f"Project not found: {data.cwd}")
     session = await session_manager.create_session(
@@ -1747,10 +1775,7 @@ async def list_directory(path: str):
     """List directory contents for the file browser dialog."""
     if not path:
         raise HTTPException(status_code=400, detail="path parameter required")
-    abs_path = Path(path).resolve()
-    allowed_bases = {get_project_dir().resolve(), Path.cwd().resolve()}
-    if not any(str(abs_path).startswith(str(base)) for base in allowed_bases):
-        raise HTTPException(status_code=403, detail="Path traversal blocked")
+    abs_path = _validate_project_path(path)
     if not abs_path.is_dir():
         raise HTTPException(status_code=404, detail="Directory not found")
     entries = []
@@ -1760,6 +1785,9 @@ async def list_directory(path: str):
             if entry.name.startswith(".") and entry.is_dir():
                 continue
             if entry.name in skip_dirs:
+                continue
+            # Skip secret files (don't expose in directory listing)
+            if entry.name in SECRET_NAMES or entry.suffix.lower() in SECRET_EXTS:
                 continue
             stat = entry.stat()
             entries.append({
@@ -1781,10 +1809,7 @@ async def search_files(path: str, q: str, max_results: int = 30):
         raise HTTPException(status_code=400, detail="path and q parameters required")
     if len(q) < 2:
         raise HTTPException(status_code=400, detail="Query must be at least 2 characters")
-    abs_path = Path(path).resolve()
-    allowed_bases = {get_project_dir().resolve(), Path.cwd().resolve()}
-    if not any(str(abs_path).startswith(str(base)) for base in allowed_bases):
-        raise HTTPException(status_code=403, detail="Path traversal blocked")
+    abs_path = _validate_project_path(path)
     if not abs_path.is_dir():
         raise HTTPException(status_code=404, detail="Directory not found")
 
@@ -1800,7 +1825,7 @@ async def search_files(path: str, q: str, max_results: int = 30):
         '.rb', '.php', '.lua', '.r', '.R', '.jl',
         '.sql', '.graphql', '.prisma',
         '.dockerfile', '.makefile',
-        '.env', '.gitignore', '.editorconfig',
+        '.gitignore', '.editorconfig',
         '.vue', '.svelte',
     }
     SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".idea",
@@ -1818,11 +1843,14 @@ async def search_files(path: str, q: str, max_results: int = 30):
                 if len(results) >= max_results:
                     break
                 fpath = Path(root) / fname
+                # Skip secret files
+                if fname in SECRET_NAMES or fpath.suffix.lower() in SECRET_EXTS:
+                    continue
                 try:
                     if fpath.stat().st_size > MAX_FILE_SIZE:
                         continue
                     ext = fpath.suffix.lower()
-                    if ext not in TEXT_EXTS and fname.lower() not in {'makefile', 'dockerfile', '.gitignore', '.env', 'license', 'readme'}:
+                    if ext not in TEXT_EXTS and fname.lower() not in {'makefile', 'dockerfile', '.gitignore', 'license', 'readme'}:
                         continue
                     try:
                         text = fpath.read_text(encoding="utf-8", errors="replace")
@@ -1856,16 +1884,16 @@ async def read_file(path: str, offset: int = 0, limit: int = 500):
     """Read file content for the file preview panel in chat. Supports line-range pagination."""
     if not path:
         raise HTTPException(status_code=400, detail="path parameter required")
-    abs_path = Path(path).resolve()
-    allowed_bases = {get_project_dir().resolve(), Path.cwd().resolve()}
-    if not any(str(abs_path).startswith(str(base)) for base in allowed_bases):
-        raise HTTPException(status_code=403, detail="Path traversal blocked")
+    abs_path = _validate_project_path(path)
     if not abs_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
     # Block binary files and very large files
     stat = abs_path.stat()
     if stat.st_size > 2_000_000:  # 2MB max
         raise HTTPException(status_code=413, detail="File too large (max 2MB)")
+    # Block files that may contain secrets
+    if abs_path.name in SECRET_NAMES or abs_path.suffix.lower() in SECRET_EXTS:
+        raise HTTPException(status_code=403, detail="Access denied: secret file")
     BINARY_EXTS = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp', '.svg', '.woff', '.woff2', '.ttf', '.eot', '.otf', '.zip', '.gz', '.tar', '.7z', '.exe', '.dll', '.so', '.dylib', '.bin', '.pyc', '.wasm'}
     if abs_path.suffix.lower() in BINARY_EXTS:
         raise HTTPException(status_code=400, detail="Binary files not supported for preview")
@@ -1907,10 +1935,7 @@ async def preflight_check(path: str):
     """Pre-flight check: verify project has required files for AutoResearch."""
     if not path:
         raise HTTPException(status_code=400, detail="path parameter required")
-    abs_path = Path(path).resolve()
-    allowed_bases = {get_project_dir().resolve(), Path.cwd().resolve()}
-    if not any(str(abs_path).startswith(str(base)) for base in allowed_bases):
-        raise HTTPException(status_code=403, detail="Path traversal blocked")
+    abs_path = _validate_project_path(path)
     if not abs_path.is_dir():
         raise HTTPException(status_code=404, detail="Directory not found")
 
