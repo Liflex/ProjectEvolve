@@ -41,6 +41,11 @@
                             <span x-show="(tab._unread === 0 || activeChatTab === tab.tab_id) && tab.messages.length > 0 && _renamingTabId !== tab.tab_id" class="text-[0.5rem] tabular-nums px-1 bg-[var(--v-dim)] text-[var(--v3)]" x-text="tab.messages.length"></span>
                             <!-- Branch indicator badge -->
                             <span x-show="tab._branchedFrom && _renamingTabId !== tab.tab_id" class="tab-branch-badge" :title="'Branched from ' + (tab._branchedFrom?.label || '?') + ' at #' + (tab._branchedFrom?.msgIdx ?? '?')">BRANCH</span>
+                            <!-- Session config indicator -->
+                            <span x-show="tab.session_config && (tab.session_config.model || tab.session_config.has_system_prompt) && _renamingTabId !== tab.tab_id"
+                                  class="tab-config-badge"
+                                  :title="tab.session_config.model ? 'Model: ' + tab.session_config.model + (tab.session_config.has_system_prompt ? ' + custom prompt' : '') : 'Custom system prompt'"
+                                  x-text="tab.session_config.model ? tab.session_config.model.replace('claude-', '').split('-')[0].toUpperCase() : 'PROMPT'"></span>
                         </button>
                         <button @click="closeChatTab(tab.tab_id)"
                                 x-show="_renamingTabId !== tab.tab_id"
@@ -768,6 +773,18 @@
                       x-text="activeTab?.is_streaming ? (activeTab?.is_thinking ? 'THINKING...' : 'STREAMING...') : 'IDLE'"></span>
                 <span class="status-separator"></span>
                 <span x-text="getChatFilterCount(activeTab) + '/' + (activeTab?.messages?.length || 0) + ' MSGS'"></span>
+                <template x-if="activeTab?.session_config?.model">
+                    <span>
+                        <span class="status-separator"></span>
+                        <span style="color:var(--cyan)" x-text="activeTab.session_config.model.replace('claude-', '').split('-')[0].toUpperCase()"></span>
+                    </span>
+                </template>
+                <template x-if="activeTab?.session_config?.has_system_prompt">
+                    <span>
+                        <span class="status-separator"></span>
+                        <span style="color:var(--amber)" x-text="'PROMPT+'"></span>
+                    </span>
+                </template>
                 <template x-if="getTotalTurns(activeTab) > 1">
                     <span>
                         <span class="status-separator"></span>

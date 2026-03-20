@@ -1,34 +1,29 @@
 # Last Experiment Summary
 
 **Experiment #147** — Project documentation search with TF-IDF ranking (Ctrl+Shift+D)
-**Date:** 2026-03-20
+**Date:** 2026-03-20 17:06:10
 
 ## What Was Done
 
-1. **`utils/docsearch.py`** — DocSearchEngine: индексирует .md файлы проекта, разбивает на секции по заголовкам, TF-IDF ранжирование, стоп-слова (EN+RU), snippet extraction.
-2. **`GET /api/docs/search`** — endpoint с кешированием (5 мин TTL), параметрами q, project, max_results.
-3. **Docs Search overlay** — Ctrl+Shift+D открывает панель с поиском по документации проекта. Показывает: файл, секцию, score, snippet, matched terms.
-4. **Command Palette entry** — "Search: Project Documentation" в категории SEARCH.
-5. **Keyboard shortcuts reference** — новая категория SEARCH с Ctrl+F, Ctrl+Shift+F, Ctrl+Shift+D, Ctrl+Alt+F, Ctrl+G.
-6. **insertDocRef()** — клик по результату вставляет `@file:line` в чат input.
+N/A
 
 ## Files Modified
 
-- `utils/docsearch.py` — NEW: DocSearchEngine with TF-IDF ranking
-- `ui/server.py` — `/api/docs/search` endpoint with cache
-- `ui/static/index.html` — docs search overlay HTML
-- `ui/static/js/app.js` — state, methods, shortcuts, command palette entry
-- `ui/static/css/main.css` — `.docs-search-*` styles
+- `utils/docsearch.py` — **NEW** — DocSearchEngine с TF-IDF ранжированием
+- `ui/server.py` — `/api/docs/search` endpoint с кешированием (5 мин TTL)
+- `ui/static/index.html` — overlay для docs search
+- `ui/static/js/app.js` — state, методы, shortcuts, command palette entry
+- `ui/static/css/main.css` — `.docs-search-*` стили
 
 ## Key Results
 
-- 352 секции проиндексировано из текущего проекта
-- TF-IDF scoring: title matches weighted 3x, file title bonus 1.5x, exact phrase bonus 2x
-- Debounced search (300ms), кеш индекса 5 минут
-- Работает без внешних зависимостей (no Ollama/embeddings needed)
+Results
+
+**What was done:**
+1. **DocSearchEngine** — индексирует все .md файлы проекта, разбивает контент на секции по заголовкам, ранжирует результаты по TF-IDF с весами (title 3x, file_title 1.5x, exact phrase 2x). Стоп-слова EN+RU. 352 секции проиндексировано.
+2. **`/api/docs/search`** — endpoint с debounce-safe кешем. Параметры: `q`, `project`, `max_results`. Возвращает ранжированные секции с file, title, score, snippet, matched_terms.
+3. **UI overlay (Ctrl+Shift+D)** — полноэкранная панель 
 
 ## For Next Iteration
 
-- Добавить embedding-based semantic search поверх TF-IDF (когда Ollama доступен)
-- Автокомплит в чате через Ctrl+Shift+D
-- Индексация .py и других исходных файлов (опционально)
+N/A

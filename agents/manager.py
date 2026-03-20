@@ -29,9 +29,10 @@ class SessionManager:
         self,
         cwd: str,
         resume_id: Optional[str] = None,
+        **kwargs,
     ) -> ClaudeSession:
         """Create a new Claude Code session."""
-        session = ClaudeSession(cwd=cwd, resume_id=resume_id)
+        session = ClaudeSession(cwd=cwd, resume_id=resume_id, **kwargs)
         await session.start()
         self._sessions[session.session_id] = session
         logger.info("Created session %s for cwd=%s", session.session_id, cwd)

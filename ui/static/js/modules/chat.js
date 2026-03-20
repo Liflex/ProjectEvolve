@@ -26,17 +26,25 @@ window.AppChat = (function() {
         async createSessionFromModal() {
             const path = (this.newSessionPath || '.').trim();
             if (!path) return;
+            const cfg = this.newSessionConfig || {};
             this.showNewSessionModal = false;
-            await this.createChatTab(path);
+            await this.createChatTab(path, null, cfg);
         },
 
-        async createChatTab(projectPath, resumeId) {
-            console.log('[chat] createChatTab:', projectPath, 'resume:', resumeId);
+        async createChatTab(projectPath, resumeId, sessionConfig) {
+            console.log('[chat] createChatTab:', projectPath, 'resume:', resumeId, 'config:', sessionConfig);
             try {
+                const body = { cwd: projectPath, resume: resumeId || null };
+                if (sessionConfig) {
+                    if (sessionConfig.model) body.model = sessionConfig.model;
+                    if (sessionConfig.max_turns) body.max_turns = sessionConfig.max_turns;
+                    if (sessionConfig.permission_mode) body.permission_mode = sessionConfig.permission_mode;
+                    if (sessionConfig.append_system_prompt) body.append_system_prompt = sessionConfig.append_system_prompt;
+                }
                 const res = await this.api('/api/sessions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cwd: projectPath, resume: resumeId || null }),
+                    body: JSON.stringify(body),
                 });
                 console.log('[chat] session created:', JSON.stringify(res));
                 if (res.warning) this.showToast(res.warning, 'error');
@@ -48,6 +56,7 @@ window.AppChat = (function() {
                     project_path: projectPath,
                     label: label,
                     messages: [],
+                    session_config: res.config || null,
                     is_active: true,
                     is_streaming: false,
                     is_thinking: false,

@@ -284,6 +284,8 @@ function _buildAppData() {
         pastSessions: [],
         showNewSessionModal: false,
         newSessionPath: '.',
+        newSessionShowConfig: false,
+        newSessionConfig: { model: '', max_turns: 10, permission_mode: 'acceptEdits', append_system_prompt: '' },
         chatTick: 0,
         chatBottomPanel: 'closed',
         chatBottomPanelHeight: 180,

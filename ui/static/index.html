@@ -200,16 +200,74 @@
 
             <!-- New session path modal -->
             <div x-show="showNewSessionModal" x-cloak class="fixed inset-0 z-40 flex items-center justify-center bg-black/60" @click.self="showNewSessionModal = false">
-                <div class="bg-[var(--bg2)] border-2 border-[var(--v-dim)] p-5 max-w-md mx-4 w-full">
+                <div class="bg-[var(--bg2)] border-2 border-[var(--v-dim)] p-5 max-w-lg mx-4 w-full" style="max-height:90vh;overflow-y:auto">
                     <div class="flex items-center justify-between mb-3">
                         <div class="text-sm text-[var(--v)] tracking-widest">NEW_SESSION</div>
                         <button @click="showNewSessionModal = false" class="text-[var(--v3)] hover:text-[var(--red)] text-xs">[X]</button>
                     </div>
+                    <!-- Project path -->
                     <div class="text-[0.625rem] text-[var(--v3)] tracking-wider mb-2">PROJECT_PATH_</div>
                     <input x-model="newSessionPath" type="text" placeholder="e.g. F:\Projects\myapp or ."
                            @keydown.enter="createSessionFromModal()"
                            class="w-full bg-[var(--bg)] border border-[var(--v-dim)] px-2 py-1.5 text-sm text-[var(--ng2)] mb-3 tracking-wider"
                            x-ref="newSessionInput">
+                    <!-- Advanced config toggle -->
+                    <div class="flex items-center justify-between mb-2 px-1">
+                        <span class="text-[0.625rem] text-[var(--v3)] tracking-wider cursor-pointer" @click="newSessionShowConfig = !newSessionShowConfig">
+                            <span x-text="newSessionShowConfig ? '&#x25BC;' : '&#x25B6;'"></span>
+                            ADVANCED_CONFIGURATION
+                        </span>
+                        <span x-show="newSessionConfig.model || newSessionConfig.append_system_prompt"
+                              class="text-[0.5rem] text-[var(--cyan)] tracking-wider">CUSTOM</span>
+                    </div>
+                    <!-- Advanced config panel -->
+                    <div x-show="newSessionShowConfig" x-transition.duration.150ms class="space-y-3 mb-3 p-3 border border-[var(--v-dim)] bg-[var(--bg)]">
+                        <!-- Model selector -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="text-[0.625rem] text-[var(--v3)] tracking-wider">MODEL</label>
+                                <span class="text-[0.5rem] text-[var(--v3)]" x-show="newSessionConfig.model" x-text="'selected: ' + newSessionConfig.model"></span>
+                            </div>
+                            <select x-model="newSessionConfig.model"
+                                    class="w-full bg-[var(--bg2)] border border-[var(--v-dim)] px-2 py-1.5 text-xs text-[var(--ng2)] tracking-wider">
+                                <option value="">Default (auto)</option>
+                                <option value="claude-sonnet-4-20250514">claude-sonnet-4-20250514</option>
+                                <option value="claude-opus-4-20250514">claude-opus-4-20250514</option>
+                                <option value="claude-haiku-3-5-20241022">claude-haiku-3-5-20241022</option>
+                            </select>
+                        </div>
+                        <!-- Max turns -->
+                        <div class="flex gap-3">
+                            <div class="flex-1">
+                                <label class="text-[0.625rem] text-[var(--v3)] tracking-wider block mb-1">MAX_TURNS</label>
+                                <input x-model.number="newSessionConfig.max_turns" type="number" min="1" max="100"
+                                       class="w-full bg-[var(--bg2)] border border-[var(--v-dim)] px-2 py-1.5 text-xs text-[var(--ng2)] tracking-wider">
+                            </div>
+                            <div class="flex-1">
+                                <label class="text-[0.625rem] text-[var(--v3)] tracking-wider block mb-1">PERMISSION_MODE</label>
+                                <select x-model="newSessionConfig.permission_mode"
+                                        class="w-full bg-[var(--bg2)] border border-[var(--v-dim)] px-2 py-1.5 text-xs text-[var(--ng2)] tracking-wider">
+                                    <option value="acceptEdits">acceptEdits</option>
+                                    <option value="plan">plan</option>
+                                    <option value="bypassPermissions">bypassPermissions</option>
+                                    <option value="default">default</option>
+                                </select>
+                            </div>
+                        </div>
+                        <!-- System prompt append -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="text-[0.625rem] text-[var(--v3)] tracking-wider">SYSTEM_PROMPT_APPEND</label>
+                                <span class="text-[0.5rem] text-[var(--v3)]" x-show="newSessionConfig.append_system_prompt"
+                                      x-text="(newSessionConfig.append_system_prompt || '').length + 'ch'"></span>
+                            </div>
+                            <textarea x-model="newSessionConfig.append_system_prompt"
+                                      rows="3" placeholder="Additional instructions for the agent (appended to system prompt)..."
+                                      class="w-full bg-[var(--bg2)] border border-[var(--v-dim)] px-2 py-1.5 text-xs text-[var(--ng2)] tracking-wider resize-none"
+                                      style="min-height:60px"></textarea>
+                        </div>
+                    </div>
+                    <!-- Action buttons -->
                     <div class="flex gap-2">
                         <button @click="createSessionFromModal()"
                                 class="flex-1 px-3 py-1.5 border border-[var(--v)] text-[var(--v)] text-xs tracking-wider hover:bg-[rgba(180,74,255,0.1)] transition-all">[> CONNECT]</button>

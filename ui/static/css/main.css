@@ -3663,6 +3663,16 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     border-radius: 2px;
     margin-left: 2px;
 }
+.tab-config-badge {
+    font-size: 0.4375rem;
+    letter-spacing: 0.05em;
+    color: var(--cyan);
+    background: rgba(0,220,255,0.08);
+    border: 1px solid rgba(0,220,255,0.2);
+    padding: 0 4px;
+    border-radius: 2px;
+    margin-left: 2px;
+}
 /* Branch watermark banner in messages area */
 .branch-watermark {
     display: flex;

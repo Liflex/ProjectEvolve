@@ -36,12 +36,16 @@ class ClaudeSession:
         resume_id: Optional[str] = None,
         max_turns: int = 10,
         permission_mode: str = "acceptEdits",
+        append_system_prompt: Optional[str] = None,
+        model: Optional[str] = None,
     ):
         self.session_id = session_id or str(uuid.uuid4())[:8]
         self.cwd = cwd
         self.resume_id = resume_id
         self.max_turns = max_turns
         self.permission_mode = permission_mode
+        self.append_system_prompt = append_system_prompt
+        self.model = model
 
         self.status = SessionStatus.STARTING
         self.created_at = datetime.now()
@@ -95,6 +99,11 @@ class ClaudeSession:
                 permission_mode=self.permission_mode,
                 env=clean_env,
             )
+
+            if self.append_system_prompt:
+                options.append_system_prompt = self.append_system_prompt
+            if self.model:
+                options.model = self.model
 
             if self.resume_id and self.message_count == 1:
                 # Only use resume_id for the very first message.
@@ -175,4 +184,10 @@ class ClaudeSession:
             "created_at": self.created_at.isoformat(),
             "message_count": self.message_count,
             "error": self._error,
+            "config": {
+                "max_turns": self.max_turns,
+                "permission_mode": self.permission_mode,
+                "model": self.model,
+                "has_system_prompt": bool(self.append_system_prompt),
+            },
         }

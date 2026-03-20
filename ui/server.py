@@ -1140,7 +1140,10 @@ except ImportError as e:
 class SessionCreateRequest(BaseModel):
     cwd: str
     resume: Optional[str] = None
-    system_prompt_append: Optional[str] = None
+    append_system_prompt: Optional[str] = None
+    model: Optional[str] = None
+    max_turns: int = 10
+    permission_mode: str = "acceptEdits"
 
 
 @app.post("/api/sessions")
@@ -1160,8 +1163,16 @@ async def create_session(data: SessionCreateRequest):
     session = await session_manager.create_session(
         cwd=str(project_path),
         resume_id=data.resume,
+        append_system_prompt=data.append_system_prompt,
+        model=data.model,
+        max_turns=data.max_turns,
+        permission_mode=data.permission_mode,
     )
-    return {"session_id": session.session_id, "created_at": session.created_at.isoformat()}
+    return {
+        "session_id": session.session_id,
+        "created_at": session.created_at.isoformat(),
+        "config": session.to_dict().get("config"),
+    }
 
 
 @app.get("/api/sessions/history")
