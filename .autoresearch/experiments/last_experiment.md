@@ -1,23 +1,24 @@
 # Last Experiment Summary
 
 **Experiment #218** — Test experiment + fix chief judge test + commit process cleanup
-**Date:** 2026-03-21
+**Date:** 2026-03-21 01:52:19
 
 ## What Was Done
 
-1. Fixed failing test `test_authority_weighted_discard` — changed scores from uniform 0.4 to asymmetric (guardian=0.2, architect=0.4, pragmatist=0.2) so weighted_score triggers correct path.
-2. Committed pending process cleanup changes from previous sessions (parallel.py, research.py).
-3. All 89 tests pass.
+N/A
 
 ## Files Modified
 
-- `tests/test_chief_judge.py` (fixed test_authority_weighted_discard)
-- `agents/parallel.py` (+43/-14: process cleanup before judges)
-- `agents/research.py` (+54/-6: async process cleanup method)
-- `.autoresearch/experiments/accumulation_context.md`
-- `.autoresearch/experiments/changes_log.md`
-- `.autoresearch/experiments/last_experiment.md`
+- None
 
 ## Key Results
 
-**Tests:** 89 passed, 0 failed
+Results
+
+**What was done:**
+1. Исправлен падающий тест `test_authority_weighted_discard` — тест использовал score 0.4 для всех профилей, но weighted_score=0.4 > порога 0.35, поэтому код уходил в `avg_score_discard`. Исправлены scores на ассиметричные (guardian=0.2, architect=0.4, pragmatist=0.2), weighted_score≈0.267 корректно триггерит `authority_weighted_discard`.
+2. Закоммичены незакоммиченные изменения из предыдущих сессий: process cleanup в `parallel.py` (kill lingering Claude CLI processes
+
+## For Next Iteration
+
+N/A
