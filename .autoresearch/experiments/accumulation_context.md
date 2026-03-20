@@ -1,4 +1,24 @@
 
+## Experiment 137 — Chat — message reference links (#N) with click-to-copy and scroll-to
+
+**Date:** 2026-03-20
+
+### What Was Done
+
+1. **`#N` reference badge** — every user and assistant message shows a clickable `#N` badge in the role line. Clicking copies reference to clipboard.
+2. **`linkMsgRefs(html, tabId)`** — renderer method that converts `#N` patterns in message content to clickable scroll-to links (protected from code blocks).
+3. **`scrollToMsg(tabId, msgIdx)`** — smooth scroll to target message with 2s purple flash highlight animation.
+4. **`copyMsgRef(tabId, msgIdx)`** — copies `#N` to clipboard with toast, fallback to input insertion.
+5. **CSS** — `.msg-ref-badge`, `.msg-ref-link` (cyan dashed), `.msg-ref-highlight` (keyframe flash).
+
+### Files Modified
+
+- `ui/static/js/modules/chat.js` — scrollToMsg(), copyMsgRef(), #N badge in role lines, linkMsgRefs() calls
+- `ui/static/js/modules/renderer.js` — linkMsgRefs() method
+- `ui/static/css/main.css` — reference styles
+
+---
+
 ## Experiment 135 — Chat — text selection floating toolbar (Copy, Quote, Find, Web)
 
 **Date:** 2026-03-20
@@ -5457,6 +5477,36 @@ Results
 3. Индикатор длины выделения в правой части тулбара
 4. Автоматическое скрытие при скролле чата, клике вне сообщения, и после выполнения действия
 5. CSS стили: position absolute с transform translateX(-50%), тень, hover-
+
+### Notes for Next
+
+N/A
+
+---
+
+## Experiment 136 — Chat — tab drag to reorder
+
+**Date:** 2026-03-20 04:50:37
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- Target:** chat-section.js, chat.js, app.js, main.css
+- Files Modified:** chat.js, app.js, chat-section.js, main.css
+
+### Results
+
+Results
+
+**What was done:**
+1. **Drag & drop reorder** — табы чата можно перетаскивать мышью для изменения порядка (HTML5 Drag and Drop API)
+2. **Visual feedback** — перетаскиваемый таб становится полупрозрачным (opacity 0.4), целевой таб показывает фиолетовую левую границу-индикатор
+3. **Context menu** — добавлены пункты MOVE LEFT / MOVE RIGHT для точного перемещения без drag (полезно на тачпадах)
+4. **Drag guard** — drag блокируется во время переименования таба
+5. **Keyboard shortcuts referenc
 
 ### Notes for Next
 
