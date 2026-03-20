@@ -1229,6 +1229,75 @@ async def set_judge_mode(data: dict):
     return {"parallel_judges": bool(enabled)}
 
 
+@app.post("/api/judge/revert/{n}")
+async def judge_revert_experiment(n: int):
+    """Manually revert experiment N commit based on judge verdict.
+
+    Creates a git revert commit for the experiment's commit.
+    Non-destructive — does not reset history.
+    """
+    project = get_project_dir()
+    exp_dir = project / ".autoresearch" / "experiments"
+
+    # Verify the experiment commit exists
+    try:
+        result = subprocess.run(
+            ["git", "log", "--oneline", "-20"],
+            capture_output=True, text=True, timeout=10,
+            cwd=str(project), encoding="utf-8", errors="replace",
+        )
+        commits = (result.stdout or "").strip().splitlines()
+        exp_prefix = f"exp #{n}:"
+        exp_commit = None
+        for line in commits:
+            if exp_prefix in line:
+                exp_commit = line.split()[0]
+                break
+
+        if not exp_commit:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Experiment #{n} commit not found in recent history",
+            )
+
+        # Perform revert
+        result = subprocess.run(
+            ["git", "revert", "--no-edit", exp_commit],
+            capture_output=True, text=True, timeout=30,
+            cwd=str(project), encoding="utf-8", errors="replace",
+        )
+
+        if result.returncode != 0:
+            err = (result.stderr or "unknown error").strip()[:300]
+            raise HTTPException(status_code=500, detail=f"Revert failed: {err}")
+
+        # Record the revert in judge verdict file
+        judge_file = exp_dir / f"judge_{n}_all.json"
+        if judge_file.exists():
+            try:
+                verdict_data = _json.loads(judge_file.read_text(encoding="utf-8"))
+                verdict_data["manually_reverted"] = True
+                verdict_data["reverted_at"] = datetime.now().isoformat()
+                judge_file.write_text(
+                    _json.dumps(verdict_data, indent=2), encoding="utf-8",
+                )
+            except Exception:
+                pass
+
+        _log_append(f"[JUDGE] Manual revert of exp #{n} ({exp_commit})")
+
+        return {
+            "experiment": n,
+            "commit": exp_commit,
+            "status": "reverted",
+            "message": f"Experiment #{n} reverted successfully",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/parallel/run")
 async def start_parallel_run(data: dict):
     """Run multiple agents in parallel.

@@ -60,7 +60,9 @@
                             <span class="text-[0.625rem] text-[var(--v3)] w-28 truncate shrink-0" x-text="exp.date"></span>
                             <span class="text-sm w-10 text-right shrink-0" :class="scoreCls(exp.score)" style="font-family:'Press Start 2P',monospace" x-text="exp.score"></span>
                             <!-- Judge verdict badge -->
-                            <span x-show="exp.judge_all_verdicts" class="judge-list-badge shrink-0"
+                            <span x-show="exp.judge_all_verdicts?.auto_reverted" class="judge-list-badge shrink-0" style="background:rgba(255,60,60,0.15);color:var(--red)" title="Auto-reverted by judge">&#x21A9;</span>
+                            <span x-show="exp.judge_all_verdicts?.manually_reverted" class="judge-list-badge shrink-0" style="background:rgba(255,170,0,0.15);color:var(--amber)" title="Manually reverted">&#x21A9;</span>
+                            <span x-show="exp.judge_all_verdicts && !exp.judge_all_verdicts?.auto_reverted && !exp.judge_all_verdicts?.manually_reverted" class="judge-list-badge shrink-0"
                                   :class="exp.judge_all_verdicts?.consensus === 'KEEP' ? 'judge-keep' : exp.judge_all_verdicts?.consensus === 'DISCARD' ? 'judge-discard' : 'judge-review'"
                                   :title="'All Judges: ' + (exp.judge_all_verdicts?.consensus || '') + ' (avg ' + (exp.judge_all_verdicts?.consensus_score || '') + ')'"
                                   x-text="'J:' + (exp.judge_all_verdicts?.consensus || '?')"></span>
@@ -171,6 +173,9 @@
                                                 </template>
                                                 <template x-if="judgeAllVerdicts">
                                                     <div class="flex items-center gap-1">
+                                                        <button x-show="judgeAllVerdicts.consensus === 'DISCARD' && !judgeAllVerdicts.auto_reverted && !judgeAllVerdicts.manually_reverted" @click="revertExperiment(selectedExp)" class="text-[0.5625rem] px-2 py-0.5 tracking-wider border border-[var(--red)] text-[var(--red)] hover:bg-[rgba(255,60,60,0.1)] transition-all" title="Revert this experiment's commit">[REVERT]</button>
+                                                        <span x-show="judgeAllVerdicts.auto_reverted" class="text-[0.5rem] text-[var(--red)] tracking-wider">&#x21A9; AUTO-REVERTED</span>
+                                                        <span x-show="judgeAllVerdicts.manually_reverted" class="text-[0.5rem] text-[var(--amber)] tracking-wider">&#x21A9; REVERTED</span>
                                                         <button @click="judgeAllVerdicts=null;judgeVerdict=null" class="text-[0.5625rem] text-[var(--v3)] hover:text-[var(--red)] tracking-wider">[CLEAR]</button>
                                                     </div>
                                                 </template>
@@ -224,6 +229,31 @@
                                                                 <span class="text-[0.4375rem] text-[var(--v3)] shrink-0" x-text="'w:' + (chk.weight || 1)"></span>
                                                             </div>
                                                         </template>
+                                                    </div>
+                                                </template>
+                                                <!-- Conflict Resolution -->
+                                                <template x-if="judgeAllVerdicts?.conflict_resolution">
+                                                    <div class="bg-[var(--bg)] p-3 pixel-border" style="border-color:var(--amber)">
+                                                        <div class="flex items-center gap-2 mb-2">
+                                                            <span class="text-[0.5625rem] text-[var(--amber)] tracking-wider">&#x2696; CONFLICT_RESOLUTION</span>
+                                                            <span class="text-xs px-1.5 py-0.5" :class="(judgeAllVerdicts.conflict_resolution.resolved === 'KEEP' ? 'text-[var(--ng)] bg-[rgba(57,255,20,0.08)]' : judgeAllVerdicts.conflict_resolution.resolved === 'DISCARD' ? 'text-[var(--red)] bg-[rgba(255,60,60,0.08)]' : 'text-[var(--amber)] bg-[rgba(255,170,0,0.08)]') + ' border border-current'" x-text="judgeAllVerdicts.conflict_resolution.resolved"></span>
+                                                            <span class="text-[0.4375rem] text-[var(--v3)] ml-auto" x-text="'via ' + (judgeAllVerdicts.conflict_resolution.resolution_method || '')"></span>
+                                                        </div>
+                                                        <div class="text-[0.5rem] text-[var(--ng3)] mb-2" x-text="judgeAllVerdicts.conflict_resolution.rationale"></div>
+                                                        <template x-if="(judgeAllVerdicts.conflict_resolution.conflicts || []).length > 0">
+                                                            <div>
+                                                                <div class="text-[0.4375rem] text-[var(--v3)] tracking-widest mb-1">DIVERGING_CHECKS_</div>
+                                                                <template x-for="(c, ci) in judgeAllVerdicts.conflict_resolution.conflicts" :key="ci">
+                                                                    <div class="flex items-center gap-2 py-0.5 text-[0.5rem]">
+                                                                        <span :class="c.severity === 'high' ? 'text-[var(--red)]' : 'text-[var(--amber)]'" x-text="(c.severity === 'high' ? '&#x274C;' : '&#x26A0;')"></span>
+                                                                        <span class="text-[var(--v3)] tracking-wider w-24 shrink-0" x-text="c.check"></span>
+                                                                        <span class="text-[var(--ng3)] flex-1" x-text="c.split"></span>
+                                                                    </div>
+                                                                </template>
+                                                            </div>
+                                                        </template>
+                                                        <div x-show="judgeAllVerdicts.conflict_resolution.agent_agreement === 'disagrees'" class="mt-2 text-[0.5rem] text-[var(--pink)] tracking-wider">&#x26A0; AGENT_DISAGREES_WITH_RESOLUTION</div>
+                                                        <div x-show="judgeAllVerdicts.conflict_resolution.agent_agreement === 'agrees'" class="mt-2 text-[0.5rem] text-[var(--ng)] tracking-wider">&#x2705; AGENT_AGREES_WITH_RESOLUTION</div>
                                                     </div>
                                                 </template>
                                             </div>

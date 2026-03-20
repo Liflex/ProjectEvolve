@@ -477,6 +477,126 @@ class ExperimentJudge:
         checks = self._run_all_checks(claimed_files, report_text)
         return self._compute_verdict(checks, prof, agent_decision, agent_score)
 
+    def _resolve_conflict(
+        self,
+        profiles: Dict[str, Dict[str, Any]],
+        agent_decision: str = "",
+        agent_score: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Analyze disagreements between judge profiles and resolve conflicts.
+
+        When profiles disagree (SPLIT), this method:
+        1. Identifies which checks caused the divergence
+        2. Uses weighted scoring as tiebreaker
+        3. Compares with agent's own decision
+        4. Produces a final resolution with rationale
+
+        Returns dict with:
+            - resolved: "KEEP" | "DISCARD" | "REVIEW" (final decision)
+            - resolution_method: how the conflict was resolved
+            - conflicts: list of per-check disagreements
+            - agent_agreement: whether agent agrees with resolution
+            - rationale: human-readable explanation
+        """
+        recs = {name: v["recommendation"] for name, v in profiles.items()}
+        scores = {name: v["score"] for name, v in profiles.items()}
+
+        # --- Identify per-check conflicts ---
+        check_results: Dict[str, Dict[str, str]] = {}  # check_name → {profile: status}
+        for pname, verdict in profiles.items():
+            for chk in verdict.get("checks", []):
+                cname = chk["name"]
+                if cname not in check_results:
+                    check_results[cname] = {}
+                check_results[cname][pname] = chk["status"]
+
+        conflicts: List[Dict[str, Any]] = []
+        for cname, statuses in check_results.items():
+            unique_statuses = set(statuses.values())
+            if len(unique_statuses) > 1:
+                # This check caused disagreement
+                passing = [p for p, s in statuses.items() if s == "pass"]
+                failing = [p for p, s in statuses.items() if s in ("fail", "warn")]
+                conflicts.append({
+                    "check": cname,
+                    "statuses": statuses,
+                    "severity": "high" if "fail" in unique_statuses else "medium",
+                    "split": f"{','.join(passing)} vs {','.join(failing)}",
+                })
+
+        # --- Resolution logic ---
+        # Priority: 1) Agent agreement majority 2) Weighted score 3) Balanced profile tiebreaker
+        keep_count = list(recs.values()).count("KEEP")
+        discard_count = list(recs.values()).count("DISCARD")
+        review_count = list(recs.values()).count("REVIEW")
+        avg_score = sum(scores.values()) / len(scores) if scores else 0
+
+        resolved = "REVIEW"
+        resolution_method = "default_review"
+
+        # Method 1: Agent agreement as tiebreaker
+        agent_dec_upper = agent_decision.upper() if agent_decision else ""
+        if agent_dec_upper in ("KEEP", "DISCARD"):
+            # Check if agent agrees with any majority
+            if agent_dec_upper == "KEEP" and keep_count >= 1 and discard_count <= 1:
+                resolved = "KEEP"
+                resolution_method = "agent_tiebreaker_keep"
+            elif agent_dec_upper == "DISCARD" and discard_count >= 1 and keep_count <= 1:
+                resolved = "DISCARD"
+                resolution_method = "agent_tiebreaker_discard"
+
+        # Method 2: Weighted score
+        if resolved == "REVIEW":
+            # balanced profile has most authority (weight 1.0, no adjustment)
+            balanced_score = scores.get("balanced", avg_score)
+            if balanced_score >= 0.7:
+                resolved = "KEEP"
+                resolution_method = "balanced_score_keep"
+            elif balanced_score <= 0.35:
+                resolved = "DISCARD"
+                resolution_method = "balanced_score_discard"
+            elif avg_score >= 0.65:
+                resolved = "KEEP"
+                resolution_method = "avg_score_keep"
+            elif avg_score <= 0.4:
+                resolved = "DISCARD"
+                resolution_method = "avg_score_discard"
+
+        # Method 3: If still REVIEW, look at conflict severity
+        if resolved == "REVIEW":
+            high_severity = sum(1 for c in conflicts if c["severity"] == "high")
+            if high_severity == 0 and avg_score > 0.5:
+                resolved = "KEEP"
+                resolution_method = "no_high_severity_conflicts"
+            elif high_severity >= 2:
+                resolved = "DISCARD"
+                resolution_method = "high_severity_conflicts"
+
+        # --- Agent agreement check ---
+        agent_agreement = "unknown"
+        if agent_dec_upper in ("KEEP", "DISCARD"):
+            agent_agreement = "agrees" if agent_dec_upper == resolved else "disagrees"
+
+        # --- Rationale ---
+        rationale_parts = [
+            f"Profiles disagree: {dict(recs)}",
+            f"Scores: strict={scores.get('strict', 0):.2f}, balanced={scores.get('balanced', 0):.2f}, lenient={scores.get('lenient', 0):.2f}",
+        ]
+        if conflicts:
+            rationale_parts.append(f"Conflicting checks: {', '.join(c['check'] for c in conflicts)}")
+        rationale_parts.append(f"Resolution: {resolved} via {resolution_method}")
+        if agent_agreement != "unknown":
+            rationale_parts.append(f"Agent {agent_agreement}")
+
+        return {
+            "resolved": resolved,
+            "resolution_method": resolution_method,
+            "conflicts": conflicts,
+            "conflict_count": len(conflicts),
+            "agent_agreement": agent_agreement,
+            "rationale": ". ".join(rationale_parts),
+        }
+
     def evaluate_all(
         self,
         claimed_files: Optional[List[str]] = None,
@@ -488,9 +608,10 @@ class ExperimentJudge:
 
         Returns dict with:
             - profiles: dict of profile_name → verdict
-            - consensus: "KEEP" | "DISCARD" | "REVIEW" | "SPLIT"
+            - consensus: "KEEP" | "DISCARD" | "REVIEW"
             - consensus_score: average score across profiles
             - agent_decision, agent_score
+            - conflict_resolution: when judges disagree, how it was resolved
         """
         claimed_files = claimed_files or []
         checks = self._run_all_checks(claimed_files, report_text)
@@ -515,12 +636,13 @@ class ExperimentJudge:
         elif review_count >= 2:
             consensus = "REVIEW"
         else:
-            consensus = "SPLIT"
-
+            # SPLIT — use conflict resolution
+            conflict = self._resolve_conflict(profiles, agent_decision, agent_score)
+            consensus = conflict["resolved"]
         # Average score
         avg_score = sum(v["score"] for v in profiles.values()) / len(profiles) if profiles else 0
 
-        return {
+        result = {
             "profiles": profiles,
             "consensus": consensus,
             "consensus_score": round(avg_score, 2),
@@ -528,6 +650,14 @@ class ExperimentJudge:
             "agent_score": agent_score,
             "available_profiles": list(JUDGE_PROFILES.keys()),
         }
+
+        # Add conflict resolution details when judges disagreed
+        if recs.count("KEEP") < 2 and recs.count("DISCARD") < 2 and recs.count("REVIEW") < 2:
+            result["conflict_resolution"] = self._resolve_conflict(
+                profiles, agent_decision, agent_score,
+            )
+
+        return result
 
 
 # ---------------------------------------------------------------------------

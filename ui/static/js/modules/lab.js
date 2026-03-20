@@ -382,6 +382,23 @@ window.AppLab = (function() {
                 this.showToast('ALL JUDGES FAILED', 'error');
             }
         },
+        async revertExperiment(n) {
+            if (!confirm('Revert experiment #' + n + '? This will create a revert commit.')) return;
+            try {
+                const result = await this.api('/api/judge/revert/' + n, { method: 'POST' });
+                this.showToast('EXP #' + n + ' REVERTED', 'success');
+                // Refresh verdict to show reverted status
+                if (this.judgeAllVerdicts) {
+                    this.judgeAllVerdicts.manually_reverted = true;
+                    this.judgeAllVerdicts.reverted_at = result.reverted_at;
+                }
+                // Reload experiments list
+                await this.loadExperiments();
+            } catch (e) {
+                console.error('[revertExperiment] FAILED:', e);
+                this.showToast('REVERT FAILED: ' + (e.detail || e.message || 'error'), 'error');
+            }
+        },
         async runCompare() {
             if (this.compareExps.length !== 2) return;
             this.compareLoading = true; this.compareData = {};
@@ -604,6 +621,9 @@ window.AppLab = (function() {
                 const n = event.number || 0;
                 const consensus = event.consensus || '?';
                 const score = event.consensus_score || 0;
+                if (consensus === 'REVERTED') {
+                    return { ts, type: 'judge', icon: '↩', color: 'var(--red)', text: `Auto-reverted exp ${n} (score=${score})` };
+                }
                 const c = consensus === 'KEEP' ? 'var(--ng)' : consensus === 'DISCARD' ? 'var(--red)' : 'var(--amber)';
                 return { ts, type: 'judge', icon: '⚖', color: c, text: `Judge exp ${n}: ${consensus} (${score})` };
             }

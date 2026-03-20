@@ -6767,3 +6767,36 @@ Results
 N/A
 
 ---
+
+## Experiment 171 — Parallel judge integration in research loop
+
+**Date:** 2026-03-20 20:14:18
+
+### What Was Done
+
+N/A
+
+### Files Modified
+
+- Target:** `agents/research.py`, `ui/server.py`, `ui/static/js/app.js`, `ui/static/templates/lab-run.js`
+- `agents/research.py` — async `_run_judge()` с dual-mode (sequential/parallel), `parallel_judges` param
+- `ui/server.py` — `RunRequest.parallel_judges`, ResearchRunner creation, `/api/run/judge-mode` endpoints
+- `ui/static/js/app.js` — `runConfig.parallel_judges: false`
+- `ui/static/templates/lab-run.js` — toggle switch UI
+
+### Results
+
+Results
+
+**What was done:**
+- `_run_judge()` конвертирован из sync в async метод с двумя режимами работы
+- **Sequential** (по умолчанию): локальный `ExperimentJudge.evaluate_all()` — быстрый, без дополнительных API вызовов
+- **Parallel** (`parallel_judges=True`): 3 независимых Claude Code агента оценивают эксперимент concurrently через `run_parallel_judges()` — каждый со своей перспективой (strict/balanced/lenient)
+- Формат вердиктов нормализован для совместимости с sequential mode
+- API endpoin
+
+### Notes for Next
+
+N/A
+
+---

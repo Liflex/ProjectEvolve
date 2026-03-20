@@ -427,7 +427,20 @@ async def run_parallel_judges(
         scores = [v.get("score", 0) for v in verdicts.values()]
         avg_score = sum(scores) / len(scores) if scores else 0
         keep_count = sum(1 for v in verdicts.values() if v.get("verdict") == "KEEP")
-        consensus = "KEEP" if keep_count > len(verdicts) / 2 else "DISCARD"
+        discard_count = sum(1 for v in verdicts.values() if v.get("verdict") == "DISCARD")
+
+        if keep_count > len(verdicts) / 2:
+            consensus = "KEEP"
+        elif discard_count > len(verdicts) / 2:
+            consensus = "DISCARD"
+        else:
+            # Split — use score tiebreaker
+            if avg_score >= 0.65:
+                consensus = "KEEP"
+            elif avg_score <= 0.35:
+                consensus = "DISCARD"
+            else:
+                consensus = "REVIEW"
     else:
         avg_score = 0
         consensus = "DISCARD"

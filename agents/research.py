@@ -325,6 +325,27 @@ class ResearchRunner:
                     _json.dumps(verdict, indent=2), encoding="utf-8"
                 )
 
+            # --- Conflict resolution: act on consensus ---
+            consensus = verdict.get("consensus", "REVIEW")
+            score = verdict.get("consensus_score", 0.5)
+
+            # Auto-revert on strong DISCARD consensus (all agree or score very low)
+            auto_reverted = False
+            if consensus == "DISCARD" and score < 0.4:
+                auto_reverted = await self._auto_revert_discard(
+                    experiment_number, consensus, score, verdict,
+                )
+
+            # Log conflict resolution details if present
+            conflict = verdict.get("conflict_resolution")
+            if conflict:
+                await self._emit(_make_event(
+                    EVENT_LOG,
+                    message=f"Conflict resolved: {conflict.get('resolved')} "
+                            f"via {conflict.get('resolution_method')} "
+                            f"(agent {conflict.get('agent_agreement', '?')})",
+                ))
+
             # Auto-adjust weights based on accumulated history
             try:
                 from utils.judge import JudgeHistory
@@ -338,10 +359,97 @@ class ResearchRunner:
             except Exception as adj_err:
                 logger.debug("Judge weight auto-adjust skipped: %s", adj_err)
 
+            verdict["auto_reverted"] = auto_reverted
             return verdict
         except Exception as e:
             logger.warning("Judge evaluation failed for exp %d: %s", experiment_number, e)
             return None
+
+    async def _auto_revert_discard(
+        self,
+        experiment_number: int,
+        consensus: str,
+        score: float,
+        verdict: Dict[str, Any],
+    ) -> bool:
+        """Auto-revert the experiment commit when judges strongly reject it.
+
+        Reverts the last commit (which should be the experiment commit)
+        using ``git revert --no-edit``. Non-destructive — creates a new
+        revert commit rather than resetting history.
+
+        Returns True if revert was performed, False otherwise.
+        """
+        import subprocess as _sp
+
+        try:
+            # Verify last commit is the experiment commit
+            result = _sp.run(
+                ["git", "log", "-1", "--pretty=format:%s"],
+                capture_output=True, text=True, timeout=10,
+                cwd=str(self.project_dir),
+                encoding="utf-8", errors="replace",
+            )
+            last_msg = (result.stdout or "").strip()
+
+            if not last_msg.startswith(f"exp #{experiment_number}:"):
+                await self._emit(_make_event(
+                    EVENT_LOG,
+                    message=f"Auto-revert skipped: last commit is not exp #{experiment_number} "
+                            f"({last_msg[:60]})",
+                ))
+                return False
+
+            # Perform revert
+            await self._emit(_make_event(
+                EVENT_LOG,
+                message=f"Auto-reverting exp #{experiment_number}: "
+                        f"DISCARD consensus (score={score:.2f})",
+            ))
+
+            result = _sp.run(
+                ["git", "revert", "--no-edit", "HEAD"],
+                capture_output=True, text=True, timeout=30,
+                cwd=str(self.project_dir),
+                encoding="utf-8", errors="replace",
+            )
+
+            if result.returncode != 0:
+                err = (result.stderr or "unknown error").strip()[:200]
+                await self._emit(_make_event(
+                    EVENT_LOG,
+                    message=f"Auto-revert FAILED for exp #{experiment_number}: {err}",
+                ))
+                return False
+
+            # Record the revert
+            revert_msg = f"exp #{experiment_number}(discard): auto-reverted by judge"
+            await self._emit(_make_event(
+                EVENT_JUDGE,
+                number=experiment_number,
+                consensus="REVERTED",
+                consensus_score=score,
+                profiles=verdict.get("profiles"),
+                revert_reason="auto_revert_discard",
+            ))
+
+            await self._emit(_make_event(
+                EVENT_LOG,
+                message=f"Auto-revert done for exp #{experiment_number}",
+            ))
+            logger.info(
+                "Auto-reverted exp %d: DISCARD consensus (score=%.2f)",
+                experiment_number, score,
+            )
+            return True
+
+        except Exception as e:
+            logger.warning("Auto-revert error for exp %d: %s", experiment_number, e)
+            await self._emit(_make_event(
+                EVENT_LOG,
+                message=f"Auto-revert error for exp #{experiment_number}: {e}",
+            ))
+            return False
 
     async def run_experiment(
         self,
