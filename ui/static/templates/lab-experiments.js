@@ -58,6 +58,11 @@
                             </div>
                             <span class="text-[0.625rem] text-[var(--v3)] w-28 truncate shrink-0" x-text="exp.date"></span>
                             <span class="text-sm w-10 text-right shrink-0" :class="scoreCls(exp.score)" style="font-family:'Press Start 2P',monospace" x-text="exp.score"></span>
+                            <!-- Judge verdict badge -->
+                            <span x-show="exp.judge_verdict" class="judge-list-badge shrink-0"
+                                  :class="exp.judge_verdict?.recommendation === 'KEEP' ? 'judge-keep' : exp.judge_verdict?.recommendation === 'DISCARD' ? 'judge-discard' : 'judge-review'"
+                                  :title="'Judge: ' + (exp.judge_verdict?.summary || '')"
+                                  x-text="exp.judge_verdict?.recommendation === 'KEEP' ? 'J:KEEP' : exp.judge_verdict?.recommendation === 'DISCARD' ? 'J:DISC' : 'J:REV'"></span>
                             <span class="text-[0.625rem] w-16 text-right shrink-0" :class="decisionCls(exp.decision)" x-text="exp.decision"></span>
                             <span class="text-[var(--v3)] text-xs transition-transform shrink-0" :class="selectedExp === exp.number && 'rotate-90 text-[var(--v)]'" x-text="selectedExp === exp.number ? 'v' : '>'"></span>
                         </div>

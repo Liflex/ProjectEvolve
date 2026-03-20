@@ -217,12 +217,24 @@ def _enrich_experiment(entry: Dict[str, Any], section: str, exp_dir: Path = None
             if line and line not in ("None", "none", "N/A"):
                 files_modified.append(line)
 
+    # Load persisted judge verdict if available
+    judge_verdict = None
+    if exp_dir:
+        judge_file = exp_dir / f"judge_{entry.get('number', 0)}.json"
+        if judge_file.exists():
+            try:
+                import json as _json
+                judge_verdict = _json.loads(judge_file.read_text(encoding="utf-8"))
+            except (OSError, _json.JSONDecodeError):
+                pass
+
     return {
         **entry,
         "what_done": _extract_section(section, "What Was Done"),
         "files_modified": files_modified,
         "results": _extract_section(section, "Results"),
         "notes": _extract_section(section, "Notes for Next"),
+        "judge_verdict": judge_verdict,
     }
 
 
@@ -531,6 +543,7 @@ async def get_experiment(n: int):
 @app.get("/api/judge/{n}")
 async def judge_experiment(n: int):
     """Run post-experiment judge on experiment N."""
+    import json as _json
     from utils.judge import ExperimentJudge
     project = get_project_dir()
     try:
@@ -543,6 +556,10 @@ async def judge_experiment(n: int):
             claimed_files=exp.get("files_modified", []),
             agent_decision=exp.get("decision", ""),
         )
+        # Persist verdict to JSON file
+        judge_file = get_exp_dir() / f"judge_{n}.json"
+        judge_file.write_text(_json.dumps(verdict, indent=2), encoding="utf-8")
+        _invalidate_cache()
         return verdict
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -957,12 +974,16 @@ async def start_run(data: RunRequest):
                 # Run post-experiment judge
                 try:
                     from utils.judge import ExperimentJudge
+                    import json as _json
                     judge = ExperimentJudge(project_dir)
                     verdict = judge.evaluate(
                         claimed_files=exp_data.get("files_modified", []),
                         agent_decision=exp_data.get("agent_decision", ""),
                     )
                     exp_data["judge_verdict"] = verdict
+                    # Persist verdict to JSON file for list view
+                    judge_file = exp_dir / f"judge_{exp_num}.json"
+                    judge_file.write_text(_json.dumps(verdict, indent=2), encoding="utf-8")
                     _log_append(
                         f"[JUDGE] Exp #{exp_num}: score={verdict['score']}, "
                         f"rec={verdict['recommendation']}, {verdict['summary']}"
