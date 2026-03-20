@@ -583,6 +583,7 @@ body { background: #0c0b14; font-family: 'VT323', monospace; }
 }
 .chat-status-bar .status-dot.connected { background: var(--ng); }
 .chat-status-bar .status-dot.connecting { background: var(--amber); animation: pulse 1.2s infinite; }
+.chat-status-bar .status-dot.reconnecting { background: var(--amber); animation: pulse 0.8s infinite; }
 .chat-status-bar .status-dot.disconnected { background: var(--red); }
 .chat-status-bar .status-separator {
     width: 1px; height: 0.75rem; background: var(--v-dim);

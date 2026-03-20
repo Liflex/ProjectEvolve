@@ -86,6 +86,9 @@ window.AppChat = (function() {
                     _mmTop: 0,
                     _mmHeight: 100,
                     _newMsgCount: 0,  // messages added while user is scrolled up
+                    _wsReconnectAttempts: 0,   // current reconnect attempt count
+                    _wsReconnectTimer: null,    // setTimeout ref for reconnect backoff
+                    _wsIntentionalClose: false, // true when user closes tab/session intentionally
                 };
                 this.chatTabs.push(tab);
                 this.activeChatTab = tab.tab_id;
@@ -140,6 +143,9 @@ window.AppChat = (function() {
             const tab = this.chatTabs.find(t => t.tab_id === tabId);
             if (!tab) return;
             this.stopTurnTimer(tab);
+            // Mark intentional close to prevent auto-reconnect
+            tab._wsIntentionalClose = true;
+            if (tab._wsReconnectTimer) { clearTimeout(tab._wsReconnectTimer); tab._wsReconnectTimer = null; }
             const ws = this.chatWs[tabId];
             if (ws) { try { ws.close(); } catch (e) { } delete this.chatWs[tabId]; }
             if (window.destroyTerminal) destroyTerminal(tabId);
@@ -271,7 +277,15 @@ window.AppChat = (function() {
             this.chatWs[tab.tab_id] = ws;
             const _app = this;
 
-            ws.onopen = () => { tab.ws_state = 'connected'; _app.chatTick++; console.log('[ws] connected:', tab.session_id); };
+            ws.onopen = () => {
+                tab.ws_state = 'connected';
+                tab._wsIntentionalClose = false;
+                // Clear reconnect state on successful connection
+                if (tab._wsReconnectTimer) { clearTimeout(tab._wsReconnectTimer); tab._wsReconnectTimer = null; }
+                tab._wsReconnectAttempts = 0;
+                _app.chatTick++;
+                console.log('[ws] connected:', tab.session_id);
+            };
 
             ws.onmessage = (event) => {
                 try {
@@ -594,20 +608,59 @@ window.AppChat = (function() {
             ws.onclose = (e) => {
                 console.log('[ws] closed:', tab.session_id, 'code:', e.code, 'reason:', e.reason);
                 tab.is_streaming = false;
-                tab.ws_state = 'disconnected';
                 _app.stopTurnTimer(tab);
+                // Clear patience timer on disconnect
+                if (tab._catStreamPatienceTimer) { clearTimeout(tab._catStreamPatienceTimer); tab._catStreamPatienceTimer = null; }
                 _app.chatTick++;
+                // Don't auto-reconnect on intentional close (tab closed, session ended by server)
+                if (tab._wsIntentionalClose || e.code === 1000) {
+                    tab.ws_state = 'disconnected';
+                    return;
+                }
+                // Attempt auto-reconnect with exponential backoff
+                _app._scheduleWsReconnect(tab);
             };
 
             ws.onerror = (e) => {
                 console.error('[ws] error:', tab.session_id, e);
-                tab.messages.push({ role: 'assistant', content: '[ERROR] WebSocket connection failed', ts: Date.now() });
-                _app._trackNewMsg(tab);
-                tab.is_streaming = false;
-                tab.ws_state = 'disconnected';
-                _app.stopTurnTimer(tab);
-                _app.chatTick++;
+                // Don't push error message — onclose always fires after onerror,
+                // and the reconnect logic in onclose handles the state transition.
+                // Pushing here caused duplicate "[ERROR]" messages on transient drops.
             };
+        },
+
+        // ========== CHAT: WEBSOCKET AUTO-RECONNECT ==========
+        _scheduleWsReconnect(tab) {
+            // Clear any existing timer
+            if (tab._wsReconnectTimer) { clearTimeout(tab._wsReconnectTimer); tab._wsReconnectTimer = null; }
+            const MAX_ATTEMPTS = 10;
+            if (tab._wsReconnectAttempts >= MAX_ATTEMPTS) {
+                tab.ws_state = 'disconnected';
+                tab.messages.push({
+                    role: 'assistant',
+                    content: '[RECONNECT FAILED] Auto-reconnect exhausted (' + MAX_ATTEMPTS + ' attempts). Click **RECONNECT** on the tab or start a new session.',
+                    ts: Date.now()
+                });
+                _app._trackNewMsg(tab);
+                _app.chatTick++;
+                return;
+            }
+            // Exponential backoff: 1s, 2s, 4s, 8s, 16s, 30s, 30s, ...
+            const delay = Math.min(1000 * Math.pow(2, tab._wsReconnectAttempts), 30000);
+            tab._wsReconnectAttempts++;
+            tab.ws_state = 'reconnecting';
+            console.log('[ws] reconnect attempt', tab._wsReconnectAttempts, '/', MAX_ATTEMPTS, 'in', delay, 'ms');
+            // Show toast only on first attempt
+            if (tab._wsReconnectAttempts === 1) {
+                _app.showToast('RECONNECTING (' + tab._wsReconnectAttempts + ')...', 'info');
+            }
+            tab._wsReconnectTimer = setTimeout(() => {
+                tab._wsReconnectTimer = null;
+                // Check if tab still exists (user may have closed it)
+                if (!_app.chatTabs.find(t => t.tab_id === tab.tab_id)) return;
+                console.log('[ws] reconnecting now, attempt', tab._wsReconnectAttempts);
+                _app.connectChatWebSocket(tab);
+            }, delay);
         },
 
         async sendChatMessage(tab) {
@@ -777,7 +830,6 @@ window.AppChat = (function() {
             this.settings.chatSendMode = (this.settings.chatSendMode || 'enter') === 'enter' ? 'ctrlenter' : 'enter';
             localStorage.setItem('ar-settings', JSON.stringify(this.settings));
             this.showToast('SEND: ' + (this.settings.chatSendMode === 'ctrlenter' ? 'CTRL+ENTER' : 'ENTER'), 'success');
-        },
         },
 
         // ========== CHAT: MARKDOWN FORMAT TOOLBAR ==========
@@ -4098,6 +4150,9 @@ window.AppChat = (function() {
                         _turnTimerInterval: null,
                         _typingStart: null,
                         _newMsgCount: 0,
+                        _wsReconnectAttempts: 0,
+                        _wsReconnectTimer: null,
+                        _wsIntentionalClose: false,
                     };
                     this.chatTabs.push(tab);
                 }
@@ -4122,29 +4177,41 @@ window.AppChat = (function() {
 
         async reconnectTab(tabId) {
             const tab = this.chatTabs.find(t => t.tab_id === tabId);
-            if (!tab || !tab._restored) return;
-            const projectPath = tab.project_path;
-            const resumeId = tab._restoredSessionId || tab.session_id;
-            console.log('[chat] reconnecting tab', tabId, 'path:', projectPath, 'resume:', resumeId);
-            try {
-                const res = await this.api('/api/sessions', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cwd: projectPath, resume: resumeId || null }),
-                });
-                if (res.warning) this.showToast(res.warning, 'error');
-                if (!res.session_id) { this.showToast('RECONNECT_FAILED', 'error'); return; }
-                // Update tab with new session info
-                tab.session_id = res.session_id;
+            if (!tab) return;
+            // Cancel any pending auto-reconnect
+            if (tab._wsReconnectTimer) { clearTimeout(tab._wsReconnectTimer); tab._wsReconnectTimer = null; }
+            tab._wsReconnectAttempts = 0;
+            // For restored tabs (page reload): create a new session via /api/sessions
+            // For regular tabs (WS drop): just reconnect the WebSocket
+            if (tab._restored) {
+                const projectPath = tab.project_path;
+                const resumeId = tab._restoredSessionId || tab.session_id;
+                console.log('[chat] reconnecting restored tab', tabId, 'path:', projectPath, 'resume:', resumeId);
+                try {
+                    const res = await this.api('/api/sessions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ cwd: projectPath, resume: resumeId || null }),
+                    });
+                    if (res.warning) this.showToast(res.warning, 'error');
+                    if (!res.session_id) { this.showToast('RECONNECT_FAILED', 'error'); return; }
+                    tab.session_id = res.session_id;
+                    tab.ws_state = 'connecting';
+                    tab._restored = false;
+                    tab._restoredSessionId = null;
+                    this.connectChatWebSocket(tab);
+                    this._scheduleChatSave();
+                    this.showToast('SESSION_RECONNECTED', 'success');
+                } catch (e) {
+                    console.error('[chat] reconnectTab failed:', e);
+                    this.showToast('RECONNECT_FAILED: ' + e.message, 'error');
+                }
+            } else if (tab.session_id) {
+                // Regular tab with active session — just reconnect WebSocket
+                console.log('[chat] reconnecting ws for tab', tabId, 'session:', tab.session_id);
                 tab.ws_state = 'connecting';
-                tab._restored = false;
-                tab._restoredSessionId = null;
                 this.connectChatWebSocket(tab);
-                this._scheduleChatSave();
-                this.showToast('SESSION_RECONNECTED', 'success');
-            } catch (e) {
-                console.error('[chat] reconnectTab failed:', e);
-                this.showToast('RECONNECT_FAILED: ' + e.message, 'error');
+                this.showToast('RECONNECTING...', 'info');
             }
         },
 

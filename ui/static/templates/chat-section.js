@@ -22,7 +22,7 @@
                                 class="flex items-center gap-2 px-3 py-2 text-xs tracking-wider transition-colors tab-btn"
                                 :class="activeChatTab === tab.tab_id ? 'text-[var(--v)] border-b-2 border-[var(--v)] -mb-[2px]' : 'text-[var(--v3)] hover:text-[var(--ng2)]'"
                                 :title="tab._unread > 0 ? tab._unread + ' new message' + (tab._unread > 1 ? 's' : '') + ' — ' + tab.label : tab.label + ' (' + tab.messages.length + ' messages)'">
-                            <span class="w-1.5 h-1.5 rounded-full" :class="tab.is_streaming ? 'bg-[var(--cyan)] animate-pulse' : tab._agentDone && activeChatTab !== tab.tab_id ? 'tab-dot-done' : tab._restored ? 'bg-[var(--amber)]' : tab.ws_state === 'connected' ? 'bg-[var(--ng)]' : tab.ws_state === 'connecting' ? 'bg-[var(--amber)] animate-pulse' : 'bg-[var(--v3)]'"></span>
+                            <span class="w-1.5 h-1.5 rounded-full" :class="tab.is_streaming ? 'bg-[var(--cyan)] animate-pulse' : tab._agentDone && activeChatTab !== tab.tab_id ? 'tab-dot-done' : tab.ws_state === 'reconnecting' ? 'bg-[var(--amber)] animate-pulse' : tab._restored ? 'bg-[var(--amber)]' : tab.ws_state === 'connected' ? 'bg-[var(--ng)]' : tab.ws_state === 'connecting' ? 'bg-[var(--amber)] animate-pulse' : 'bg-[var(--v3)]'"></span>
                             <template x-if="_renamingTabId === tab.tab_id">
                                 <input id="tab-rename-input"
                                        x-model="_renameText"
@@ -50,11 +50,11 @@
                         <button @click="closeChatTab(tab.tab_id)"
                                 x-show="_renamingTabId !== tab.tab_id"
                                 class="text-[var(--v3)] hover:text-[var(--red)] text-xs px-1 mr-1 opacity-0 group-hover:opacity-100 transition-opacity">x</button>
-                        <!-- Restored indicator + reconnect button -->
-                        <template x-if="tab._restored && _renamingTabId !== tab.tab_id">
+                        <!-- Restored / Disconnected indicator + reconnect button -->
+                        <template x-if="(tab._restored || tab.ws_state === 'disconnected') && _renamingTabId !== tab.tab_id">
                             <button @click.stop="reconnectTab(tab.tab_id)"
                                     class="tab-reconnect-btn"
-                                    title="Reconnect session (resume from where you left off)">&#x21bb; RECONNECT</button>
+                                    :title="tab._restored ? 'Reconnect session (resume from where you left off)' : 'Reconnect WebSocket connection'">&#x21bb; RECONNECT</button>
                         </template>
                     </div>
                 </template>
@@ -325,11 +325,11 @@
         <div class="flex-1 overflow-hidden relative">
             <template x-for="tab in chatTabs" :key="tab.tab_id">
                 <div x-show="activeChatTab === tab.tab_id" class="absolute inset-0 flex flex-col">
-                    <!-- Restored session banner -->
-                    <div x-show="tab._restored" class="chat-restored-banner">
-                        <span>&#x1f504; SESSION_RESTORED — messages from previous session</span>
+                    <!-- Restored / Disconnected session banner -->
+                    <div x-show="tab._restored || tab.ws_state === 'disconnected'" class="chat-restored-banner">
+                        <span x-text="tab._restored ? '&#x1f504; SESSION_RESTORED — messages from previous session' : '&#x26a0; DISCONNECTED — connection lost'"></span>
                         <button @click="reconnectTab(tab.tab_id)" class="chat-restored-reconnect-btn">&#x21bb; RECONNECT</button>
-                        <button @click="tab._restored = false" class="chat-restored-dismiss-btn" title="Dismiss">&#x2715;</button>
+                        <button @click="tab._restored = false" x-show="tab._restored" class="chat-restored-dismiss-btn" title="Dismiss">&#x2715;</button>
                     </div>
                     <!-- Messages area with minimap -->
                     <div class="flex-1 overflow-hidden relative flex flex-col" style="min-height:0">
@@ -765,8 +765,8 @@
         <div x-show="activeTab" class="chat-status-bar">
             <div class="status-left">
                 <span class="status-dot" :class="activeTab?.ws_state"></span>
-                <span :style="'color:' + (activeTab?.ws_state === 'connected' ? 'var(--ng2)' : activeTab?.ws_state === 'connecting' ? 'var(--amber)' : 'var(--red)')"
-                      x-text="activeTab?.ws_state === 'connected' ? 'CONNECTED' : activeTab?.ws_state === 'connecting' ? 'CONNECTING...' : 'DISCONNECTED'"></span>
+                <span :style="'color:' + (activeTab?.ws_state === 'connected' ? 'var(--ng2)' : activeTab?.ws_state === 'reconnecting' || activeTab?.ws_state === 'connecting' ? 'var(--amber)' : 'var(--red)')"
+                      x-text="activeTab?.ws_state === 'connected' ? 'CONNECTED' : activeTab?.ws_state === 'reconnecting' ? 'RECONNECTING (' + (activeTab?._wsReconnectAttempts || 0) + ')...' : activeTab?.ws_state === 'connecting' ? 'CONNECTING...' : 'DISCONNECTED'"></span>
                 <span class="status-separator"></span>
                 <span class="truncate max-w-[200px]" style="color:var(--ng3)" x-text="activeTab?.project_path"></span>
                 <span class="status-separator"></span>
