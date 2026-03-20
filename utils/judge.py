@@ -1,4 +1,4 @@
-"""Post-experiment auto-judge — basic sanity checker.
+"""Post-experiment auto-judge — quality evaluator.
 
 Evaluates experiment results after the agent commits by running
 a set of lightweight checks:
@@ -6,6 +6,8 @@ a set of lightweight checks:
   2. File consistency — do claimed files match actual git diff?
   3. Syntax validation — no obvious errors in changed files
   4. Diff size sanity — not too large, not empty
+  5. Report quality — does the experiment report have proper sections?
+  6. Code quality — are there code smells in the diff?
 
 Produces a verdict dict with score, decision recommendation, and check details.
 """
@@ -185,16 +187,16 @@ class ExperimentJudge:
         if total_lines == 0:
             return CheckResult("diff_size", "warn", "No lines changed")
 
-        if total_lines > 2000:
-            return CheckResult(
-                "diff_size", "warn",
-                f"Large change: {files_changed} files, +{insertions}/-{deletions} lines"
-            )
-
         if total_lines > 5000:
             return CheckResult(
                 "diff_size", "fail",
                 f"Very large change: {files_changed} files, +{insertions}/-{deletions} lines"
+            )
+
+        if total_lines > 2000:
+            return CheckResult(
+                "diff_size", "warn",
+                f"Large change: {files_changed} files, +{insertions}/-{deletions} lines"
             )
 
         return CheckResult(
@@ -202,11 +204,82 @@ class ExperimentJudge:
             f"{files_changed} file(s), +{insertions}/-{deletions} lines"
         )
 
+
+    def _check_report_quality(self, report_text: str) -> CheckResult:
+        """Validate experiment report has proper sections."""
+        if not report_text or not report_text.strip():
+            return CheckResult("report_quality", "warn", "No report text provided")
+
+        required = ["Results", "Decision"]
+        optional = ["Files Modified", "What was done", "Next"]
+        found_required = []
+        found_optional = []
+
+        text_lower = report_text.lower()
+        for section in required:
+            if section.lower() in text_lower:
+                found_required.append(section)
+        for section in optional:
+            if section.lower() in text_lower:
+                found_optional.append(section)
+
+        total = len(required) + len(optional)
+        found = len(found_required) + len(found_optional)
+
+        if found_required == required and found >= 3:
+            return CheckResult("report_quality", "pass",
+                f"All required sections present ({found}/{total} total)")
+        elif found_required == required:
+            return CheckResult("report_quality", "pass",
+                f"Required sections OK, {found}/{total} total sections")
+        elif found_required:
+            missing = [s for s in required if s not in found_required]
+            return CheckResult("report_quality", "warn",
+                f"Missing sections: {chr(44).join(missing)} ({found}/{total} found)")
+        else:
+            return CheckResult("report_quality", "fail",
+                f"No required sections found ({found}/{total} total)")
+
+    def _check_code_quality(self) -> CheckResult:
+        """Analyze diff for code smells: long lines, binary files."""
+        diff_output = self._run_git("diff", "HEAD~1", "HEAD")
+        if not diff_output.strip():
+            diff_output = self._run_git("diff", "--cached")
+        if not diff_output.strip():
+            return CheckResult("code_quality", "warn", "No diff available for analysis")
+
+        issues = []
+        long_lines = 0
+        very_long_lines = 0
+
+        for line in diff_output.splitlines():
+            if not line.startswith("+") or line.startswith("+++"):
+                continue
+            line_len = len(line[1:])
+            if line_len > 200:
+                long_lines += 1
+            if line_len > 300:
+                very_long_lines += 1
+
+        if very_long_lines > 5:
+            issues.append(f"{very_long_lines} very long lines (>300 chars)")
+        elif long_lines > 10:
+            issues.append(f"{long_lines} long lines (>200 chars)")
+
+        binary_count = diff_output.count("Binary files")
+        if binary_count > 0:
+            issues.append(f"{binary_count} binary file(s)")
+
+        if issues:
+            return CheckResult("code_quality", "warn", "; ".join(issues))
+        return CheckResult("code_quality", "pass", "No code smells detected")
+
     def evaluate(
         self,
         claimed_files: Optional[List[str]] = None,
         agent_decision: str = "",
         agent_score: Optional[float] = None,
+        report_text: str = "",
     ) -> Dict[str, Any]:
         """Run all checks and produce a verdict.
 
@@ -225,6 +298,10 @@ class ExperimentJudge:
         checks.append(self._check_syntax())
         checks.append(self._check_diff_size())
 
+        # Enhanced checks
+        checks.append(self._check_report_quality(report_text))
+        checks.append(self._check_code_quality())
+
         # Calculate score from checks
         total_weight = sum(c.weight for c in checks)
         if total_weight == 0:
@@ -242,7 +319,7 @@ class ExperimentJudge:
             recommendation = "DISCARD"
         elif fails >= 1:
             recommendation = "REVIEW"
-        elif warns >= 2:
+        elif warns >= 3:
             recommendation = "REVIEW"
         else:
             recommendation = "KEEP"

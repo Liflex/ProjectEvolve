@@ -503,6 +503,23 @@ function _buildAppData() {
         },
         get expTotalPages() { return Math.max(1, Math.ceil(this.filteredExperiments.length / 50)); },
         get paginatedExperiments() { const s = this.expPage * 50; return this.filteredExperiments.slice(s, s + 50); },
+        get judgeScoreSparkline() {
+            const exps = this.filteredExperiments || [];
+            const scored = exps.filter(e => e.judge_verdict && e.judge_verdict.score != null).slice(-20);
+            if (scored.length < 2) return '';
+            const w = 120, h = 20;
+            const maxS = Math.max(...scored.map(e => e.judge_verdict.score));
+            const minS = Math.min(...scored.map(e => e.judge_verdict.score));
+            const range = maxS - minS || 1;
+            let pts = scored.map((e, i) => {
+                const x = (i / (scored.length - 1)) * w;
+                const y = h - ((e.judge_verdict.score - minS) / range) * (h - 2) - 1;
+                return x + ',' + y;
+            });
+            const color = scored[scored.length - 1].judge_verdict.recommendation === 'KEEP' ? 'var(--ng)' : scored[scored.length - 1].judge_verdict.recommendation === 'DISCARD' ? 'var(--red)' : 'var(--amber)';
+            return '<svg width="' + w + '" height="' + h + '" style="display:block" title="Judge score trend (last ' + scored.length + ')"><polyline points="' + pts.join(' ') + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+        },
+
         get filteredPastSessions() {
             if (!this.sessionPickerSearch) return this.pastSessions;
             const q = this.sessionPickerSearch.toLowerCase();

@@ -555,6 +555,7 @@ async def judge_experiment(n: int):
         verdict = judge.evaluate(
             claimed_files=exp.get("files_modified", []),
             agent_decision=exp.get("decision", ""),
+            report_text=exp.get("results", ""),
         )
         # Persist verdict to JSON file
         judge_file = get_exp_dir() / f"judge_{n}.json"
@@ -979,6 +980,7 @@ async def start_run(data: RunRequest):
                     verdict = judge.evaluate(
                         claimed_files=exp_data.get("files_modified", []),
                         agent_decision=exp_data.get("agent_decision", ""),
+                        report_text=output,
                     )
                     exp_data["judge_verdict"] = verdict
                     # Persist verdict to JSON file for list view

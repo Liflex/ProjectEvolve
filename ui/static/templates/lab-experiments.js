@@ -7,6 +7,7 @@
             <div>
                 <h2 class="text-lg tracking-widest text-[var(--v)] glow" style="font-family:'Press Start 2P',monospace">EXPERIMENT_LOG</h2>
                 <p class="text-xs text-[var(--ng3)] mt-1" x-text="filteredExperiments.length + ' RECORDS_'"></p>
+                <div x-show="judgeScoreSparkline" x-html="judgeScoreSparkline" class="mt-1 opacity-60" title="Judge score trend"></div>
             </div>
             <div class="flex items-center gap-2">
                 <input x-model="expSearch" type="text" placeholder="SEARCH_"

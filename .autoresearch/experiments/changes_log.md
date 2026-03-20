@@ -2938,3 +2938,50 @@ Results
 3. **TOC: FOLD ALL / OPEN ALL** — кнопки в панели
 
 
+## Experiment 141 — Post-experiment auto-judge — basic sanity checker
+
+**Time:** 2026-03-20 05:17:40
+
+**Files:** Target:** utils/judge.py (new), ui/server.py, lab.js, lab-experiments.js, app.js, Files Modified:** utils/judge.py, ui/server.py, ui/static/js/app.js, ui/static/js/modules/lab.js, ui/static/templates/lab-experiments.js
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. **`utils/judge.py`** — `ExperimentJudge` с 4 проверками:
+   - `commit_exists` — проверяет что агент сделал коммит
+   - `file_consistency` — сравнивает заявленные files_modified с реальным git diff
+   - `syntax_check` — проверяет Python/JS файлы на синтаксические ошибки
+   - `diff_size` — проверяет что размер изменений разумный
+2. **Server hook** — judge автоматически запускается после сохранения артефактов эксперимента. Вердикт сохраняется в данные эксперимента и л
+
+
+## Experiment 142 — Judge verdict badge in experiment list — persist & display
+
+**Time:** 2026-03-20 05:26:18
+
+**Files:** Target:** ui/server.py, lab-experiments.js template, main.css, Files Modified:** ui/server.py, ui/static/css/main.css, ui/static/templates/lab-experiments.js
+
+**What was done:**
+
+N/A
+
+**Results:**
+
+Results
+
+**What was done:**
+1. Judge verdict теперь персистируется в `judge_{n}.json` файл при auto-judge после эксперимента и при ручном запуске через API
+2. `_enrich_experiment()` читает JSON-файл и добавляет `judge_verdict` в данные каждого эксперимента
+3. В списке экспериментов Lab добавлен цветной badge `J:KEEP` / `J:DISC` / `J:REV` между score и decision
+4. CSS стили для badge (зелёный/красный/янтарный)
+
+**Working:** yes
+**Tests:** syntax check passed (Python AST parse OK)
+
+
