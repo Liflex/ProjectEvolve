@@ -1716,10 +1716,38 @@ window.AppChat = (function() {
                 }
                 let thinkingIndicatorHtml = '';
                 if (msg.is_streaming && tab.is_thinking && !msg.content) {
-                    thinkingIndicatorHtml = '<div class="thinking-streaming-indicator">'
-                        + '<span class="tsi-label">THINKING</span>'
-                        + '<span class="tsi-dots"><span></span><span></span><span></span></span>'
-                        + '</div>';
+                    const thinkBuf = tab._thinkingBuffer || '';
+                    const thinkBufLen = thinkBuf.length;
+                    if (thinkBufLen > 0) {
+                        // Live thinking preview — show accumulating content in collapsible block
+                        const showLiveThink = this.settings.showThinking !== false;
+                        const livePreview = thinkBufLen > 300 ? thinkBuf.slice(0, 300) + '...' : thinkBuf;
+                        const escapedLive = this.escHtml(livePreview).replace(/\n/g, '<br>');
+                        const liveId = 'live-think-' + tab.tab_id;
+                        thinkingIndicatorHtml = '<div class="thinking-streaming-indicator thinking-streaming-live">'
+                            + '<span class="tsi-label">THINKING</span>'
+                            + '<span class="tsi-dots"><span></span><span></span><span></span></span>'
+                            + '<span class="tsi-charcount">' + thinkBufLen + 'ch</span>'
+                            + '</div>'
+                            + '<div class="thinking-live-block" style="display:' + (showLiveThink ? 'block' : 'none') + '">'
+                            + '<div class="thinking-live-toggle" onclick="var b=document.getElementById(\'' + liveId + '\');var a=this.querySelector(\'[data-tarrow]\');if(b.style.display===\'none\'){b.style.display=\'block\';a.textContent=\'\\u25BC\';this.classList.add(\'open\');}else{b.style.display=\'none\';a.textContent=\'\\u25B6\';this.classList.remove(\'open\');}" '
+                            + 'style="display:flex;align-items:center;gap:6px;padding:3px 8px;cursor:pointer;border:1px solid var(--v-dim);border-top:none;background:var(--thinking-bg);user-select:none;font-size:0.5625rem;letter-spacing:0.1em;color:var(--v3);transition:background 0.15s" '
+                            + 'onmouseenter="this.style.background=\'var(--thinking-bg-hover)\'" onmouseleave="this.style.background=\'var(--thinking-bg)\'">'
+                            + '<span data-tarrow style="font-size:0.375rem;min-width:8px;color:var(--v3)">' + (showLiveThink ? '&#x25BC;' : '&#x25B6;') + '</span>'
+                            + '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--amber);flex-shrink:0"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5.1 7.5l.9-1.8A6 6 0 0 1 6 10a6 6 0 1 1 12 0c0 1.5-.5 2.8-1.4 3.9l-1.4-1.4c.6-.7.8-1.5.8-2.5 0-2.2-1.8-4-4-4S8 7.8 8 10s1.8 4 4 4c.7 0 1.3-.2 1.9-.5l1.2 1.5A5.8 5.8 0 0 1 12 16a6 6 0 0 1-6-6 8 8 0 0 0 6 8z"/></svg>'
+                            + '<span style="color:var(--amber);font-weight:bold;letter-spacing:0.12em">LIVE</span>'
+                            + '<span class="tsi-live-cursor"></span>'
+                            + '</div>'
+                            + '<div id="' + liveId + '" style="display:' + (showLiveThink ? 'block' : 'none') + ';border:1px solid var(--v-dim);border-top:none;background:var(--thinking-content-bg);padding:6px 10px;font-size:0.6875rem;color:var(--ng3);line-height:1.6;font-style:italic;max-height:180px;overflow-y:auto">'
+                            + escapedLive
+                            + '<span class="tsi-typing-cursor"></span>'
+                            + '</div></div>';
+                    } else {
+                        thinkingIndicatorHtml = '<div class="thinking-streaming-indicator">'
+                            + '<span class="tsi-label">THINKING</span>'
+                            + '<span class="tsi-dots"><span></span><span></span><span></span></span>'
+                            + '</div>';
+                    }
                 }
                 const isPinned = this.pinnedMessages.some(p => p.tabId === tab.tab_id && p.msgIdx === idx);
                 return '<div class="msg-wrap chat-msg-fadein chat-msg-row' + (isPinned ? ' msg-pinned' : '') + '" data-msg-idx="' + idx + '">'

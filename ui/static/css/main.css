@@ -3103,6 +3103,53 @@ input[type="range"]::-moz-range-thumb:hover { background: var(--pink); }
     50% { opacity: 1; }
 }
 
+/* === LIVE THINKING PREVIEW (streaming) === */
+.thinking-streaming-live {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.thinking-streaming-live .tsi-charcount {
+    color: var(--v3);
+    opacity: 0.5;
+    font-size: 0.5rem;
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+}
+.thinking-live-block {
+    margin: 0;
+    animation: think-pulse 2s ease-in-out infinite;
+}
+.thinking-live-toggle.open {
+    border-bottom: 1px solid var(--v-dim);
+}
+.thinking-live-toggle.open + div {
+    border-top: none;
+}
+/* Blinking cursor at end of live thinking content */
+.tsi-typing-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background: var(--amber);
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: tsi-cursor-blink 0.8s step-end infinite;
+}
+@keyframes tsi-cursor-blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+/* Small blinking dot in the toggle header */
+.tsi-live-cursor {
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--amber);
+    animation: tsi-cursor-blink 0.8s step-end infinite;
+    margin-left: 4px;
+}
+
 /* === AGENT ACTIVITY STATUS BAR === */
 .agent-activity-bar {
     display: flex;
